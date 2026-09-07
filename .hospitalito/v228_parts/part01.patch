@@ -1,0 +1,164 @@
+--- a/index.html
++++ b/index.html
+@@ -3,7 +3,7 @@
+ <head>
+ <meta charset="utf-8" />
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+-<title>HC Demo v227 · Supabase</title>
++<title>HC Demo v228 · Supabase</title>
+ <style>
+   :root{
+     --bg:#071a33;
+@@ -37104,6 +37104,7 @@
+         <button class="btn small accBackBtn" id="btnAccBack" type="button">Volver</button>
+         <button class="btn small" id="btnAccMembers" type="button">Miembros</button>
+         <button class="btn small" id="btnAccInstitutions" type="button">Mis instituciones</button>
++        <button class="btn small primary" id="btnOpenSettings" type="button">⚙ Configuración</button>
+         <div style="font-weight:900;" id="accTitle">Cuenta</div>
+       </div>
+ 
+@@ -37238,32 +37239,6 @@
+   </div>
+ </div>
+ 
+-<div id="labModal" style="
+-  position:fixed;
+-  inset:0;
+-  display:none;
+-  background:rgba(0,0,0,.6);
+-  z-index:999;
+-  align-items:center;
+-  justify-content:center;
+-">
+-  <div style="
+-    width:600px;
+-    max-width:90vw;
+-    background:#0b1222;
+-    border-radius:16px;
+-    padding:16px;
+-    border:1px solid rgba(255,255,255,.2);
+-  ">
+-    <div id="labModalContent"></div>
+-
+-    <div style="margin-top:10px; display:flex; gap:8px;">
+-      <button class="btn primary" id="btnSendLab">Enviar resultado</button>
+-      <button class="btn" onclick="closeLabModal()">Cancelar</button>
+-    </div>
+-  </div>
+-</div>
+-
+ <script id="hcV201NursingPatch">
+ /* =====================================================================
+    v201 — INFORMES DE ENFERMERÍA: ESTADO DE BORRADOR + MENÚS NO SUPERPUESTOS
+@@ -41624,5 +41599,617 @@
+ })();
+ </script>
+ 
++
++<!-- =====================================================================
++     v228 · CONFIGURACIÓN A PANTALLA COMPLETA + TEMAS + AUDITORÍA SEGURA
++     Convive con Cuenta clásica. No reemplaza flujos clínicos ni sync.
++     ===================================================================== -->
++<style id="hc-v228-settings-style">
++:root{
++  --hc-theme-bg:#071a33;
++  --hc-theme-bg2:#0a2a59;
++  --hc-theme-surface:#102a4a;
++  --hc-theme-surface-2:#163c66;
++  --hc-theme-line:#2f5f91;
++  --hc-theme-text:#f8fbff;
++  --hc-theme-muted:#b9c9dc;
++  --hc-theme-accent:#2f80ed;
++  --hc-theme-accent-2:#1d5fb8;
++  --hc-theme-accent-soft:rgba(47,128,237,.18);
++  --hc-theme-input:#081a33;
++  --hc-theme-topbar:#061020;
++  --hc-theme-patient:#0b4ea2;
++  --hc-settings-sidebar:280px;
++}
++body[data-hc-theme="blue-dark"]{
++  --hc-theme-bg:#071a33;--hc-theme-bg2:#0a2a59;--hc-theme-surface:#102a4a;--hc-theme-surface-2:#163c66;
++  --hc-theme-line:#2f5f91;--hc-theme-text:#f8fbff;--hc-theme-muted:#b9c9dc;--hc-theme-accent:#2f80ed;
++  --hc-theme-accent-2:#1d5fb8;--hc-theme-accent-soft:rgba(47,128,237,.18);--hc-theme-input:#081a33;
++  --hc-theme-topbar:#061020;--hc-theme-patient:#0b4ea2;
++}
++body[data-hc-theme="light"]{
++  --hc-theme-bg:#f4f7fb;--hc-theme-bg2:#e9eef5;--hc-theme-surface:#ffffff;--hc-theme-surface-2:#eef3f8;
++  --hc-theme-line:#d0d7de;--hc-theme-text:#1f2328;--hc-theme-muted:#57606a;--hc-theme-accent:#0969da;
++  --hc-theme-accent-2:#0550ae;--hc-theme-accent-soft:rgba(9,105,218,.12);--hc-theme-input:#ffffff;
++  --hc-theme-topbar:#ffffff;--hc-theme-patient:#0969da;
++}
++body[data-hc-theme="dark"]{
++  --hc-theme-bg:#0d1117;--hc-theme-bg2:#010409;--hc-theme-surface:#161b22;--hc-theme-surface-2:#21262d;
++  --hc-theme-line:#30363d;--hc-theme-text:#f0f6fc;--hc-theme-muted:#8b949e;--hc-theme-accent:#2f81f7;
++  --hc-theme-accent-2:#1f6feb;--hc-theme-accent-soft:rgba(47,129,247,.16);--hc-theme-input:#0d1117;
++  --hc-theme-topbar:#010409;--hc-theme-patient:#1f6feb;
++}
++body[data-hc-theme="red"]{
++  --hc-theme-bg:#260b0e;--hc-theme-bg2:#3a0e14;--hc-theme-surface:#341216;--hc-theme-surface-2:#481820;
++  --hc-theme-line:#6a2831;--hc-theme-text:#fff7f7;--hc-theme-muted:#e4b9bd;--hc-theme-accent:#e5484d;
++  --hc-theme-accent-2:#b4232c;--hc-theme-accent-soft:rgba(229,72,77,.18);--hc-theme-input:#220b0e;
++  --hc-theme-topbar:#170609;--hc-theme-patient:#9f1d2c;
++}
++body[data-hc-theme="pink"]{
++  --hc-theme-bg:#2b0c22;--hc-theme-bg2:#411033;--hc-theme-surface:#3a1130;--hc-theme-surface-2:#501943;
++  --hc-theme-line:#71305f;--hc-theme-text:#fff5fb;--hc-theme-muted:#e7bfd5;--hc-theme-accent:#e85aad;
++  --hc-theme-accent-2:#b93b88;--hc-theme-accent-soft:rgba(232,90,173,.18);--hc-theme-input:#26091d;
++  --hc-theme-topbar:#190613;--hc-theme-patient:#9d2d73;
++}
++body[data-hc-theme="lime"]{
++  --hc-theme-bg:#0f1d0a;--hc-theme-bg2:#182e10;--hc-theme-surface:#172a10;--hc-theme-surface-2:#203a16;
++  --hc-theme-line:#3b6030;--hc-theme-text:#f7fff2;--hc-theme-muted:#c4ddb7;--hc-theme-accent:#7bdc4c;
++  --hc-theme-accent-2:#4eaa2f;--hc-theme-accent-soft:rgba(123,220,76,.17);--hc-theme-input:#0e190a;
++  --hc-theme-topbar:#091207;--hc-theme-patient:#357a25;
++}
++body[data-hc-theme="sky"]{
++  --hc-theme-bg:#072333;--hc-theme-bg2:#0b3449;--hc-theme-surface:#0c3348;--hc-theme-surface-2:#10435d;
++  --hc-theme-line:#2e6a87;--hc-theme-text:#f4fbff;--hc-theme-muted:#b9d7e7;--hc-theme-accent:#38a7d8;
++  --hc-theme-accent-2:#1f7fa8;--hc-theme-accent-soft:rgba(56,167,216,.18);--hc-theme-input:#071f2d;
++  --hc-theme-topbar:#041822;--hc-theme-patient:#117aa5;
++}
++
++/* Aplicación general del tema: sólo shell y componentes comunes; colores semánticos clínicos se preservan. */
++body[data-hc-theme]{
++  background:radial-gradient(1200px 650px at 15% 0%,var(--hc-theme-bg2) 0%,var(--hc-theme-bg) 58%,var(--hc-theme-bg) 100%) !important;
++  color:var(--hc-theme-text) !important;
++}
++body[data-hc-theme] .topbar{
++  background:color-mix(in srgb,var(--hc-theme-topbar) 92%,transparent) !important;
++  color:var(--hc-theme-text) !important;
++  border-color:var(--hc-theme-line) !important;
++}
++body[data-hc-theme] :where(.card,.miniBox,.invCard,.labReqBox,.labResBox,.apptCard,.activityBox,.chatWrap,.medScheduleBox){
++  border-color:var(--hc-theme-line) !important;
++}
++body[data-hc-theme] :where(.tab,.btn,.censoItem,.memberItem){
++  border-color:var(--hc-theme-line) !important;
++}
++body[data-hc-theme] .tab.active,
++body[data-hc-theme] .btn.primary,
++body[data-hc-theme] .censoItem.active{
++  background:var(--hc-theme-accent-soft) !important;
++  border-color:var(--hc-theme-accent) !important;
++}
++body[data-hc-theme] .pacBar{
++  background:linear-gradient(180deg,var(--hc-theme-patient),var(--hc-theme-accent-2)) !important;
++  color:#fff !important;
++}
++body[data-hc-theme] :where(input,select,textarea){
++  border-color:var(--hc-theme-line);
++}
++body[data-hc-theme="light"] :where(#appMed,#appAdmin,#medPanel,#medCenso){color:var(--hc-theme-text);}
++body[data-hc-theme="light"] :where(.card,.miniBox,.invCard,.labReqBox,.labResBox,.apptCard,.activityBox,.chatWrap,.medScheduleBox){
++  background:rgba(255,255,255,.90);
++  color:var(--hc-theme-text);
++}
++body[data-hc-theme="light"] :where(.censoItem,.memberItem,.tab,.btn){color:var(--hc-theme-text);}
++body[data-hc-theme="light"] .btn.primary{color:#fff !important;}
++body[data-hc-theme="light"] .btn.danger{color:#7a1a1f !important;}
++body[data-hc-theme="light"] :where(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
++  background:#fff;color:#1f2328;border-color:#afb8c1;
++}
++body[data-hc-theme="light"] :where(input,textarea)::placeholder{color:#6e7781;}
++body[data-hc-theme="light"] .muted{color:#57606a !important;}
++body[data-hc-theme="light"] .instBar{background:#1f2328 !important;color:#fff !important;}
