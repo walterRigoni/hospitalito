@@ -1,0 +1,1 @@
+Trigger temporal para ejecutar el publicador validado de Hospitalito v228.
