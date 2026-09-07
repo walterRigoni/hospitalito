@@ -1,0 +1,71 @@
++    nav.innerHTML=html;
++  }
++  function setTop(id){
++    const d=sectionDef(id);const t=document.getElementById("hcSettingsSectionTitle"),s=document.getElementById("hcSettingsSectionSub");
++    if(t)t.textContent=d.label;if(s)s.textContent=d.sub;
++  }
++  function openSettings(section="account"){
++    if(!session)return;
++    try{closeAccount?.();}catch(_){ }
++    const modal=document.getElementById("hcSettingsModal");if(!modal)return;
++    const u=currentUser();
++    const brand=document.getElementById("hcSettingsBrandUser");if(brand)brand.textContent=`${u.name||session?.name||meName()} · ${session?.role||u.role||""}`;
++    modal.classList.add("show");modal.classList.remove("nav-open");modal.setAttribute("aria-hidden","false");
++    document.body.style.overflow="hidden";
++    selectedMember="";memberChat="";setSection(section);
++  }
++  function closeSettings(){
++    const modal=document.getElementById("hcSettingsModal");if(!modal)return;
++    modal.classList.remove("show","nav-open");modal.setAttribute("aria-hidden","true");document.body.style.overflow="";
++  }
++  function setSection(id){
++    currentSection=NAV.some(x=>x.id===id)?id:"account";selectedMember=currentSection==="members"?selectedMember:"";memberChat=currentSection==="members"?memberChat:"";
++    buildNav();setTop(currentSection);renderSection(currentSection);document.getElementById("hcSettingsModal")?.classList.remove("nav-open");
++    const sc=document.getElementById("hcSettingsContent");if(sc)sc.scrollTop=0;
++  }
++  function hero(title,sub){return `<div class="hcSettingsHero"><h2>${esc(title)}</h2><p>${esc(sub)}</p></div>`;}
++  function roleLabel(r){return ({medico:"Médico",enfermero:"Enfermería",admin:"Administrador",administrativo:"Administración",farmaceutico:"Farmacia",bioquimico:"Bioquímica",microbiologo:"Microbiología",imagenologo:"Imagenología",nutricionista:"Nutrición",hemoterapia:"Hemoterapia",kinesiologo:"Kinesiología"})[r]||r||"—";}
++  function avatarHtml(u,cls="hcSettingsAvatar"){
++    return `<div class="${cls}">${u?.photo?`<img src="${u.photo}" alt="avatar">`:`<span class="hcSettingsMuted">sin foto</span>`}</div>`;
++  }
++  function currentInstitutionName(){
++    return String(session?.institutionName||localStorage.getItem(LS.backendRegistryName)||getInst?.()?.line1||"Institución");
++  }
++  function renderAccount(){
++    const u=currentUser();
++    return `<div class="hcSettingsPage">${hero("Cuenta y perfil","Tus datos de identificación dentro de Hospitalito. La Cuenta clásica sigue disponible mientras terminamos esta migración.")}
++      <div class="hcSettingsGrid">
++        <div class="hcSettingsCard">
++          <div class="hcSettingsRow">${avatarHtml(u)}<div class="hcSettingsMeta"><div class="hcSettingsName">${esc(u.name||session?.name||meName())}</div><div class="hcSettingsMuted">@${esc(meName())} · ${esc(roleLabel(session?.role||u.role))}</div><div class="hcSettingsMuted" style="margin-top:4px;">${esc(currentInstitutionName())}</div></div></div>
++          <div class="hcSettingsFields">
++            <div class="hcSettingsField full"><label>Nombre visible</label><input id="hcsProfileName" value="${esc(u.name||session?.name||"")}"></div>
++            <div class="hcSettingsField"><label>Título profesional</label><input id="hcsProfessionalTitle" value="${esc(u.professionalTitle||"")}" placeholder="Ej.: Dr., Dra., Lic."></div>
++            <div class="hcSettingsField"><label>Matrícula / identificador</label><input id="hcsLicenseNumber" value="${esc(u.licenseNumber||"")}" placeholder="Ej.: MP 12345"></div>
++            <div class="hcSettingsField full"><label>Especialidad / función</label><input id="hcsSpecialty" value="${esc(u.specialty||"")}" placeholder="Ej.: Terapia Intensiva"></div>
++            <div class="hcSettingsField full"><label>Foto de perfil</label><input id="hcsProfilePhoto" type="file" accept="image/*"></div>
++          </div>
++          <div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsSaveProfile" type="button">Guardar perfil</button><button class="hcSettingsBtn" id="hcsOpenClassicAccount" type="button">Abrir Cuenta clásica</button></div>
++          <div id="hcsProfileMsg" class="hcSettingsNotice">Los cambios de perfil usan el mismo sistema de cuenta ya existente.</div>
++        </div>
++        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Resumen de cuenta</div><div class="hcSettingsCardSub">Información de solo lectura para evitar cambios accidentales de permisos.</div>
++          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Usuario</div><div class="hcToggleSub">${esc(meName())}</div></div></div>
++          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Rol</div><div class="hcToggleSub">${esc(roleLabel(session?.role||u.role))}</div></div></div>
++          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Institución activa</div><div class="hcToggleSub">${esc(currentInstitutionName())}</div></div></div>
++          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Tema</div><div class="hcToggleSub">${esc(THEME_DEFS[userTheme(u)]?.label||"Azul oscuro")}</div></div><button class="hcSettingsBtn" data-hcs-section="personalization">Cambiar</button></div>
++        </div>
++      </div></div>`;
++  }
++  function renderPrivacy(){
++    return `<div class="hcSettingsPage">${hero("Seguridad y privacidad","Cambio de contraseña y estado de la sesión. Hospitalito no expone aquí credenciales ni secretos del backend.")}
++      <div class="hcSettingsGrid">
++        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Cambiar contraseña</div><div class="hcSettingsCardSub">Usa el mismo Backend Global de la Cuenta clásica.</div>
++          <div class="hcSettingsFields"><div class="hcSettingsField full"><label>Contraseña actual</label><input id="hcsPassCurrent" type="password" autocomplete="current-password"></div><div class="hcSettingsField"><label>Nueva contraseña</label><input id="hcsPassNew" type="password" autocomplete="new-password"></div><div class="hcSettingsField"><label>Repetir nueva contraseña</label><input id="hcsPassNew2" type="password" autocomplete="new-password"></div></div>
++          <div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsChangePassword" type="button">Actualizar contraseña</button></div><div id="hcsPassMsg" class="hcSettingsNotice">No se muestra ni almacena la contraseña en esta pantalla.</div>
++        </div>
++        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Privacidad de datos</div><div class="hcSettingsCardSub">Hospitalito separa cuenta global y datos clínicos institucionales.</div><div class="hcSettingsNotice">El rol actual es <b>${esc(roleLabel(session?.role))}</b>. Los permisos clínicos siguen gobernados por los roles existentes; esta pantalla no los modifica.</div><div class="hcSettingsNotice">La preferencia visual se guarda por usuario. Los datos clínicos continúan en el backend institucional configurado.</div></div>
++      </div></div>`;
++  }
++  function memberThemeStyle(u){const p=palette(userTheme(u));return `--member-accent:${p.accent};--member-bg:${p.surface};`;}
++  function renderMembers(){
++    const users=(getUsers?.()||[]).filter(u=>String(u.username||"")!==meName());
++    if(selectedMember){
