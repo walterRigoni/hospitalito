@@ -1,0 +1,120 @@
++        <button class="hcSettingsBtn" id="hcSettingsCloseBtn" type="button">Cerrar</button>
++      </header>
++      <main class="hcSettingsContent" id="hcSettingsContent"></main>
++    </section>
++  </div>
++  <div class="hcSettingsNavBackdrop" id="hcSettingsNavBackdrop"></div>
++</div>
++
++<script id="hc-v228-settings-script">
++(function(){
++  "use strict";
++  window.HC_DEMO_VERSION="v228";
++
++  const THEME_DEFS={
++    "blue-dark":{label:"Azul oscuro",hint:"Predeterminado",bg:"#071a33",surface:"#102a4a",line:"#2f5f91",accent:"#2f80ed"},
++    "light":{label:"Claro",hint:"Limpio y luminoso",bg:"#f4f7fb",surface:"#ffffff",line:"#d0d7de",accent:"#0969da"},
++    "dark":{label:"Oscuro",hint:"Grafito",bg:"#0d1117",surface:"#161b22",line:"#30363d",accent:"#2f81f7"},
++    "red":{label:"Rojo",hint:"Bordó clínico",bg:"#260b0e",surface:"#341216",line:"#6a2831",accent:"#e5484d"},
++    "pink":{label:"Rosado",hint:"Magenta suave",bg:"#2b0c22",surface:"#3a1130",line:"#71305f",accent:"#e85aad"},
++    "lime":{label:"Verde lima",hint:"Verde profundo",bg:"#0f1d0a",surface:"#172a10",line:"#3b6030",accent:"#7bdc4c"},
++    "sky":{label:"Azul claro",hint:"Azul + celeste",bg:"#072333",surface:"#0c3348",line:"#2e6a87",accent:"#38a7d8"}
++  };
++  const NAV=[
++    {group:"Cuenta",id:"account",icon:"◉",label:"Cuenta y perfil",sub:"Datos personales y profesionales"},
++    {group:"Cuenta",id:"privacy",icon:"⌁",label:"Seguridad y privacidad",sub:"Contraseña y privacidad"},
++    {group:"Organización",id:"members",icon:"◎",label:"Miembros",sub:"Perfiles, actividad y mensajes"},
++    {group:"Organización",id:"institutions",icon:"◇",label:"Mis instituciones",sub:"Ámbitos de trabajo"},
++    {group:"Cuenta",id:"signature",icon:"✎",label:"Firma",sub:"Firma y matrícula"},
++    {group:"Preferencias",id:"personalization",icon:"◈",label:"Personalización",sub:"Temas y ambientación"},
++    {group:"Preferencias",id:"notifications",icon:"◌",label:"Notificaciones",sub:"Estado y avisos"},
++    {group:"Preferencias",id:"accessibility",icon:"Aa",label:"Apariencia y accesibilidad",sub:"Contraste y lectura"},
++    {group:"Sistema",id:"sessions",icon:"▣",label:"Sesiones y dispositivos",sub:"Este navegador"},
++    {group:"Sistema",id:"data",icon:"▤",label:"Datos y almacenamiento",sub:"Caché y preferencias"},
++    {group:"Sistema",id:"diagnostics",icon:"⌘",label:"Diagnóstico y acerca de",sub:"Versión y estado"},
++    {group:"Sesión",id:"logout",icon:"↪",label:"Cerrar sesión",sub:"Salir de Hospitalito"}
++  ];
++  const PREF_PREFIX="hc.ui.settings.v228.";
++  const THEME_PREFIX="hc.ui.theme.v228.";
++  let currentSection="account";
++  let selectedMember="";
++  let memberChat="";
++  let pendingProfilePhoto=null;
++  let pendingSignature=null;
++
++  const esc=(s)=>typeof escHTML==="function"?escHTML(String(s??"")):String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
++  const meName=()=>String(session?.username||"guest");
++  const prefKey=()=>PREF_PREFIX+meName();
++  const themeKey=()=>THEME_PREFIX+meName();
++  const normalizeTheme=(k)=>THEME_DEFS[k]?k:"blue-dark";
++  const currentUser=()=>{
++    try{return findUserByUsername?.(session?.username||"")||loadJSON?.(LS.globalAuthUser,{})||{};}catch(_){return {};}
++  };
++  function loadPrefs(){
++    try{return {showSyncStatus:true,highContrast:false,largeText:false,reduceMotion:false,...JSON.parse(localStorage.getItem(prefKey())||"{}")};}
++    catch(_){return {showSyncStatus:true,highContrast:false,largeText:false,reduceMotion:false};}
++  }
++  function savePrefs(p){try{localStorage.setItem(prefKey(),JSON.stringify(p||{}));}catch(_){}}
++  function userTheme(u){
++    if(String(u?.username||"")===meName()){
++      try{const local=localStorage.getItem(themeKey())||"";if(THEME_DEFS[local])return local;}catch(_){ }
++    }
++    const fromUser=String(u?.uiTheme||u?.preferences?.theme||"").trim();
++    if(THEME_DEFS[fromUser]) return fromUser;
++    return "blue-dark";
++  }
++  function applyPrefs(){
++    const p=loadPrefs();
++    document.body.classList.toggle("hcUiHighContrast",!!p.highContrast);
++    document.body.classList.toggle("hcUiLargeText",!!p.largeText);
++    document.body.classList.toggle("hcUiReduceMotion",!!p.reduceMotion);
++    document.body.classList.toggle("hcUiHideSyncStatus",p.showSyncStatus===false);
++  }
++  function applyTheme(k){
++    k=normalizeTheme(k);
++    document.documentElement.dataset.hcTheme=k;
++    document.body.dataset.hcTheme=k;
++    return k;
++  }
++  async function persistTheme(k){
++    k=applyTheme(k);
++    try{localStorage.setItem(themeKey(),k);}catch(_){ }
++    try{
++      const users=getUsers?.()||[];const idx=users.findIndex(u=>String(u.username||"")===meName());
++      if(idx>=0){
++        const old=users[idx]||{};
++        const patch={uiTheme:k,preferences:{...(old.preferences||{}),theme:k}};
++        users[idx]=typeof hcUserUpdateStamp==="function"?hcUserUpdateStamp(old,patch):{...old,...patch};
++        setUsers?.(users);
++      }
++      const ga=typeof loadJSON==="function"?loadJSON(LS.globalAuthUser,{}):{};
++      if(ga&&Object.keys(ga).length){saveJSON?.(LS.globalAuthUser,{...ga,uiTheme:k,preferences:{...(ga.preferences||{}),theme:k}});}
++    }catch(e){console.warn("v228 tema local:",e);}
++    if(!session?.localSeed && typeof hcGlobalAccountRequest==="function" && typeof hcGlobalAuthToken==="function" && hcGlobalAuthToken()){
++      try{
++        const u=currentUser();
++        const patch={name:u.name||session?.name||meName(),photo:u.photo||"",signature:u.signature||"",professionalTitle:u.professionalTitle||"",licenseNumber:u.licenseNumber||"",specialty:u.specialty||"",uiTheme:k,preferences:{...(u.preferences||{}),theme:k}};
++        const r=await hcGlobalAccountRequest("updateProfile",{token:hcGlobalAuthToken(),user:patch});
++        if(r?.user){
++          const updated={...u,...r.user,uiTheme:r.user.uiTheme||k,preferences:{...(u.preferences||{}),...(r.user.preferences||{}),theme:r.user?.preferences?.theme||r.user?.uiTheme||k}};
++          try{hcGlobalCacheUser?.(updated,{id:hcGlobalCurrentInstitutionId?.(),name:session?.institutionName||""});saveJSON?.(LS.globalAuthUser,updated);}catch(_){ }
++        }
++      }catch(e){console.warn("v228: el Backend Global no persistió uiTheme; se conserva localmente.",e);}
++    }
++    if(currentSection==="personalization") renderSection("personalization");
++  }
++  function initialTheme(){
++    const u=currentUser();
++    let k=userTheme(u);
++    try{const local=localStorage.getItem(themeKey());if(THEME_DEFS[local])k=local;}catch(_){ }
++    applyTheme(k);applyPrefs();
++  }
++  function palette(k){return THEME_DEFS[normalizeTheme(k)];}
++  function sectionDef(id){return NAV.find(x=>x.id===id)||NAV[0];}
++  function buildNav(){
++    const nav=document.getElementById("hcSettingsNav");if(!nav)return;
++    let group="";let html="";
++    NAV.forEach(item=>{
++      if(item.group!==group){group=item.group;html+=`<div class="hcSettingsNavGroup">${esc(group)}</div>`;}
++      html+=`<button type="button" class="hcSettingsNavBtn ${item.id===currentSection?"active":""}" data-hcs-section="${esc(item.id)}"><span class="hcSettingsNavIcon">${esc(item.icon)}</span><span style="min-width:0;"><span style="display:block;">${esc(item.label)}</span><span style="display:block;font-size:10px;color:var(--hc-theme-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(item.sub)}</span></span></button>`;
++    });
