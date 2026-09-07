@@ -1,0 +1,90 @@
++.hcToggleText{min-width:0;}
++.hcToggleTitle{font-size:13px;font-weight:800;}
++.hcToggleSub{font-size:11px;color:var(--hc-theme-muted);margin-top:2px;line-height:1.35;}
++.hcSwitch{position:relative;width:42px;height:24px;flex:0 0 auto;}
++.hcSwitch input{opacity:0;width:0;height:0;}
++.hcSwitchTrack{position:absolute;inset:0;border-radius:99px;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);cursor:pointer;}
++.hcSwitchTrack:before{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:var(--hc-theme-muted);transition:.18s;}
++.hcSwitch input:checked + .hcSwitchTrack{background:var(--hc-theme-accent);border-color:var(--hc-theme-accent);}
++.hcSwitch input:checked + .hcSwitchTrack:before{transform:translateX(18px);background:#fff;}
++.hcMemberToolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
++.hcMemberToolbar input{flex:1;min-width:0;background:var(--hc-theme-input);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 10px;}
++.hcMemberListNew{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
++.hcMemberCardNew{display:flex;align-items:center;gap:10px;border:1px solid var(--hc-theme-line);border-radius:10px;padding:10px;background:var(--hc-theme-surface);cursor:pointer;min-width:0;}
++.hcMemberCardNew:hover{background:var(--hc-theme-surface-2);}
++.hcMemberMiniAvatar{width:42px;height:42px;border-radius:11px;overflow:hidden;display:grid;place-items:center;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);flex:0 0 auto;}
++.hcMemberMiniAvatar img{width:100%;height:100%;object-fit:cover;}
++.hcMemberProfileSurface{--member-accent:var(--hc-theme-accent);--member-bg:var(--hc-theme-surface);border:1px solid var(--hc-theme-line);border-radius:14px;overflow:hidden;background:linear-gradient(145deg,color-mix(in srgb,var(--member-accent) 20%,var(--hc-theme-surface)),var(--hc-theme-surface) 58%);}
++.hcMemberProfileHead{padding:24px;display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--hc-theme-line);}
++.hcMemberProfileBody{padding:18px;}
++.hcMemberProfileActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
++.hcMemberActivity{display:grid;gap:7px;margin-top:10px;}
++.hcMemberActivityItem{padding:9px 10px;border:1px solid var(--hc-theme-line);border-radius:9px;background:color-mix(in srgb,var(--hc-theme-surface) 85%,transparent);}
++.hcMemberActivityTime{font-size:10px;color:var(--hc-theme-muted);}
++.hcMemberActivityText{font-size:12px;margin-top:3px;}
++.hcSettingsChat{height:min(62vh,680px);display:flex;flex-direction:column;background:color-mix(in srgb,var(--member-accent,var(--hc-theme-accent)) 12%,var(--hc-theme-surface));border:1px solid var(--hc-theme-line);border-radius:12px;overflow:hidden;}
++.hcSettingsChatMsgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
++.hcSettingsBubble{max-width:76%;padding:8px 10px;border-radius:12px;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);font-size:12px;}
++.hcSettingsBubble.me{align-self:flex-end;background:color-mix(in srgb,var(--member-accent,var(--hc-theme-accent)) 35%,var(--hc-theme-surface));}
++.hcSettingsBubble img{max-width:100%;border-radius:8px;margin-top:6px;display:block;}
++.hcSettingsBubbleMeta{font-size:9px;color:var(--hc-theme-muted);margin-top:4px;}
++.hcSettingsChatComposer{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;padding:10px;border-top:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);}
++.hcSettingsChatComposer input[type="text"]{min-width:0;background:var(--hc-theme-input);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 10px;}
++.hcSettingsChatComposer input[type="file"]{max-width:155px;font-size:10px;}
++.hcInstitutionCardNew{border:1px solid var(--hc-theme-line);border-radius:10px;padding:12px;background:var(--hc-theme-surface);display:flex;align-items:center;gap:12px;margin-top:8px;}
++.hcInstitutionCurrent{border-color:var(--hc-theme-accent);box-shadow:inset 3px 0 0 var(--hc-theme-accent);}
++.hcSettingsCode{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;background:var(--hc-theme-input);border:1px solid var(--hc-theme-line);border-radius:9px;padding:10px;color:var(--hc-theme-text);}
++.hcSettingsNavBackdrop{display:none;}
++body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal *:before,body.hcUiReduceMotion #hcSettingsModal *:after{scroll-behavior:auto!important;transition:none!important;animation-duration:.001ms!important;}
++
++@media (max-width:900px){
++  .hcSettingsShell{grid-template-columns:1fr;}
++  .hcSettingsSidebar{position:fixed;z-index:3;left:0;top:0;bottom:0;width:min(84vw,320px);transform:translateX(-105%);transition:transform .2s ease;box-shadow:18px 0 50px rgba(0,0,0,.30);}
++  #hcSettingsModal.nav-open .hcSettingsSidebar{transform:translateX(0);}
++  .hcSettingsMenuBtn{display:inline-flex;}
++  .hcSettingsNavBackdrop{display:block;position:fixed;inset:0;z-index:2;background:rgba(0,0,0,.48);opacity:0;pointer-events:none;transition:opacity .2s;}
++  #hcSettingsModal.nav-open .hcSettingsNavBackdrop{opacity:1;pointer-events:auto;}
++  .hcSettingsTop{padding:8px 10px;min-height:56px;}
++  .hcSettingsTopTitle{font-size:16px;}
++  .hcSettingsContent{padding:12px;}
++  .hcSettingsGrid{grid-template-columns:1fr;}
++  .hcThemeGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
++  .hcMemberListNew{grid-template-columns:1fr;}
++  .hcSettingsFields{grid-template-columns:1fr;}
++  .hcSettingsField.full{grid-column:auto;}
++  .hcSettingsChatComposer{grid-template-columns:minmax(0,1fr) auto;}
++  .hcSettingsChatComposer input[type="file"]{grid-column:1/-1;max-width:none;width:100%;}
++  .hcMemberProfileHead{padding:16px;align-items:flex-start;}
++  .hcMemberProfileBody{padding:12px;}
++}
++@media (max-width:520px){
++  .hcSettingsContent{padding:8px;}
++  .hcSettingsCard{padding:12px;border-radius:10px;}
++  .hcThemeGrid{grid-template-columns:1fr 1fr;gap:7px;}
++  .hcSettingsHero h2{font-size:19px;}
++  .hcSettingsAvatar{width:62px;height:62px;border-radius:14px;}
++  .hcMemberProfileHead{flex-direction:column;}
++  .hcSettingsBubble{max-width:88%;}
++}
++</style>
++
++<div id="hcSettingsModal" aria-hidden="true">
++  <div class="hcSettingsShell">
++    <aside class="hcSettingsSidebar" id="hcSettingsSidebar">
++      <div class="hcSettingsBrand">
++        <div class="hcSettingsBrandTitle">Configuración</div>
++        <div class="hcSettingsBrandSub" id="hcSettingsBrandUser">Hospitalito</div>
++      </div>
++      <nav class="hcSettingsNav" id="hcSettingsNav"></nav>
++      <div class="hcSettingsSidebarFoot">
++        <button class="hcSettingsBtn ghost" id="hcSettingsBackToAccount" type="button" style="width:100%;">← Volver a Cuenta clásica</button>
++      </div>
++    </aside>
++    <section class="hcSettingsStage">
++      <header class="hcSettingsTop">
++        <button class="hcSettingsBtn hcSettingsMenuBtn" id="hcSettingsMenuBtn" type="button" aria-label="Abrir menú">☰</button>
++        <div style="min-width:0;">
++          <div class="hcSettingsTopTitle" id="hcSettingsSectionTitle">Cuenta</div>
++          <div class="hcSettingsTopSub" id="hcSettingsSectionSub">Perfil y preferencias de usuario</div>
++        </div>
++        <div class="hcSettingsTopSpacer"></div>
