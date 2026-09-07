@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v227 · Supabase</title>
+<title>HC Demo v228 · Supabase</title>
 <style>
   :root{
     --bg:#071a33;
@@ -37104,6 +37104,7 @@ bootWithBackend();
         <button class="btn small accBackBtn" id="btnAccBack" type="button">Volver</button>
         <button class="btn small" id="btnAccMembers" type="button">Miembros</button>
         <button class="btn small" id="btnAccInstitutions" type="button">Mis instituciones</button>
+        <button class="btn small primary" id="btnOpenSettings" type="button">⚙ Configuración</button>
         <div style="font-weight:900;" id="accTitle">Cuenta</div>
       </div>
 
@@ -37235,32 +37236,6 @@ bootWithBackend();
       <div id="chatBox"></div>
     </div>
 
-  </div>
-</div>
-
-<div id="labModal" style="
-  position:fixed;
-  inset:0;
-  display:none;
-  background:rgba(0,0,0,.6);
-  z-index:999;
-  align-items:center;
-  justify-content:center;
-">
-  <div style="
-    width:600px;
-    max-width:90vw;
-    background:#0b1222;
-    border-radius:16px;
-    padding:16px;
-    border:1px solid rgba(255,255,255,.2);
-  ">
-    <div id="labModalContent"></div>
-
-    <div style="margin-top:10px; display:flex; gap:8px;">
-      <button class="btn primary" id="btnSendLab">Enviar resultado</button>
-      <button class="btn" onclick="closeLabModal()">Cancelar</button>
-    </div>
   </div>
 </div>
 
@@ -41621,6 +41596,618 @@ body.hcMobilePortrait #medPanel .adminCensusCard > div[style*="overflow:auto"]{
   setTimeout(resetBurst,350);
   setTimeout(resetBurst,1200);
   console.info("HC v227: panel móvil anclado a x=0; no se recorta el borde izquierdo de Prescripciones.");
+})();
+</script>
+
+
+<!-- =====================================================================
+     v228 · CONFIGURACIÓN A PANTALLA COMPLETA + TEMAS + AUDITORÍA SEGURA
+     Convive con Cuenta clásica. No reemplaza flujos clínicos ni sync.
+     ===================================================================== -->
+<style id="hc-v228-settings-style">
+:root{
+  --hc-theme-bg:#071a33;
+  --hc-theme-bg2:#0a2a59;
+  --hc-theme-surface:#102a4a;
+  --hc-theme-surface-2:#163c66;
+  --hc-theme-line:#2f5f91;
+  --hc-theme-text:#f8fbff;
+  --hc-theme-muted:#b9c9dc;
+  --hc-theme-accent:#2f80ed;
+  --hc-theme-accent-2:#1d5fb8;
+  --hc-theme-accent-soft:rgba(47,128,237,.18);
+  --hc-theme-input:#081a33;
+  --hc-theme-topbar:#061020;
+  --hc-theme-patient:#0b4ea2;
+  --hc-settings-sidebar:280px;
+}
+body[data-hc-theme="blue-dark"]{
+  --hc-theme-bg:#071a33;--hc-theme-bg2:#0a2a59;--hc-theme-surface:#102a4a;--hc-theme-surface-2:#163c66;
+  --hc-theme-line:#2f5f91;--hc-theme-text:#f8fbff;--hc-theme-muted:#b9c9dc;--hc-theme-accent:#2f80ed;
+  --hc-theme-accent-2:#1d5fb8;--hc-theme-accent-soft:rgba(47,128,237,.18);--hc-theme-input:#081a33;
+  --hc-theme-topbar:#061020;--hc-theme-patient:#0b4ea2;
+}
+body[data-hc-theme="light"]{
+  --hc-theme-bg:#f4f7fb;--hc-theme-bg2:#e9eef5;--hc-theme-surface:#ffffff;--hc-theme-surface-2:#eef3f8;
+  --hc-theme-line:#d0d7de;--hc-theme-text:#1f2328;--hc-theme-muted:#57606a;--hc-theme-accent:#0969da;
+  --hc-theme-accent-2:#0550ae;--hc-theme-accent-soft:rgba(9,105,218,.12);--hc-theme-input:#ffffff;
+  --hc-theme-topbar:#ffffff;--hc-theme-patient:#0969da;
+}
+body[data-hc-theme="dark"]{
+  --hc-theme-bg:#0d1117;--hc-theme-bg2:#010409;--hc-theme-surface:#161b22;--hc-theme-surface-2:#21262d;
+  --hc-theme-line:#30363d;--hc-theme-text:#f0f6fc;--hc-theme-muted:#8b949e;--hc-theme-accent:#2f81f7;
+  --hc-theme-accent-2:#1f6feb;--hc-theme-accent-soft:rgba(47,129,247,.16);--hc-theme-input:#0d1117;
+  --hc-theme-topbar:#010409;--hc-theme-patient:#1f6feb;
+}
+body[data-hc-theme="red"]{
+  --hc-theme-bg:#260b0e;--hc-theme-bg2:#3a0e14;--hc-theme-surface:#341216;--hc-theme-surface-2:#481820;
+  --hc-theme-line:#6a2831;--hc-theme-text:#fff7f7;--hc-theme-muted:#e4b9bd;--hc-theme-accent:#e5484d;
+  --hc-theme-accent-2:#b4232c;--hc-theme-accent-soft:rgba(229,72,77,.18);--hc-theme-input:#220b0e;
+  --hc-theme-topbar:#170609;--hc-theme-patient:#9f1d2c;
+}
+body[data-hc-theme="pink"]{
+  --hc-theme-bg:#2b0c22;--hc-theme-bg2:#411033;--hc-theme-surface:#3a1130;--hc-theme-surface-2:#501943;
+  --hc-theme-line:#71305f;--hc-theme-text:#fff5fb;--hc-theme-muted:#e7bfd5;--hc-theme-accent:#e85aad;
+  --hc-theme-accent-2:#b93b88;--hc-theme-accent-soft:rgba(232,90,173,.18);--hc-theme-input:#26091d;
+  --hc-theme-topbar:#190613;--hc-theme-patient:#9d2d73;
+}
+body[data-hc-theme="lime"]{
+  --hc-theme-bg:#0f1d0a;--hc-theme-bg2:#182e10;--hc-theme-surface:#172a10;--hc-theme-surface-2:#203a16;
+  --hc-theme-line:#3b6030;--hc-theme-text:#f7fff2;--hc-theme-muted:#c4ddb7;--hc-theme-accent:#7bdc4c;
+  --hc-theme-accent-2:#4eaa2f;--hc-theme-accent-soft:rgba(123,220,76,.17);--hc-theme-input:#0e190a;
+  --hc-theme-topbar:#091207;--hc-theme-patient:#357a25;
+}
+body[data-hc-theme="sky"]{
+  --hc-theme-bg:#072333;--hc-theme-bg2:#0b3449;--hc-theme-surface:#0c3348;--hc-theme-surface-2:#10435d;
+  --hc-theme-line:#2e6a87;--hc-theme-text:#f4fbff;--hc-theme-muted:#b9d7e7;--hc-theme-accent:#38a7d8;
+  --hc-theme-accent-2:#1f7fa8;--hc-theme-accent-soft:rgba(56,167,216,.18);--hc-theme-input:#071f2d;
+  --hc-theme-topbar:#041822;--hc-theme-patient:#117aa5;
+}
+
+/* Aplicación general del tema: sólo shell y componentes comunes; colores semánticos clínicos se preservan. */
+body[data-hc-theme]{
+  background:radial-gradient(1200px 650px at 15% 0%,var(--hc-theme-bg2) 0%,var(--hc-theme-bg) 58%,var(--hc-theme-bg) 100%) !important;
+  color:var(--hc-theme-text) !important;
+}
+body[data-hc-theme] .topbar{
+  background:color-mix(in srgb,var(--hc-theme-topbar) 92%,transparent) !important;
+  color:var(--hc-theme-text) !important;
+  border-color:var(--hc-theme-line) !important;
+}
+body[data-hc-theme] :where(.card,.miniBox,.invCard,.labReqBox,.labResBox,.apptCard,.activityBox,.chatWrap,.medScheduleBox){
+  border-color:var(--hc-theme-line) !important;
+}
+body[data-hc-theme] :where(.tab,.btn,.censoItem,.memberItem){
+  border-color:var(--hc-theme-line) !important;
+}
+body[data-hc-theme] .tab.active,
+body[data-hc-theme] .btn.primary,
+body[data-hc-theme] .censoItem.active{
+  background:var(--hc-theme-accent-soft) !important;
+  border-color:var(--hc-theme-accent) !important;
+}
+body[data-hc-theme] .pacBar{
+  background:linear-gradient(180deg,var(--hc-theme-patient),var(--hc-theme-accent-2)) !important;
+  color:#fff !important;
+}
+body[data-hc-theme] :where(input,select,textarea){
+  border-color:var(--hc-theme-line);
+}
+body[data-hc-theme="light"] :where(#appMed,#appAdmin,#medPanel,#medCenso){color:var(--hc-theme-text);}
+body[data-hc-theme="light"] :where(.card,.miniBox,.invCard,.labReqBox,.labResBox,.apptCard,.activityBox,.chatWrap,.medScheduleBox){
+  background:rgba(255,255,255,.90);
+  color:var(--hc-theme-text);
+}
+body[data-hc-theme="light"] :where(.censoItem,.memberItem,.tab,.btn){color:var(--hc-theme-text);}
+body[data-hc-theme="light"] .btn.primary{color:#fff !important;}
+body[data-hc-theme="light"] .btn.danger{color:#7a1a1f !important;}
+body[data-hc-theme="light"] :where(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  background:#fff;color:#1f2328;border-color:#afb8c1;
+}
+body[data-hc-theme="light"] :where(input,textarea)::placeholder{color:#6e7781;}
+body[data-hc-theme="light"] .muted{color:#57606a !important;}
+body[data-hc-theme="light"] .instBar{background:#1f2328 !important;color:#fff !important;}
+/* Formularios clínicos claros conservan contraste propio en todos los temas. */
+body[data-hc-theme] #labModalContent :where(input[type="text"],input[type="number"],textarea),
+body[data-hc-theme] #medPanel :where(.heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox),
+body[data-hc-theme] #medPanel :where(.heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox) *{
+  color:#111827 !important;
+}
+body.hcUiHighContrast :where(.card,.btn,.tab,.censoItem,input,select,textarea){border-width:2px !important;}
+body.hcUiHighContrast .muted{opacity:1 !important;filter:contrast(1.25);}
+body.hcUiLargeText :where(.btn,.tab,input,select,textarea,label,th,td,.muted,.censoItem){font-size:calc(1em + 1px) !important;}
+body.hcUiHideSyncStatus #backendStatus{display:none !important;}
+
+/* Nuevo panel de Configuración. */
+#hcSettingsModal{
+  position:fixed;inset:0;display:none;z-index:2147483644;
+  background:var(--hc-theme-bg);color:var(--hc-theme-text);
+}
+#hcSettingsModal.show{display:block;}
+.hcSettingsShell{height:100dvh;display:grid;grid-template-columns:var(--hc-settings-sidebar) minmax(0,1fr);background:var(--hc-theme-bg);}
+.hcSettingsSidebar{
+  min-width:0;background:color-mix(in srgb,var(--hc-theme-surface) 94%,#000 6%);
+  border-right:1px solid var(--hc-theme-line);display:flex;flex-direction:column;overflow:hidden;
+}
+.hcSettingsBrand{padding:18px 18px 12px;border-bottom:1px solid var(--hc-theme-line);}
+.hcSettingsBrandTitle{font-size:16px;font-weight:900;letter-spacing:-.01em;}
+.hcSettingsBrandSub{margin-top:4px;font-size:12px;color:var(--hc-theme-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hcSettingsNav{padding:10px;overflow:auto;display:flex;flex-direction:column;gap:3px;flex:1;}
+.hcSettingsNavGroup{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--hc-theme-muted);padding:12px 10px 5px;font-weight:800;}
+.hcSettingsNavBtn{
+  width:100%;display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;border:0;
+  background:transparent;color:var(--hc-theme-text);text-align:left;cursor:pointer;font-weight:650;font-size:13px;
+}
+.hcSettingsNavBtn:hover{background:color-mix(in srgb,var(--hc-theme-surface-2) 80%,transparent);}
+.hcSettingsNavBtn.active{background:var(--hc-theme-accent-soft);color:var(--hc-theme-text);box-shadow:inset 3px 0 0 var(--hc-theme-accent);}
+.hcSettingsNavIcon{width:20px;text-align:center;opacity:.95;}
+.hcSettingsSidebarFoot{padding:10px;border-top:1px solid var(--hc-theme-line);}
+.hcSettingsStage{min-width:0;display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:var(--hc-theme-bg);}
+.hcSettingsTop{
+  min-height:64px;display:flex;align-items:center;gap:12px;padding:10px 18px;border-bottom:1px solid var(--hc-theme-line);
+  background:color-mix(in srgb,var(--hc-theme-bg) 88%,var(--hc-theme-surface) 12%);flex:0 0 auto;
+}
+.hcSettingsMenuBtn{display:none;}
+.hcSettingsTopTitle{font-size:18px;font-weight:900;letter-spacing:-.02em;}
+.hcSettingsTopSub{font-size:12px;color:var(--hc-theme-muted);margin-top:2px;}
+.hcSettingsTopSpacer{flex:1;}
+.hcSettingsContent{overflow:auto;padding:24px;min-width:0;-webkit-overflow-scrolling:touch;}
+.hcSettingsPage{max-width:1060px;margin:0 auto;}
+.hcSettingsHero{margin-bottom:18px;}
+.hcSettingsHero h2{margin:0;font-size:22px;letter-spacing:-.025em;}
+.hcSettingsHero p{margin:6px 0 0;color:var(--hc-theme-muted);font-size:13px;line-height:1.45;}
+.hcSettingsGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;}
+.hcSettingsGrid.one{grid-template-columns:1fr;}
+.hcSettingsCard{
+  background:color-mix(in srgb,var(--hc-theme-surface) 92%,transparent);border:1px solid var(--hc-theme-line);
+  border-radius:12px;padding:16px;min-width:0;box-shadow:0 8px 24px rgba(0,0,0,.08);
+}
+.hcSettingsCardTitle{font-weight:850;font-size:14px;margin-bottom:4px;}
+.hcSettingsCardSub{font-size:12px;color:var(--hc-theme-muted);line-height:1.45;margin-bottom:12px;}
+.hcSettingsRow{display:flex;align-items:center;gap:12px;min-width:0;}
+.hcSettingsRow.wrap{flex-wrap:wrap;}
+.hcSettingsAvatar{width:76px;height:76px;border-radius:18px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface-2);display:grid;place-items:center;overflow:hidden;flex:0 0 auto;}
+.hcSettingsAvatar img{width:100%;height:100%;object-fit:cover;}
+.hcSettingsMeta{min-width:0;flex:1;}
+.hcSettingsName{font-size:18px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.hcSettingsMuted{color:var(--hc-theme-muted);font-size:12px;}
+.hcSettingsFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px;}
+.hcSettingsField{display:flex;flex-direction:column;gap:5px;min-width:0;}
+.hcSettingsField.full{grid-column:1/-1;}
+.hcSettingsField label{font-size:11px;color:var(--hc-theme-muted);font-weight:700;}
+.hcSettingsField :where(input,select,textarea){
+  width:100%;min-width:0;background:var(--hc-theme-input);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);
+  border-radius:9px;padding:9px 10px;font-size:13px;
+}
+.hcSettingsField textarea{min-height:90px;}
+.hcSettingsActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.hcSettingsBtn{
+  border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface-2);color:var(--hc-theme-text);
+  border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer;font-size:12px;
+}
+.hcSettingsBtn:hover{filter:brightness(1.08);}
+.hcSettingsBtn.primary{background:var(--hc-theme-accent);border-color:var(--hc-theme-accent);color:#fff;}
+.hcSettingsBtn.danger{background:#8f1d27;border-color:#b52a35;color:#fff;}
+.hcSettingsBtn.ghost{background:transparent;}
+.hcSettingsNotice{margin-top:10px;padding:9px 10px;border-radius:9px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface-2);font-size:12px;color:var(--hc-theme-muted);line-height:1.45;}
+.hcSettingsNotice.good{border-color:#2f8f57;color:#b7f0cb;background:rgba(47,143,87,.12);}
+.hcSettingsNotice.warn{border-color:#b7791f;color:#f6d89a;background:rgba(183,121,31,.12);}
+body[data-hc-theme="light"] .hcSettingsNotice.good{color:#155b32;}
+body[data-hc-theme="light"] .hcSettingsNotice.warn{color:#6b4b12;}
+.hcThemeGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}
+.hcThemeTile{border:1px solid var(--hc-theme-line);border-radius:11px;padding:10px;background:var(--hc-theme-surface);cursor:pointer;text-align:left;color:var(--hc-theme-text);}
+.hcThemeTile.active{outline:2px solid var(--hc-theme-accent);outline-offset:1px;}
+.hcThemePreview{height:58px;border-radius:8px;border:1px solid rgba(127,127,127,.25);overflow:hidden;display:grid;grid-template-columns:28% 72%;margin-bottom:8px;}
+.hcThemePreviewSide{background:var(--p-surface);border-right:1px solid var(--p-line);}
+.hcThemePreviewMain{background:var(--p-bg);padding:7px;}
+.hcThemePreviewBar{height:8px;border-radius:99px;background:var(--p-accent);margin-bottom:6px;width:64%;}
+.hcThemePreviewCard{height:22px;border-radius:5px;background:var(--p-surface);border:1px solid var(--p-line);}
+.hcThemeLabel{font-size:12px;font-weight:850;}
+.hcThemeHint{font-size:10px;color:var(--hc-theme-muted);margin-top:2px;}
+.hcToggleRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid var(--hc-theme-line);}
+.hcToggleRow:last-child{border-bottom:0;}
+.hcToggleText{min-width:0;}
+.hcToggleTitle{font-size:13px;font-weight:800;}
+.hcToggleSub{font-size:11px;color:var(--hc-theme-muted);margin-top:2px;line-height:1.35;}
+.hcSwitch{position:relative;width:42px;height:24px;flex:0 0 auto;}
+.hcSwitch input{opacity:0;width:0;height:0;}
+.hcSwitchTrack{position:absolute;inset:0;border-radius:99px;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);cursor:pointer;}
+.hcSwitchTrack:before{content:"";position:absolute;width:18px;height:18px;left:2px;top:2px;border-radius:50%;background:var(--hc-theme-muted);transition:.18s;}
+.hcSwitch input:checked + .hcSwitchTrack{background:var(--hc-theme-accent);border-color:var(--hc-theme-accent);}
+.hcSwitch input:checked + .hcSwitchTrack:before{transform:translateX(18px);background:#fff;}
+.hcMemberToolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
+.hcMemberToolbar input{flex:1;min-width:0;background:var(--hc-theme-input);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 10px;}
+.hcMemberListNew{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;}
+.hcMemberCardNew{display:flex;align-items:center;gap:10px;border:1px solid var(--hc-theme-line);border-radius:10px;padding:10px;background:var(--hc-theme-surface);cursor:pointer;min-width:0;}
+.hcMemberCardNew:hover{background:var(--hc-theme-surface-2);}
+.hcMemberMiniAvatar{width:42px;height:42px;border-radius:11px;overflow:hidden;display:grid;place-items:center;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);flex:0 0 auto;}
+.hcMemberMiniAvatar img{width:100%;height:100%;object-fit:cover;}
+.hcMemberProfileSurface{--member-accent:var(--hc-theme-accent);--member-bg:var(--hc-theme-surface);border:1px solid var(--hc-theme-line);border-radius:14px;overflow:hidden;background:linear-gradient(145deg,color-mix(in srgb,var(--member-accent) 20%,var(--hc-theme-surface)),var(--hc-theme-surface) 58%);}
+.hcMemberProfileHead{padding:24px;display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--hc-theme-line);}
+.hcMemberProfileBody{padding:18px;}
+.hcMemberProfileActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.hcMemberActivity{display:grid;gap:7px;margin-top:10px;}
+.hcMemberActivityItem{padding:9px 10px;border:1px solid var(--hc-theme-line);border-radius:9px;background:color-mix(in srgb,var(--hc-theme-surface) 85%,transparent);}
+.hcMemberActivityTime{font-size:10px;color:var(--hc-theme-muted);}
+.hcMemberActivityText{font-size:12px;margin-top:3px;}
+.hcSettingsChat{height:min(62vh,680px);display:flex;flex-direction:column;background:color-mix(in srgb,var(--member-accent,var(--hc-theme-accent)) 12%,var(--hc-theme-surface));border:1px solid var(--hc-theme-line);border-radius:12px;overflow:hidden;}
+.hcSettingsChatMsgs{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:8px;}
+.hcSettingsBubble{max-width:76%;padding:8px 10px;border-radius:12px;background:var(--hc-theme-surface-2);border:1px solid var(--hc-theme-line);font-size:12px;}
+.hcSettingsBubble.me{align-self:flex-end;background:color-mix(in srgb,var(--member-accent,var(--hc-theme-accent)) 35%,var(--hc-theme-surface));}
+.hcSettingsBubble img{max-width:100%;border-radius:8px;margin-top:6px;display:block;}
+.hcSettingsBubbleMeta{font-size:9px;color:var(--hc-theme-muted);margin-top:4px;}
+.hcSettingsChatComposer{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:7px;padding:10px;border-top:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);}
+.hcSettingsChatComposer input[type="text"]{min-width:0;background:var(--hc-theme-input);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 10px;}
+.hcSettingsChatComposer input[type="file"]{max-width:155px;font-size:10px;}
+.hcInstitutionCardNew{border:1px solid var(--hc-theme-line);border-radius:10px;padding:12px;background:var(--hc-theme-surface);display:flex;align-items:center;gap:12px;margin-top:8px;}
+.hcInstitutionCurrent{border-color:var(--hc-theme-accent);box-shadow:inset 3px 0 0 var(--hc-theme-accent);}
+.hcSettingsCode{font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word;background:var(--hc-theme-input);border:1px solid var(--hc-theme-line);border-radius:9px;padding:10px;color:var(--hc-theme-text);}
+.hcSettingsNavBackdrop{display:none;}
+body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal *:before,body.hcUiReduceMotion #hcSettingsModal *:after{scroll-behavior:auto!important;transition:none!important;animation-duration:.001ms!important;}
+
+@media (max-width:900px){
+  .hcSettingsShell{grid-template-columns:1fr;}
+  .hcSettingsSidebar{position:fixed;z-index:3;left:0;top:0;bottom:0;width:min(84vw,320px);transform:translateX(-105%);transition:transform .2s ease;box-shadow:18px 0 50px rgba(0,0,0,.30);}
+  #hcSettingsModal.nav-open .hcSettingsSidebar{transform:translateX(0);}
+  .hcSettingsMenuBtn{display:inline-flex;}
+  .hcSettingsNavBackdrop{display:block;position:fixed;inset:0;z-index:2;background:rgba(0,0,0,.48);opacity:0;pointer-events:none;transition:opacity .2s;}
+  #hcSettingsModal.nav-open .hcSettingsNavBackdrop{opacity:1;pointer-events:auto;}
+  .hcSettingsTop{padding:8px 10px;min-height:56px;}
+  .hcSettingsTopTitle{font-size:16px;}
+  .hcSettingsContent{padding:12px;}
+  .hcSettingsGrid{grid-template-columns:1fr;}
+  .hcThemeGrid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .hcMemberListNew{grid-template-columns:1fr;}
+  .hcSettingsFields{grid-template-columns:1fr;}
+  .hcSettingsField.full{grid-column:auto;}
+  .hcSettingsChatComposer{grid-template-columns:minmax(0,1fr) auto;}
+  .hcSettingsChatComposer input[type="file"]{grid-column:1/-1;max-width:none;width:100%;}
+  .hcMemberProfileHead{padding:16px;align-items:flex-start;}
+  .hcMemberProfileBody{padding:12px;}
+}
+@media (max-width:520px){
+  .hcSettingsContent{padding:8px;}
+  .hcSettingsCard{padding:12px;border-radius:10px;}
+  .hcThemeGrid{grid-template-columns:1fr 1fr;gap:7px;}
+  .hcSettingsHero h2{font-size:19px;}
+  .hcSettingsAvatar{width:62px;height:62px;border-radius:14px;}
+  .hcMemberProfileHead{flex-direction:column;}
+  .hcSettingsBubble{max-width:88%;}
+}
+</style>
+
+<div id="hcSettingsModal" aria-hidden="true">
+  <div class="hcSettingsShell">
+    <aside class="hcSettingsSidebar" id="hcSettingsSidebar">
+      <div class="hcSettingsBrand">
+        <div class="hcSettingsBrandTitle">Configuración</div>
+        <div class="hcSettingsBrandSub" id="hcSettingsBrandUser">Hospitalito</div>
+      </div>
+      <nav class="hcSettingsNav" id="hcSettingsNav"></nav>
+      <div class="hcSettingsSidebarFoot">
+        <button class="hcSettingsBtn ghost" id="hcSettingsBackToAccount" type="button" style="width:100%;">← Volver a Cuenta clásica</button>
+      </div>
+    </aside>
+    <section class="hcSettingsStage">
+      <header class="hcSettingsTop">
+        <button class="hcSettingsBtn hcSettingsMenuBtn" id="hcSettingsMenuBtn" type="button" aria-label="Abrir menú">☰</button>
+        <div style="min-width:0;">
+          <div class="hcSettingsTopTitle" id="hcSettingsSectionTitle">Cuenta</div>
+          <div class="hcSettingsTopSub" id="hcSettingsSectionSub">Perfil y preferencias de usuario</div>
+        </div>
+        <div class="hcSettingsTopSpacer"></div>
+        <button class="hcSettingsBtn" id="hcSettingsCloseBtn" type="button">Cerrar</button>
+      </header>
+      <main class="hcSettingsContent" id="hcSettingsContent"></main>
+    </section>
+  </div>
+  <div class="hcSettingsNavBackdrop" id="hcSettingsNavBackdrop"></div>
+</div>
+
+<script id="hc-v228-settings-script">
+(function(){
+  "use strict";
+  window.HC_DEMO_VERSION="v228";
+
+  const THEME_DEFS={
+    "blue-dark":{label:"Azul oscuro",hint:"Predeterminado",bg:"#071a33",surface:"#102a4a",line:"#2f5f91",accent:"#2f80ed"},
+    "light":{label:"Claro",hint:"Limpio y luminoso",bg:"#f4f7fb",surface:"#ffffff",line:"#d0d7de",accent:"#0969da"},
+    "dark":{label:"Oscuro",hint:"Grafito",bg:"#0d1117",surface:"#161b22",line:"#30363d",accent:"#2f81f7"},
+    "red":{label:"Rojo",hint:"Bordó clínico",bg:"#260b0e",surface:"#341216",line:"#6a2831",accent:"#e5484d"},
+    "pink":{label:"Rosado",hint:"Magenta suave",bg:"#2b0c22",surface:"#3a1130",line:"#71305f",accent:"#e85aad"},
+    "lime":{label:"Verde lima",hint:"Verde profundo",bg:"#0f1d0a",surface:"#172a10",line:"#3b6030",accent:"#7bdc4c"},
+    "sky":{label:"Azul claro",hint:"Azul + celeste",bg:"#072333",surface:"#0c3348",line:"#2e6a87",accent:"#38a7d8"}
+  };
+  const NAV=[
+    {group:"Cuenta",id:"account",icon:"◉",label:"Cuenta y perfil",sub:"Datos personales y profesionales"},
+    {group:"Cuenta",id:"privacy",icon:"⌁",label:"Seguridad y privacidad",sub:"Contraseña y privacidad"},
+    {group:"Organización",id:"members",icon:"◎",label:"Miembros",sub:"Perfiles, actividad y mensajes"},
+    {group:"Organización",id:"institutions",icon:"◇",label:"Mis instituciones",sub:"Ámbitos de trabajo"},
+    {group:"Cuenta",id:"signature",icon:"✎",label:"Firma",sub:"Firma y matrícula"},
+    {group:"Preferencias",id:"personalization",icon:"◈",label:"Personalización",sub:"Temas y ambientación"},
+    {group:"Preferencias",id:"notifications",icon:"◌",label:"Notificaciones",sub:"Estado y avisos"},
+    {group:"Preferencias",id:"accessibility",icon:"Aa",label:"Apariencia y accesibilidad",sub:"Contraste y lectura"},
+    {group:"Sistema",id:"sessions",icon:"▣",label:"Sesiones y dispositivos",sub:"Este navegador"},
+    {group:"Sistema",id:"data",icon:"▤",label:"Datos y almacenamiento",sub:"Caché y preferencias"},
+    {group:"Sistema",id:"diagnostics",icon:"⌘",label:"Diagnóstico y acerca de",sub:"Versión y estado"},
+    {group:"Sesión",id:"logout",icon:"↪",label:"Cerrar sesión",sub:"Salir de Hospitalito"}
+  ];
+  const PREF_PREFIX="hc.ui.settings.v228.";
+  const THEME_PREFIX="hc.ui.theme.v228.";
+  let currentSection="account";
+  let selectedMember="";
+  let memberChat="";
+  let pendingProfilePhoto=null;
+  let pendingSignature=null;
+
+  const esc=(s)=>typeof escHTML==="function"?escHTML(String(s??"")):String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const meName=()=>String(session?.username||"guest");
+  const prefKey=()=>PREF_PREFIX+meName();
+  const themeKey=()=>THEME_PREFIX+meName();
+  const normalizeTheme=(k)=>THEME_DEFS[k]?k:"blue-dark";
+  const currentUser=()=>{
+    try{return findUserByUsername?.(session?.username||"")||loadJSON?.(LS.globalAuthUser,{})||{};}catch(_){return {};}
+  };
+  function loadPrefs(){
+    try{return {showSyncStatus:true,highContrast:false,largeText:false,reduceMotion:false,...JSON.parse(localStorage.getItem(prefKey())||"{}")};}
+    catch(_){return {showSyncStatus:true,highContrast:false,largeText:false,reduceMotion:false};}
+  }
+  function savePrefs(p){try{localStorage.setItem(prefKey(),JSON.stringify(p||{}));}catch(_){}}
+  function userTheme(u){
+    if(String(u?.username||"")===meName()){
+      try{const local=localStorage.getItem(themeKey())||"";if(THEME_DEFS[local])return local;}catch(_){ }
+    }
+    const fromUser=String(u?.uiTheme||u?.preferences?.theme||"").trim();
+    if(THEME_DEFS[fromUser]) return fromUser;
+    return "blue-dark";
+  }
+  function applyPrefs(){
+    const p=loadPrefs();
+    document.body.classList.toggle("hcUiHighContrast",!!p.highContrast);
+    document.body.classList.toggle("hcUiLargeText",!!p.largeText);
+    document.body.classList.toggle("hcUiReduceMotion",!!p.reduceMotion);
+    document.body.classList.toggle("hcUiHideSyncStatus",p.showSyncStatus===false);
+  }
+  function applyTheme(k){
+    k=normalizeTheme(k);
+    document.documentElement.dataset.hcTheme=k;
+    document.body.dataset.hcTheme=k;
+    return k;
+  }
+  async function persistTheme(k){
+    k=applyTheme(k);
+    try{localStorage.setItem(themeKey(),k);}catch(_){ }
+    try{
+      const users=getUsers?.()||[];const idx=users.findIndex(u=>String(u.username||"")===meName());
+      if(idx>=0){
+        const old=users[idx]||{};
+        const patch={uiTheme:k,preferences:{...(old.preferences||{}),theme:k}};
+        users[idx]=typeof hcUserUpdateStamp==="function"?hcUserUpdateStamp(old,patch):{...old,...patch};
+        setUsers?.(users);
+      }
+      const ga=typeof loadJSON==="function"?loadJSON(LS.globalAuthUser,{}):{};
+      if(ga&&Object.keys(ga).length){saveJSON?.(LS.globalAuthUser,{...ga,uiTheme:k,preferences:{...(ga.preferences||{}),theme:k}});}
+    }catch(e){console.warn("v228 tema local:",e);}
+    if(!session?.localSeed && typeof hcGlobalAccountRequest==="function" && typeof hcGlobalAuthToken==="function" && hcGlobalAuthToken()){
+      try{
+        const u=currentUser();
+        const patch={name:u.name||session?.name||meName(),photo:u.photo||"",signature:u.signature||"",professionalTitle:u.professionalTitle||"",licenseNumber:u.licenseNumber||"",specialty:u.specialty||"",uiTheme:k,preferences:{...(u.preferences||{}),theme:k}};
+        const r=await hcGlobalAccountRequest("updateProfile",{token:hcGlobalAuthToken(),user:patch});
+        if(r?.user){
+          const updated={...u,...r.user,uiTheme:r.user.uiTheme||k,preferences:{...(u.preferences||{}),...(r.user.preferences||{}),theme:r.user?.preferences?.theme||r.user?.uiTheme||k}};
+          try{hcGlobalCacheUser?.(updated,{id:hcGlobalCurrentInstitutionId?.(),name:session?.institutionName||""});saveJSON?.(LS.globalAuthUser,updated);}catch(_){ }
+        }
+      }catch(e){console.warn("v228: el Backend Global no persistió uiTheme; se conserva localmente.",e);}
+    }
+    if(currentSection==="personalization") renderSection("personalization");
+  }
+  function initialTheme(){
+    const u=currentUser();
+    let k=userTheme(u);
+    try{const local=localStorage.getItem(themeKey());if(THEME_DEFS[local])k=local;}catch(_){ }
+    applyTheme(k);applyPrefs();
+  }
+  function palette(k){return THEME_DEFS[normalizeTheme(k)];}
+  function sectionDef(id){return NAV.find(x=>x.id===id)||NAV[0];}
+  function buildNav(){
+    const nav=document.getElementById("hcSettingsNav");if(!nav)return;
+    let group="";let html="";
+    NAV.forEach(item=>{
+      if(item.group!==group){group=item.group;html+=`<div class="hcSettingsNavGroup">${esc(group)}</div>`;}
+      html+=`<button type="button" class="hcSettingsNavBtn ${item.id===currentSection?"active":""}" data-hcs-section="${esc(item.id)}"><span class="hcSettingsNavIcon">${esc(item.icon)}</span><span style="min-width:0;"><span style="display:block;">${esc(item.label)}</span><span style="display:block;font-size:10px;color:var(--hc-theme-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(item.sub)}</span></span></button>`;
+    });
+    nav.innerHTML=html;
+  }
+  function setTop(id){
+    const d=sectionDef(id);const t=document.getElementById("hcSettingsSectionTitle"),s=document.getElementById("hcSettingsSectionSub");
+    if(t)t.textContent=d.label;if(s)s.textContent=d.sub;
+  }
+  function openSettings(section="account"){
+    if(!session)return;
+    try{closeAccount?.();}catch(_){ }
+    const modal=document.getElementById("hcSettingsModal");if(!modal)return;
+    const u=currentUser();
+    const brand=document.getElementById("hcSettingsBrandUser");if(brand)brand.textContent=`${u.name||session?.name||meName()} · ${session?.role||u.role||""}`;
+    modal.classList.add("show");modal.classList.remove("nav-open");modal.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+    selectedMember="";memberChat="";setSection(section);
+  }
+  function closeSettings(){
+    const modal=document.getElementById("hcSettingsModal");if(!modal)return;
+    modal.classList.remove("show","nav-open");modal.setAttribute("aria-hidden","true");document.body.style.overflow="";
+  }
+  function setSection(id){
+    currentSection=NAV.some(x=>x.id===id)?id:"account";selectedMember=currentSection==="members"?selectedMember:"";memberChat=currentSection==="members"?memberChat:"";
+    buildNav();setTop(currentSection);renderSection(currentSection);document.getElementById("hcSettingsModal")?.classList.remove("nav-open");
+    const sc=document.getElementById("hcSettingsContent");if(sc)sc.scrollTop=0;
+  }
+  function hero(title,sub){return `<div class="hcSettingsHero"><h2>${esc(title)}</h2><p>${esc(sub)}</p></div>`;}
+  function roleLabel(r){return ({medico:"Médico",enfermero:"Enfermería",admin:"Administrador",administrativo:"Administración",farmaceutico:"Farmacia",bioquimico:"Bioquímica",microbiologo:"Microbiología",imagenologo:"Imagenología",nutricionista:"Nutrición",hemoterapia:"Hemoterapia",kinesiologo:"Kinesiología"})[r]||r||"—";}
+  function avatarHtml(u,cls="hcSettingsAvatar"){
+    return `<div class="${cls}">${u?.photo?`<img src="${u.photo}" alt="avatar">`:`<span class="hcSettingsMuted">sin foto</span>`}</div>`;
+  }
+  function currentInstitutionName(){
+    return String(session?.institutionName||localStorage.getItem(LS.backendRegistryName)||getInst?.()?.line1||"Institución");
+  }
+  function renderAccount(){
+    const u=currentUser();
+    return `<div class="hcSettingsPage">${hero("Cuenta y perfil","Tus datos de identificación dentro de Hospitalito. La Cuenta clásica sigue disponible mientras terminamos esta migración.")}
+      <div class="hcSettingsGrid">
+        <div class="hcSettingsCard">
+          <div class="hcSettingsRow">${avatarHtml(u)}<div class="hcSettingsMeta"><div class="hcSettingsName">${esc(u.name||session?.name||meName())}</div><div class="hcSettingsMuted">@${esc(meName())} · ${esc(roleLabel(session?.role||u.role))}</div><div class="hcSettingsMuted" style="margin-top:4px;">${esc(currentInstitutionName())}</div></div></div>
+          <div class="hcSettingsFields">
+            <div class="hcSettingsField full"><label>Nombre visible</label><input id="hcsProfileName" value="${esc(u.name||session?.name||"")}"></div>
+            <div class="hcSettingsField"><label>Título profesional</label><input id="hcsProfessionalTitle" value="${esc(u.professionalTitle||"")}" placeholder="Ej.: Dr., Dra., Lic."></div>
+            <div class="hcSettingsField"><label>Matrícula / identificador</label><input id="hcsLicenseNumber" value="${esc(u.licenseNumber||"")}" placeholder="Ej.: MP 12345"></div>
+            <div class="hcSettingsField full"><label>Especialidad / función</label><input id="hcsSpecialty" value="${esc(u.specialty||"")}" placeholder="Ej.: Terapia Intensiva"></div>
+            <div class="hcSettingsField full"><label>Foto de perfil</label><input id="hcsProfilePhoto" type="file" accept="image/*"></div>
+          </div>
+          <div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsSaveProfile" type="button">Guardar perfil</button><button class="hcSettingsBtn" id="hcsOpenClassicAccount" type="button">Abrir Cuenta clásica</button></div>
+          <div id="hcsProfileMsg" class="hcSettingsNotice">Los cambios de perfil usan el mismo sistema de cuenta ya existente.</div>
+        </div>
+        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Resumen de cuenta</div><div class="hcSettingsCardSub">Información de solo lectura para evitar cambios accidentales de permisos.</div>
+          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Usuario</div><div class="hcToggleSub">${esc(meName())}</div></div></div>
+          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Rol</div><div class="hcToggleSub">${esc(roleLabel(session?.role||u.role))}</div></div></div>
+          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Institución activa</div><div class="hcToggleSub">${esc(currentInstitutionName())}</div></div></div>
+          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Tema</div><div class="hcToggleSub">${esc(THEME_DEFS[userTheme(u)]?.label||"Azul oscuro")}</div></div><button class="hcSettingsBtn" data-hcs-section="personalization">Cambiar</button></div>
+        </div>
+      </div></div>`;
+  }
+  function renderPrivacy(){
+    return `<div class="hcSettingsPage">${hero("Seguridad y privacidad","Cambio de contraseña y estado de la sesión. Hospitalito no expone aquí credenciales ni secretos del backend.")}
+      <div class="hcSettingsGrid">
+        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Cambiar contraseña</div><div class="hcSettingsCardSub">Usa el mismo Backend Global de la Cuenta clásica.</div>
+          <div class="hcSettingsFields"><div class="hcSettingsField full"><label>Contraseña actual</label><input id="hcsPassCurrent" type="password" autocomplete="current-password"></div><div class="hcSettingsField"><label>Nueva contraseña</label><input id="hcsPassNew" type="password" autocomplete="new-password"></div><div class="hcSettingsField"><label>Repetir nueva contraseña</label><input id="hcsPassNew2" type="password" autocomplete="new-password"></div></div>
+          <div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsChangePassword" type="button">Actualizar contraseña</button></div><div id="hcsPassMsg" class="hcSettingsNotice">No se muestra ni almacena la contraseña en esta pantalla.</div>
+        </div>
+        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Privacidad de datos</div><div class="hcSettingsCardSub">Hospitalito separa cuenta global y datos clínicos institucionales.</div><div class="hcSettingsNotice">El rol actual es <b>${esc(roleLabel(session?.role))}</b>. Los permisos clínicos siguen gobernados por los roles existentes; esta pantalla no los modifica.</div><div class="hcSettingsNotice">La preferencia visual se guarda por usuario. Los datos clínicos continúan en el backend institucional configurado.</div></div>
+      </div></div>`;
+  }
+  function memberThemeStyle(u){const p=palette(userTheme(u));return `--member-accent:${p.accent};--member-bg:${p.surface};`;}
+  function renderMembers(){
+    const users=(getUsers?.()||[]).filter(u=>String(u.username||"")!==meName());
+    if(selectedMember){
+      const u=users.find(x=>String(x.username||"")===selectedMember)||findUserByUsername?.(selectedMember);
+      if(!u){selectedMember="";return renderMembers();}
+      if(memberChat===selectedMember)return renderMemberChat(u);
+      const acts=(getActivity?.()||[]).filter(a=>String(a.user||"")===selectedMember).slice().reverse().slice(0,15);
+      return `<div class="hcSettingsPage">${hero("Miembros","Perfil ampliado dentro de la nueva Configuración.")}<div class="hcMemberProfileSurface" style="${memberThemeStyle(u)}">
+        <div class="hcMemberProfileHead">${avatarHtml(u)}<div class="hcSettingsMeta"><div class="hcSettingsName">${esc(u.name||u.username)}</div><div class="hcSettingsMuted">@${esc(u.username)} · ${esc(roleLabel(u.role))}</div><div class="hcSettingsMuted" style="margin-top:5px;">Tema personal: ${esc(THEME_DEFS[userTheme(u)]?.label||"Azul oscuro")}</div><div class="hcMemberProfileActions"><button class="hcSettingsBtn" id="hcsMembersBack">← Miembros</button><button class="hcSettingsBtn primary" data-hcs-chat="${esc(u.username)}">Mensajes</button></div></div></div>
+        <div class="hcMemberProfileBody"><div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Perfil profesional</div><div class="hcToggleRow"><div><div class="hcToggleTitle">Especialidad / función</div><div class="hcToggleSub">${esc(u.specialty||"—")}</div></div></div><div class="hcToggleRow"><div><div class="hcToggleTitle">Matrícula</div><div class="hcToggleSub">${esc(u.licenseNumber||"—")}</div></div></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Actividad reciente</div><div class="hcMemberActivity">${acts.length?acts.map(a=>`<div class="hcMemberActivityItem"><div class="hcMemberActivityTime">${esc(typeof dmyhmFromISODateTime==="function"?dmyhmFromISODateTime(a.ts):a.ts||"")}</div><div class="hcMemberActivityText">${esc(a.message||"—")}</div></div>`).join(""):`<div class="hcSettingsMuted">Sin actividad registrada.</div>`}</div></div></div></div>
+      </div></div>`;
+    }
+    return `<div class="hcSettingsPage">${hero("Miembros","Perfiles de la institución, actividad y mensajes en una vista más amplia.")}<div class="hcSettingsCard"><div class="hcMemberToolbar"><input id="hcsMemberSearch" placeholder="Buscar por nombre, usuario o rol"><span class="hcSettingsMuted">${users.length} miembros</span></div><div class="hcMemberListNew" id="hcsMemberList">${users.length?users.map(u=>`<button class="hcMemberCardNew" type="button" data-hcs-member="${esc(u.username)}" data-search="${esc((u.name+" "+u.username+" "+u.role).toLowerCase())}"><span class="hcMemberMiniAvatar">${u.photo?`<img src="${u.photo}" alt="">`:`<span class="hcSettingsMuted">${esc((u.name||u.username||"?").slice(0,1).toUpperCase())}</span>`}</span><span style="min-width:0;text-align:left;"><span style="display:block;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(u.name||u.username)}</span><span class="hcSettingsMuted" style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">@${esc(u.username)} · ${esc(roleLabel(u.role))}</span></span></button>`).join(""):`<div class="hcSettingsMuted">No hay otros miembros disponibles.</div>`}</div></div></div>`;
+  }
+  function renderMemberChat(u){
+    const chats=getChats?.()||{};const k=typeof chatKey==="function"?chatKey(meName(),u.username):[meName(),u.username].sort().join("__");const msgs=Array.isArray(chats[k])?chats[k]:[];
+    return `<div class="hcSettingsPage">${hero("Mensajes",`Conversación con ${u.name||u.username}`)}<div class="hcMemberProfileSurface" style="${memberThemeStyle(u)}"><div class="hcMemberProfileHead">${avatarHtml(u)}<div class="hcSettingsMeta"><div class="hcSettingsName">${esc(u.name||u.username)}</div><div class="hcSettingsMuted">@${esc(u.username)} · ${esc(THEME_DEFS[userTheme(u)]?.label||"Azul oscuro")}</div><div class="hcMemberProfileActions"><button class="hcSettingsBtn" id="hcsChatBack">← Perfil</button></div></div></div><div class="hcMemberProfileBody"><div class="hcSettingsChat" style="${memberThemeStyle(u)}"><div class="hcSettingsChatMsgs" id="hcsChatMsgs">${msgs.map(m=>{const mine=String(m.from||"")===meName();const stamp=typeof dmyhmFromISODateTime==="function"?dmyhmFromISODateTime(m.ts):m.ts||"";return `<div class="hcSettingsBubble ${mine?"me":""}">${m.text?`<div>${esc(m.text)}</div>`:""}${m.kind==="image"&&m.dataURL?`<img src="${m.dataURL}" alt="imagen">`:""}<div class="hcSettingsBubbleMeta">${esc(stamp)} · ${mine?"vos":esc(u.name||u.username)}</div></div>`;}).join("")}</div><div class="hcSettingsChatComposer"><input id="hcsChatText" type="text" placeholder="Escribí un mensaje..."><input id="hcsChatImg" type="file" accept="image/*"><button class="hcSettingsBtn primary" id="hcsChatSend" type="button">Enviar</button></div></div></div></div></div>`;
+  }
+  function renderInstitutions(){
+    const rows=typeof hcGlobalStoredInstitutions==="function"?hcGlobalStoredInstitutions():[];const current=typeof hcGlobalCurrentInstitutionId==="function"?hcGlobalCurrentInstitutionId():String(session?.institutionId||"");
+    return `<div class="hcSettingsPage">${hero("Mis instituciones","Ámbitos de trabajo habilitados para tu cuenta.")}<div class="hcSettingsCard"><div class="hcSettingsCardTitle">Instituciones disponibles</div><div class="hcSettingsCardSub">Cambiar de institución mantiene la lógica segura ya existente y recarga su censo correspondiente.</div>${rows.length?rows.map(i=>`<div class="hcInstitutionCardNew ${String(i.id)===String(current)?"hcInstitutionCurrent":""}"><div style="flex:1;min-width:0;"><div style="font-weight:850;">${esc(i.name||"Institución")}</div><div class="hcSettingsMuted">${esc(i.role||"")} ${i.description||i.address?`· ${esc(i.description||i.address)}`:""}</div></div>${String(i.id)===String(current)?`<span class="hcSettingsMuted">Actual</span>`:`<button class="hcSettingsBtn" data-hcs-switch-inst="${esc(i.id)}">Abrir</button>`}</div>`).join(""):`<div class="hcSettingsNotice">No hay una lista global disponible en este equipo. Institución actual: <b>${esc(currentInstitutionName())}</b>.</div>`}</div></div>`;
+  }
+  function renderSignature(){
+    const u=currentUser();
+    return `<div class="hcSettingsPage">${hero("Firma","Firma gráfica y datos profesionales usados en documentos impresos.")}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Vista previa</div><div class="userSignaturePreview" style="min-height:150px;display:grid;place-items:center;background:#fff;border-radius:10px;border:1px solid #d0d7de;overflow:hidden;">${u.signature?`<img src="${u.signature}" alt="Firma" style="max-width:100%;max-height:140px;object-fit:contain;">`:`<span style="color:#475569;font-size:12px;">Sin firma cargada</span>`}</div><div class="hcSettingsField" style="margin-top:10px;"><label>Adjuntar nueva firma</label><input id="hcsSignatureFile" type="file" accept="image/png,image/jpeg,image/webp"></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Datos profesionales</div><div class="hcSettingsFields"><div class="hcSettingsField"><label>Título</label><input id="hcsSigTitle" value="${esc(u.professionalTitle||"")}"></div><div class="hcSettingsField"><label>Matrícula</label><input id="hcsSigLicense" value="${esc(u.licenseNumber||"")}"></div><div class="hcSettingsField full"><label>Especialidad / función</label><input id="hcsSigSpecialty" value="${esc(u.specialty||"")}"></div></div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsSaveSignature" type="button">Guardar firma y datos</button><button class="hcSettingsBtn" id="hcsRemoveSignature" type="button">Quitar firma</button></div><div id="hcsSignatureMsg" class="hcSettingsNotice">La firma gráfica del prototipo no reemplaza una firma digital criptográfica certificada.</div></div></div></div>`;
+  }
+  function renderPersonalization(){
+    const active=userTheme(currentUser());
+    return `<div class="hcSettingsPage">${hero("Personalización","Elegí la ambientación visual. Los colores clínicos de seguridad permanecen independientes del tema.")}<div class="hcSettingsCard"><div class="hcThemeGrid">${Object.entries(THEME_DEFS).map(([k,d])=>`<button class="hcThemeTile ${k===active?"active":""}" type="button" data-hcs-theme="${k}"><div class="hcThemePreview" style="--p-bg:${d.bg};--p-surface:${d.surface};--p-line:${d.line};--p-accent:${d.accent};"><div class="hcThemePreviewSide"></div><div class="hcThemePreviewMain"><div class="hcThemePreviewBar"></div><div class="hcThemePreviewCard"></div></div></div><div class="hcThemeLabel">${esc(d.label)}</div><div class="hcThemeHint">${esc(d.hint)}</div></button>`).join("")}</div><div class="hcSettingsNotice">Tema actual: <b>${esc(THEME_DEFS[active]?.label||"Azul oscuro")}</b>. Se guarda por usuario en este dispositivo y se intenta asociar al perfil global cuando el backend lo admite.</div></div></div>`;
+  }
+  function switchRow(id,title,sub,checked,disabled=false){return `<div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">${esc(title)}</div><div class="hcToggleSub">${esc(sub)}</div></div><label class="hcSwitch"><input id="${id}" type="checkbox" ${checked?"checked":""} ${disabled?"disabled":""}><span class="hcSwitchTrack"></span></label></div>`;}
+  function renderNotifications(){const p=loadPrefs();return `<div class="hcSettingsPage">${hero("Notificaciones","Preferencias de información visual del sistema.")}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow("hcsShowSync","Mostrar estado de sincronización","Muestra el estado Supabase en la barra superior.",p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Alertas clínicas</div>${switchRow("hcsClinicalAlerts","Alertas clínicas activas","Las alarmas de Enfermería, prescripciones y estados críticos no se desactivan desde Personalización.",true,true)}<div class="hcSettingsNotice warn">Se mantienen fuera del sistema de temas para no perder significado clínico.</div></div></div></div>`;}
+  function renderAccessibility(){const p=loadPrefs();return `<div class="hcSettingsPage">${hero("Apariencia y accesibilidad","Ajustes visuales que no cambian datos clínicos.")}<div class="hcSettingsCard">${switchRow("hcsHighContrast","Contraste reforzado","Engrosa bordes y mejora la lectura de textos secundarios.",!!p.highContrast)}${switchRow("hcsLargeText","Texto ligeramente mayor","Aumenta el tamaño de controles y texto común.",!!p.largeText)}${switchRow("hcsReduceMotion","Reducir animaciones decorativas","Reduce transiciones dentro de Configuración; no apaga alarmas clínicas.",!!p.reduceMotion)}</div></div>`;}
+  function renderSessions(){
+    const mobile=document.body.classList.contains("hcMobile")||matchMedia?.("(pointer:coarse)")?.matches;const orientation=innerWidth>innerHeight?"Horizontal":"Vertical";
+    return `<div class="hcSettingsPage">${hero("Sesiones y dispositivos","Información del dispositivo que está usando esta sesión.")}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Este dispositivo</div><div class="hcToggleRow"><div><div class="hcToggleTitle">Tipo detectado</div><div class="hcToggleSub">${mobile?"Celular / táctil":"PC / escritorio"}</div></div></div><div class="hcToggleRow"><div><div class="hcToggleTitle">Orientación</div><div class="hcToggleSub">${orientation} · ${innerWidth} × ${innerHeight}px</div></div></div><div class="hcToggleRow"><div><div class="hcToggleTitle">Conectividad</div><div class="hcToggleSub">${navigator.onLine?"En línea":"Sin conexión"}</div></div></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Navegador</div><div class="hcSettingsCode">${esc(navigator.userAgent)}</div><div class="hcSettingsNotice">Hospitalito no ofrece todavía revocación remota de sesiones desde esta pantalla.</div></div></div></div>`;
+  }
+  function storageStats(){let bytes=0,count=0,rows=[];try{Object.keys(localStorage).forEach(k=>{const v=localStorage.getItem(k)||"";const b=(k.length+v.length)*2;bytes+=b;count++;rows.push([k,b]);});}catch(_){ }rows.sort((a,b)=>b[1]-a[1]);return {bytes,count,rows};}
+  function fmtBytes(n){if(n<1024)return `${n} B`;if(n<1048576)return `${(n/1024).toFixed(1)} KB`;return `${(n/1048576).toFixed(2)} MB`;}
+  function renderData(){const st=storageStats();return `<div class="hcSettingsPage">${hero("Datos y almacenamiento","Estado de la caché local. Los datos clínicos principales continúan en el backend institucional.")}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Uso local aproximado</div><div style="font-size:30px;font-weight:900;margin:8px 0;">${esc(fmtBytes(st.bytes))}</div><div class="hcSettingsMuted">${st.count} claves en localStorage</div><div class="hcSettingsNotice">Hospitalito usa caché clínica acotada para evitar saturar el navegador.</div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Preferencias visuales</div><div class="hcSettingsCardSub">Esta acción no toca pacientes, prescripciones ni backend.</div><div class="hcSettingsActions"><button class="hcSettingsBtn" id="hcsResetVisualPrefs">Restablecer preferencias visuales</button></div></div></div></div>`;}
+  function diagnosticsText(){const st=storageStats();return [`Hospitalito ${window.HC_DEMO_VERSION||"v228"}`,`Usuario: ${session?.username||"—"} (${session?.role||"—"})`,`Institución: ${currentInstitutionName()}`,`Backend: ${document.getElementById("backendStatus")?.textContent?.trim()||"—"}`,`Online: ${navigator.onLine?"sí":"no"}`,`Viewport: ${innerWidth}x${innerHeight}`,`Tema: ${userTheme(currentUser())}`,`localStorage: ${fmtBytes(st.bytes)} / ${st.count} claves`,`Paciente seleccionado: ${typeof selectedPatientId!=="undefined"&&selectedPatientId?selectedPatientId:"ninguno"}`].join("\n");}
+  function renderDiagnostics(){return `<div class="hcSettingsPage">${hero("Diagnóstico y acerca de","Resumen técnico no sensible para detectar problemas de interfaz o sincronización.")}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Hospitalito</div><div class="hcSettingsCode" id="hcsDiagnosticsText">${esc(diagnosticsText())}</div><div class="hcSettingsActions"><button class="hcSettingsBtn" id="hcsCopyDiagnostics">Copiar diagnóstico</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Revisión v228</div><div class="hcSettingsNotice good">✓ JavaScript validado sintácticamente.</div><div class="hcSettingsNotice good">✓ IDs duplicados del modal de Laboratorio corregidos.</div><div class="hcSettingsNotice">La revisión automática evita tocar algoritmos clínicos o sincronización cuando no hay un bug concreto verificable.</div></div></div></div>`;}
+  function renderLogout(){return `<div class="hcSettingsPage">${hero("Cerrar sesión","Finaliza la sesión actual en este navegador.")}<div class="hcSettingsCard" style="max-width:620px;"><div class="hcSettingsCardTitle">Salir de Hospitalito</div><div class="hcSettingsCardSub">No elimina historias clínicas ni desconfigura la institución del equipo.</div><div class="hcSettingsActions"><button class="hcSettingsBtn danger" id="hcsLogout" type="button">Cerrar sesión</button></div></div></div>`;}
+  function renderSection(id){
+    const box=document.getElementById("hcSettingsContent");if(!box)return;
+    const map={account:renderAccount,privacy:renderPrivacy,members:renderMembers,institutions:renderInstitutions,signature:renderSignature,personalization:renderPersonalization,notifications:renderNotifications,accessibility:renderAccessibility,sessions:renderSessions,data:renderData,diagnostics:renderDiagnostics,logout:renderLogout};
+    box.innerHTML=(map[id]||renderAccount)();
+    if(id==="members"&&memberChat){setTimeout(()=>{const m=document.getElementById("hcsChatMsgs");if(m)m.scrollTop=m.scrollHeight;},0);}
+  }
+  function msg(id,text,kind=""){const el=document.getElementById(id);if(!el)return;el.textContent=text;el.className="hcSettingsNotice"+(kind?` ${kind}`:"");}
+  async function saveProfile(){
+    if(!session)return;const u=currentUser();let photo=u.photo||"";
+    try{const f=document.getElementById("hcsProfilePhoto")?.files?.[0];if(f){if(f.size>8*1024*1024)throw new Error("La foto supera 8 MB.");photo=await readFileAsDataURL(f);}}
+    catch(e){return msg("hcsProfileMsg",e.message||String(e),"warn");}
+    const patch={name:String(document.getElementById("hcsProfileName")?.value||u.name||"").trim(),photo,professionalTitle:String(document.getElementById("hcsProfessionalTitle")?.value||"").trim(),licenseNumber:String(document.getElementById("hcsLicenseNumber")?.value||"").trim(),specialty:String(document.getElementById("hcsSpecialty")?.value||"").trim(),uiTheme:userTheme(u),preferences:{...(u.preferences||{}),theme:userTheme(u)}};
+    try{
+      let updated={...u,...patch};
+      const users=getUsers?.()||[];const idx=users.findIndex(x=>String(x.username||"")===meName());if(idx>=0){updated=typeof hcUserUpdateStamp==="function"?hcUserUpdateStamp(users[idx],patch):updated;users[idx]=updated;setUsers?.(users);}
+      if(!session.localSeed&&typeof hcGlobalAuthToken==="function"&&hcGlobalAuthToken()){
+        const r=await hcGlobalAccountRequest("updateProfile",{token:hcGlobalAuthToken(),user:patch});updated={...updated,...(r.user||{})};try{hcGlobalCacheUser?.(updated,{id:hcGlobalCurrentInstitutionId?.(),name:session?.institutionName||""});saveJSON?.(LS.globalAuthUser,updated);}catch(_){ }
+      }
+      session.name=updated.name||session.name;saveJSON?.(LS.session,session);syncSessionUI?.();msg("hcsProfileMsg","Perfil guardado correctamente.","good");
+    }catch(e){msg("hcsProfileMsg",e.message||String(e),"warn");}
+  }
+  async function changePasswordNew(){
+    const cur=String(document.getElementById("hcsPassCurrent")?.value||""),next=String(document.getElementById("hcsPassNew")?.value||""),next2=String(document.getElementById("hcsPassNew2")?.value||"");
+    if(!cur||!next||!next2)return msg("hcsPassMsg","Completá los tres campos.","warn");if(next!==next2)return msg("hcsPassMsg","Las nuevas contraseñas no coinciden.","warn");
+    if(session?.localSeed)return msg("hcsPassMsg","El admin semilla es una cuenta técnica local. Su contraseña no se modifica desde aquí.","warn");
+    try{await hcGlobalAccountRequest("changePassword",{token:hcGlobalAuthToken(),currentPassword:cur,newPassword:next});["hcsPassCurrent","hcsPassNew","hcsPassNew2"].forEach(id=>{const e=document.getElementById(id);if(e)e.value="";});msg("hcsPassMsg","Contraseña global actualizada.","good");}catch(e){msg("hcsPassMsg",e.message||String(e),"warn");}
+  }
+  async function saveSignatureNew(remove=false){
+    const u=currentUser();let signature=remove?"":(pendingSignature||u.signature||"");
+    const patch={signature,professionalTitle:String(document.getElementById("hcsSigTitle")?.value||u.professionalTitle||"").trim(),licenseNumber:String(document.getElementById("hcsSigLicense")?.value||u.licenseNumber||"").trim(),specialty:String(document.getElementById("hcsSigSpecialty")?.value||u.specialty||"").trim(),uiTheme:userTheme(u),preferences:{...(u.preferences||{}),theme:userTheme(u)}};
+    try{let updated={...u,...patch};const users=getUsers?.()||[];const idx=users.findIndex(x=>String(x.username||"")===meName());if(idx>=0){updated=typeof hcUserUpdateStamp==="function"?hcUserUpdateStamp(users[idx],patch):updated;users[idx]=updated;setUsers?.(users);}if(!session?.localSeed&&typeof hcGlobalAuthToken==="function"&&hcGlobalAuthToken()){const r=await hcGlobalAccountRequest("updateProfile",{token:hcGlobalAuthToken(),user:patch});updated={...updated,...(r.user||{})};try{hcGlobalCacheUser?.(updated,{id:hcGlobalCurrentInstitutionId?.(),name:session?.institutionName||""});saveJSON?.(LS.globalAuthUser,updated);}catch(_){ }}pendingSignature=null;msg("hcsSignatureMsg",remove?"Firma eliminada.":"Firma y datos profesionales guardados.","good");renderSection("signature");}catch(e){msg("hcsSignatureMsg",e.message||String(e),"warn");}
+  }
+  async function sendMemberChat(){
+    if(!memberChat)return;const other=findUserByUsername?.(memberChat);if(!other)return;const text=String(document.getElementById("hcsChatText")?.value||"").trim();const file=document.getElementById("hcsChatImg")?.files?.[0]||null;if(!text&&!file)return;const chats=getChats?.()||{};const k=typeof chatKey==="function"?chatKey(meName(),memberChat):[meName(),memberChat].sort().join("__");const arr=Array.isArray(chats[k])?chats[k]:[];if(file){const dataURL=await readFileAsDataURL(file);arr.push({id:typeof uid==="function"?uid("msg"):String(Date.now()),ts:typeof isoNowLocalFull==="function"?isoNowLocalFull():new Date().toISOString(),from:meName(),kind:"image",text,dataURL});}else{arr.push({id:typeof uid==="function"?uid("msg"):String(Date.now()),ts:typeof isoNowLocalFull==="function"?isoNowLocalFull():new Date().toISOString(),from:meName(),kind:"text",text});}while(arr.length>300)arr.shift();chats[k]=arr;setChats?.(chats);renderSection("members");
+  }
+  function setPref(name,value){const p=loadPrefs();p[name]=value;savePrefs(p);applyPrefs();}
+  function resetVisualPrefs(){try{localStorage.removeItem(prefKey());localStorage.removeItem(themeKey());}catch(_){ }const users=getUsers?.()||[];const idx=users.findIndex(u=>String(u.username||"")===meName());if(idx>=0){const old=users[idx];users[idx]={...old,uiTheme:"blue-dark",preferences:{...(old.preferences||{}),theme:"blue-dark"}};setUsers?.(users);}applyTheme("blue-dark");applyPrefs();renderSection("data");}
+
+  document.addEventListener("click",async function(ev){
+    const open=ev.target.closest?.("#btnOpenSettings");if(open){ev.preventDefault();openSettings("account");return;}
+    if(ev.target.closest?.("#hcSettingsCloseBtn")){closeSettings();return;}
+    if(ev.target.closest?.("#hcSettingsMenuBtn")){document.getElementById("hcSettingsModal")?.classList.toggle("nav-open");return;}
+    if(ev.target.id==="hcSettingsNavBackdrop"){document.getElementById("hcSettingsModal")?.classList.remove("nav-open");return;}
+    const sec=ev.target.closest?.("[data-hcs-section]");if(sec){setSection(sec.getAttribute("data-hcs-section")||"account");return;}
+    if(ev.target.closest?.("#hcSettingsBackToAccount")){closeSettings();openAccount?.();return;}
+    if(ev.target.closest?.("#hcsOpenClassicAccount")){closeSettings();openAccount?.();return;}
+    const themeBtn=ev.target.closest?.("[data-hcs-theme]");if(themeBtn){await persistTheme(themeBtn.getAttribute("data-hcs-theme"));return;}
+    if(ev.target.closest?.("#hcsSaveProfile")){await saveProfile();return;}
+    if(ev.target.closest?.("#hcsChangePassword")){await changePasswordNew();return;}
+    const mem=ev.target.closest?.("[data-hcs-member]");if(mem){selectedMember=mem.getAttribute("data-hcs-member")||"";memberChat="";renderSection("members");return;}
+    if(ev.target.closest?.("#hcsMembersBack")){selectedMember="";memberChat="";renderSection("members");return;}
+    const chat=ev.target.closest?.("[data-hcs-chat]");if(chat){memberChat=chat.getAttribute("data-hcs-chat")||"";selectedMember=memberChat;renderSection("members");return;}
+    if(ev.target.closest?.("#hcsChatBack")){memberChat="";renderSection("members");return;}
+    if(ev.target.closest?.("#hcsChatSend")){await sendMemberChat();return;}
+    const sw=ev.target.closest?.("[data-hcs-switch-inst]");if(sw){const id=sw.getAttribute("data-hcs-switch-inst")||"";const rows=typeof hcGlobalStoredInstitutions==="function"?hcGlobalStoredInstitutions():[];closeSettings();if(typeof hcInstitutionChooserOpen==="function")hcInstitutionChooserOpen(rows,{switching:true});return;}
+    if(ev.target.closest?.("#hcsSaveSignature")){await saveSignatureNew(false);return;}
+    if(ev.target.closest?.("#hcsRemoveSignature")){if(confirm("¿Quitar la firma guardada de su cuenta?"))await saveSignatureNew(true);return;}
+    if(ev.target.closest?.("#hcsResetVisualPrefs")){if(confirm("¿Restablecer solamente las preferencias visuales de este usuario?"))resetVisualPrefs();return;}
+    if(ev.target.closest?.("#hcsCopyDiagnostics")){const txt=diagnosticsText();try{await navigator.clipboard.writeText(txt);toast?.("Diagnóstico copiado");}catch(_){prompt("Copiar diagnóstico:",txt);}return;}
+    if(ev.target.closest?.("#hcsLogout")){closeSettings();logout?.();return;}
+  },true);
+  document.addEventListener("change",async function(ev){
+    if(ev.target.id==="hcsProfilePhoto"){const f=ev.target.files?.[0]||null;pendingProfilePhoto=f||null;return;}
+    if(ev.target.id==="hcsSignatureFile"){
+      const f=ev.target.files?.[0]||null;if(!f){pendingSignature=null;return;}
+      try{pendingSignature=typeof hcPrepareSignatureDataURL==="function"?await hcPrepareSignatureDataURL(f):await readFileAsDataURL(f);msg("hcsSignatureMsg","Firma preparada. Presioná Guardar firma y datos.","good");}catch(e){pendingSignature=null;msg("hcsSignatureMsg",e.message||String(e),"warn");}
+      return;
+    }
+    if(ev.target.id==="hcsShowSync"){setPref("showSyncStatus",!!ev.target.checked);return;}
+    if(ev.target.id==="hcsHighContrast"){setPref("highContrast",!!ev.target.checked);return;}
+    if(ev.target.id==="hcsLargeText"){setPref("largeText",!!ev.target.checked);return;}
+    if(ev.target.id==="hcsReduceMotion"){setPref("reduceMotion",!!ev.target.checked);return;}
+  },true);
+  document.addEventListener("input",function(ev){if(ev.target.id==="hcsMemberSearch"){const q=String(ev.target.value||"").trim().toLowerCase();document.querySelectorAll("#hcsMemberList [data-search]").forEach(el=>{el.style.display=!q||String(el.dataset.search||"").includes(q)?"":"none";});}},true);
+  document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&document.getElementById("hcSettingsModal")?.classList.contains("show")){const modal=document.getElementById("hcSettingsModal");if(modal.classList.contains("nav-open"))modal.classList.remove("nav-open");else closeSettings();}},true);
+  window.addEventListener("resize",()=>{if(currentSection==="sessions"&&document.getElementById("hcSettingsModal")?.classList.contains("show"))renderSection("sessions");},{passive:true});
+
+  window.hcSettingsOpen=openSettings;window.hcSettingsClose=closeSettings;window.hcSettingsApplyTheme=applyTheme;
+  initialTheme();
+  setTimeout(initialTheme,100);setTimeout(initialTheme,700);
+  console.info("HC v228: Configuración a pantalla completa, 7 temas y auditoría segura activas.");
 })();
 </script>
 
