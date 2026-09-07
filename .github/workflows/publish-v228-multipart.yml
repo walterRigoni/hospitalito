@@ -1,0 +1,62 @@
+name: Publish Hospitalito v228 multipart
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-v228-multipart.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Verify base and assemble exact patch
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'HC Demo v228 · Supabase' index.html; then
+            echo 'v228 already present; nothing to apply.'
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          b = Path('index.html').read_bytes()
+          sha = hashlib.sha1(b'blob ' + str(len(b)).encode() + b'\0' + b).hexdigest()
+          expected = 'dbcef3f362a4489b6208b8b70f800ea3e86a07c9'
+          print('index.html blob:', sha)
+          if sha != expected:
+              raise SystemExit(f'Base inesperada: {sha} != {expected}')
+          PY
+          cat .hospitalito/v228_parts/part*.patch > /tmp/v228.patch
+          actual="$(sha256sum /tmp/v228.patch | awk '{print $1}')"
+          echo "patch sha256: $actual"
+          test "$actual" = 'd03a34a3b35381f0664d2aa4d792356cc21f6ae8eda98da6452f03b57e84679b'
+          git apply --check /tmp/v228.patch
+          git apply /tmp/v228.patch
+          grep -q 'HC Demo v228 · Supabase' index.html
+          grep -q 'id="hcSettingsModal"' index.html
+          grep -q 'id="btnOpenSettings"' index.html
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Commit and publish v228
+        if: steps.apply.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ChatGPT Hospitalito"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Hospitalito v228: configuración, temas y auditoría"
+          git push origin main
