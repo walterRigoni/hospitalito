@@ -45,3 +45,5 @@ jobs:
           git add index.html
           git commit -m "Hospitalito v228: configuración, temas y auditoría"
           git push
+
+# trigger: v228 validated publisher
