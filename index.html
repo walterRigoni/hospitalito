@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v228 · Supabase</title>
+<title>HC Demo v229 · Supabase</title>
 <style>
   :root{
     --bg:#071a33;
@@ -39073,7 +39073,7 @@ bootWithBackend();
 (function(){
 "use strict";
 
-const HC207_VERSION=221;
+const HC207_VERSION=229;
 const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-sync";
 const HC207_PUBLISHABLE="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
 const HC207_BUCKETS=["beds","registry","patients","clinical","inst","archive","activity","chats","pharmacyDrugs","appointments","doctorSchedules"];
@@ -39435,11 +39435,27 @@ async function hc214InitialPull(fromValidation=false){
     hc207Status("Supabase · recuperando estado institucional…","warn");
     const local=hc207Snapshot();
     const outbox=hc214ReadOutboxSnapshot(hc207InstitutionId);
-    const r=await hc207Req("pull");
+    /* v229: bootstrap liviano. El censo y las listas institucionales deben quedar
+       disponibles antes de descargar historia clínica. hospitalito-sync v9 acepta
+       filtro de buckets y devuelve igualmente el cursor global del servidor. */
+    const coreBuckets=HC207_BUCKETS.filter(k=>k!=="clinical");
+    const r=await hc207Req("pull",{buckets:coreBuckets,clientVersion:229});
     const rows=Array.isArray(r.rows)?r.rows:[];
     const remote=hc207RowsToSnapshot(rows);
+    const hasClinicalRows=rows.some(x=>String(x?.bucket||"")==="clinical");
+    const coreOnly=Number(r?.syncVersion||0)>=9 && r?.filtered===true && !hasClinicalRows;
     const explicitBuckets=new Set(Array.isArray(outbox?.buckets)?outbox.buckets:[]);
     const preserved=hc214OverlayLocalNewer(local,remote,outbox);
+    if(coreOnly){
+      /* No interpretar la ausencia intencional de clinical como borrado remoto.
+         Sólo las ediciones clínicas explícitas del outbox pueden volver a subirse. */
+      preserved.clinical.clear();
+      const explicitClinical=outbox?.clinical&&typeof outbox.clinical==="object"?outbox.clinical:{};
+      Object.entries(explicitClinical).forEach(([pid,fields])=>{
+        const set=new Set((Array.isArray(fields)?fields:[]).map(String).filter(Boolean));
+        if(set.size)preserved.clinical.set(String(pid),set);
+      });
+    }
     const merged={...remote,clinical:{}};
 
     // Censo y listas institucionales: NUNCA reemplazar el servidor por una copia local incompleta.
@@ -39453,10 +39469,12 @@ async function hc214InitialPull(fromValidation=false){
     merged.chats=hc216MergeSharedObject(remote.chats,local.chats,explicitBuckets.has("chats"));
     merged.doctorSchedules=hc216MergeSharedObject(remote.doctorSchedules,local.doctorSchedules,explicitBuckets.has("doctorSchedules"));
 
-    // Clinical v224: el servidor sigue siendo completo, pero localStorage funciona como CACHÉ.
-    // Conservamos completa la historia visible/pending y sólo campos operativos del resto de internados.
+    // Clinical v229: durante el bootstrap liviano se conserva la caché clínica local
+    // sin publicarla como si fuera más nueva. Los datos operativos de internados se
+    // revalidan luego con hospitalito-patient-sync.
     const fullIds=Array.from(preserved.clinical.keys());
-    const c=hc224SlimClinicalForCache(remote.clinical,merged.registry,fullIds);
+    const clinicalBase=coreOnly ? (local.clinical||{}) : (remote.clinical||{});
+    const c=hc224SlimClinicalForCache(clinicalBase,merged.registry,fullIds);
     preserved.clinical.forEach((fields,pid)=>{
       c[pid]=c[pid]&&typeof c[pid]==="object"?c[pid]:{};
       fields.forEach(field=>{
@@ -39477,7 +39495,11 @@ async function hc214InitialPull(fromValidation=false){
 
     hc214PersistOutbox();
     hc207PendingPull=false;hc207RetryCount=0;hc207ClearErr();hc214RefreshUI();
-    hc207Status("Supabase · sincronizado","ok");
+    hc207Status(coreOnly?"Supabase · censo listo · sincronizando historia…":"Supabase · sincronizado","ok");
+    if(coreOnly){
+      setTimeout(()=>{try{hc229WarmActiveClinical();}catch(e){console.warn("v229 warm clinical",e);}},40);
+      setTimeout(()=>{try{window.hc229MaybePromptWorkShift?.("post-sync");}catch(_){ }},120);
+    }
     if(hc207DirtyBuckets.size||hc207DirtyClinical.size)hc215ScheduleSync(35);
     return true;
   }catch(e){
@@ -39614,6 +39636,30 @@ function hc215ApplyIncoming(rows){
   }
   return changed;
 }
+/* v229 — calentamiento clínico operacional posterior al censo.
+   Descarga sólo los campos necesarios para alarmas/bandejas de los pacientes
+   activos. La historia completa se mantiene dirigida al paciente seleccionado. */
+async function hc229WarmActiveClinical(){
+  if(!hc207Connected)return false;
+  const reg=hc207Local("registry")||[];
+  const ids=Array.from(new Set(reg.filter(a=>a&&a.active!==false&&a.patientId).map(a=>String(a.patientId)).filter(Boolean)));
+  if(!ids.length){hc207Status("Supabase · sincronizado","ok");return true;}
+  const fields=Array.from(hc224WarmClinicalFields());
+  let changed=false;
+  for(let i=0;i<ids.length;i+=4){
+    const batch=ids.slice(i,i+4);
+    const results=await Promise.all(batch.map(async pid=>{
+      try{return await hc221PatientReq(pid,fields);}catch(e){console.warn("v229 warm patient",pid,e);return null;}
+    }));
+    results.forEach(r=>{const rows=Array.isArray(r?.rows)?r.rows:[];if(rows.length&&hc215ApplyIncoming(rows))changed=true;});
+    await new Promise(resolve=>setTimeout(resolve,15));
+  }
+  if(changed)hc214RefreshUI();
+  hc207Status("Supabase · sincronizado","ok");
+  return true;
+}
+try{window.hc229WarmActiveClinical=hc229WarmActiveClinical;}catch(_){ }
+
 /* v221 — REVALIDACIÓN CLÍNICA DIRIGIDA
    El flujo incremental sigue siendo el mecanismo principal. Además, para el paciente
    actualmente seleccionado se consulta periódicamente el estado clínico autoritativo
@@ -42208,6 +42254,382 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
   initialTheme();
   setTimeout(initialTheme,100);setTimeout(initialTheme,700);
   console.info("HC v228: Configuración a pantalla completa, 7 temas y auditoría segura activas.");
+})();
+</script>
+
+<!-- =====================================================================
+     v229 · JORNADA DIARIA + DICTADO CLÍNICO + VOZ EN PRESCRIPCIONES
+            + TEMAS INTEGRALES + REFUERZO MÓVIL/SYNC
+     ===================================================================== -->
+<style id="hc-v229-integral-style">
+/* ---------- Tema integral: las variables v228 pasan a gobernar también la UI histórica ---------- */
+body[data-hc-theme]{
+  --bg:var(--hc-theme-bg) !important;
+  --card:color-mix(in srgb,var(--hc-theme-surface) 94%,transparent) !important;
+  --line:var(--hc-theme-line) !important;
+  --txt:var(--hc-theme-text) !important;
+  --muted:var(--hc-theme-muted) !important;
+  --black:color-mix(in srgb,var(--hc-theme-surface) 72%,#000 28%) !important;
+  --blue:var(--hc-theme-accent) !important;
+  color-scheme:dark;
+}
+body[data-hc-theme="light"]{color-scheme:light;}
+body[data-hc-theme] :where(.card,.miniBox,.invCard,.invMiniItem,.labReqBox,.labResBox,.labHistoryItem,.labResultGroup,.apptCard,.activityBox,.chatWrap,.medScheduleBox,.svChartCard,.miniTrendBox,.consultorioCensoDateBox,.ambMiniHeader,.ownScheduleCard,.scheduleNotice,.adminLogoBox,.pharmConsumptionCard,.pharmCard,.hcSettingsCard,.hcMemberProfileSurface,.hcSettingsChat,.prListItem){
+  background:color-mix(in srgb,var(--hc-theme-surface) 94%,transparent) !important;
+  border-color:var(--hc-theme-line) !important;
+  color:var(--hc-theme-text) !important;
+}
+body[data-hc-theme] :where(.card,.miniBox,.invCard,.invMiniItem,.labReqBox,.labResBox,.labHistoryItem,.labResultGroup,.apptCard,.activityBox,.chatWrap,.medScheduleBox,.svChartCard,.miniTrendBox,.consultorioCensoDateBox,.ambMiniHeader,.ownScheduleCard,.scheduleNotice,.adminLogoBox,.pharmConsumptionCard,.pharmCard,.prListItem) .muted{
+  color:var(--hc-theme-muted) !important;
+}
+body[data-hc-theme] :where(.btn,.tab,.censoItem,.memberItem,.labChip,.chk,.agendaSlot,.hcSettingsBtn){
+  color:var(--hc-theme-text) !important;
+  border-color:var(--hc-theme-line) !important;
+}
+body[data-hc-theme] :where(.btn:not(.danger):not(.primary):not(.attached),.tab:not(.active),.censoItem:not(.active),.memberItem,.labChip,.chk){
+  background:color-mix(in srgb,var(--hc-theme-surface-2) 58%,transparent) !important;
+}
+body[data-hc-theme] :where(.btn.primary,.tab.active,.censoItem.active,.hcSettingsBtn.primary){
+  background:var(--hc-theme-accent-soft) !important;
+  border-color:var(--hc-theme-accent) !important;
+  color:var(--hc-theme-text) !important;
+}
+body[data-hc-theme="light"] :where(.btn.primary,.hcSettingsBtn.primary){
+  background:var(--hc-theme-accent) !important;color:#fff !important;
+}
+body[data-hc-theme] :where(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+  background:var(--hc-theme-input) !important;
+  color:var(--hc-theme-text) !important;
+  border-color:var(--hc-theme-line) !important;
+  caret-color:var(--hc-theme-accent) !important;
+}
+body[data-hc-theme] :where(input,textarea)::placeholder{color:color-mix(in srgb,var(--hc-theme-muted) 82%,transparent) !important;opacity:1 !important;}
+body[data-hc-theme] select option{background:var(--hc-theme-surface) !important;color:var(--hc-theme-text) !important;}
+body[data-hc-theme] :where(th,td){border-color:var(--hc-theme-line) !important;color:var(--hc-theme-text);}
+body[data-hc-theme] :where(th,.svTable th,.medScheduleTable th){background:color-mix(in srgb,var(--hc-theme-surface-2) 88%,transparent) !important;color:var(--hc-theme-text) !important;}
+body[data-hc-theme] :where(.instBar){background:color-mix(in srgb,var(--hc-theme-surface) 58%,#000 42%) !important;color:var(--hc-theme-text) !important;border-color:var(--hc-theme-line) !important;}
+body[data-hc-theme] .pacBar{background:linear-gradient(180deg,var(--hc-theme-patient),var(--hc-theme-accent-2)) !important;color:#fff !important;}
+body[data-hc-theme] :where(#previewCard,#labModalCard,#accountModal>.card){background:var(--hc-theme-surface) !important;color:var(--hc-theme-text) !important;border-color:var(--hc-theme-line) !important;}
+body[data-hc-theme] #labModalBar{background:var(--hc-theme-surface-2) !important;border-color:var(--hc-theme-line) !important;}
+body[data-hc-theme] #labModalContent :where(input[type="text"],input[type="number"],textarea,select){background:var(--hc-theme-input) !important;color:var(--hc-theme-text) !important;border-color:var(--hc-theme-line) !important;}
+body[data-hc-theme] #medPanel :where(.heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,.amioProtocolFormBox){
+  background:color-mix(in srgb,var(--hc-theme-surface-2) 82%,transparent) !important;
+  color:var(--hc-theme-text) !important;
+  border-color:var(--hc-theme-line) !important;
+}
+body[data-hc-theme] #medPanel :where(.heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,.amioProtocolFormBox) *{color:inherit !important;}
+body[data-hc-theme] .medScheduleTable :where(th.medicationCol,td.medicationCol){background:var(--hc-theme-surface-2) !important;color:var(--hc-theme-text) !important;}
+body[data-hc-theme] :where(.labResultGroupTitle,.agendaDay,.svDayRow td){background:color-mix(in srgb,var(--hc-theme-surface-2) 82%,transparent) !important;color:var(--hc-theme-text) !important;border-color:var(--hc-theme-line) !important;}
+body[data-hc-theme] :where(.svChartAxis,.miniTrendAxis){stroke:var(--hc-theme-line) !important;}
+body[data-hc-theme] :where(.svChartLine,.miniTrendLine){stroke:var(--hc-theme-accent) !important;}
+body[data-hc-theme] :where(.svChartDot,.miniTrendDot){fill:var(--hc-theme-accent) !important;}
+body[data-hc-theme] :where(.svChartLabel,.miniTrendLabel){fill:var(--hc-theme-muted) !important;}
+body[data-hc-theme] .invCircle text{fill:var(--hc-theme-text) !important;}
+body[data-hc-theme] .invCircleBg{stroke:var(--hc-theme-line) !important;}
+/* Colores semánticos clínicos se preservan explícitamente. */
+body[data-hc-theme] :where(.sv-good,.labBadge.urg,.labBadge.prog,.invBadge.ok,.invBadge.warn,.apptStatus,.censoNurseBlink,.hcNursePatientAlert,.medSlot.done,.medSlot.due,.medNewOrderAck,.btn.danger,.btn.attached){
+  filter:none !important;
+}
+
+/* ---------- Refuerzo censo móvil ---------- */
+body.hcMobile #medCenso{min-height:220px;overscroll-behavior:contain;}
+body.hcMobile #appMed > .card:first-child{background:var(--hc-theme-surface) !important;color:var(--hc-theme-text) !important;}
+body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;color:var(--hc-theme-text) !important;border:1px solid var(--hc-theme-line) !important;}
+.hc229CensoLoading{padding:12px;border:1px dashed var(--hc-theme-line);border-radius:12px;background:var(--hc-theme-surface);color:var(--hc-theme-muted);font-size:12px;line-height:1.45;}
+
+/* ---------- Jornada diaria ---------- */
+#hc229ShiftModal,#hc229AccountingModal{position:fixed;inset:0;display:none;z-index:2147483646;background:rgba(2,8,18,.78);backdrop-filter:blur(7px);padding:18px;overflow:auto;color:var(--hc-theme-text);}
+#hc229ShiftModal.show,#hc229AccountingModal.show{display:grid;place-items:center;}
+.hc229ModalCard{width:min(920px,96vw);max-height:min(92dvh,900px);overflow:auto;background:var(--hc-theme-surface);border:1px solid var(--hc-theme-line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.38);color:var(--hc-theme-text);}
+.hc229ModalHead{position:sticky;top:0;z-index:2;display:flex;gap:12px;align-items:flex-start;padding:16px 18px;border-bottom:1px solid var(--hc-theme-line);background:color-mix(in srgb,var(--hc-theme-surface) 94%,transparent);backdrop-filter:blur(8px);}
+.hc229ModalHead h2{margin:0;font-size:20px;letter-spacing:-.02em;}.hc229ModalHead p{margin:5px 0 0;color:var(--hc-theme-muted);font-size:12px;line-height:1.4}.hc229Spacer{flex:1;}
+.hc229ModalBody{padding:18px;}.hc229Section{margin-bottom:18px;}.hc229SectionTitle{font-weight:900;font-size:13px;margin-bottom:8px;}.hc229Services{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}
+.hc229Choice{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--hc-theme-line);border-radius:11px;background:color-mix(in srgb,var(--hc-theme-surface-2) 68%,transparent);cursor:pointer;font-size:12px;font-weight:750;}
+.hc229Choice:has(input:checked){border-color:var(--hc-theme-accent);background:var(--hc-theme-accent-soft);}.hc229Choice input{width:auto!important;margin:0!important;accent-color:var(--hc-theme-accent);}
+.hc229ModeRow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;}.hc229TimeGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}.hc229Actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:16px;}.hc229Hint{padding:10px 12px;border:1px solid var(--hc-theme-line);border-radius:11px;background:color-mix(in srgb,var(--hc-theme-accent-soft) 60%,transparent);font-size:11px;color:var(--hc-theme-muted);line-height:1.45;}.hc229Error{display:none;margin-top:10px;color:#fecaca;background:rgba(185,28,28,.22);border:1px solid rgba(248,113,113,.5);padding:9px 11px;border-radius:10px;font-size:12px;}.hc229Error.show{display:block;}
+#btnWorkShift,#btnWorkShiftAdmin,#hc229VoiceModeBtn{display:none;}
+.hc229ShiftBadge{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border-radius:999px;background:var(--hc-theme-accent-soft);border:1px solid var(--hc-theme-line);font-size:10px;font-weight:850;}
+.hc229AccountingTools{display:grid;grid-template-columns:180px minmax(160px,1fr) auto;gap:8px;align-items:end;margin-bottom:12px;}.hc229TableWrap{overflow:auto;border:1px solid var(--hc-theme-line);border-radius:12px;}.hc229AccountingTable{min-width:860px;width:100%;border-collapse:collapse;}.hc229AccountingTable th,.hc229AccountingTable td{padding:8px 9px;font-size:11px;vertical-align:top;border-bottom:1px solid var(--hc-theme-line);}.hc229AccountingTable th{position:sticky;top:0;background:var(--hc-theme-surface-2)!important;z-index:1;}.hc229WorkAccountCard{grid-column:1/-1;}
+
+/* ---------- Dictado ---------- */
+#hc229VoiceFloat{position:fixed;right:18px;bottom:max(18px,env(safe-area-inset-bottom));z-index:2147483400;display:none;align-items:center;gap:8px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);color:var(--hc-theme-text);border-radius:999px;padding:9px 12px;box-shadow:0 12px 36px rgba(0,0,0,.28);font-size:12px;font-weight:850;cursor:pointer;}
+#hc229VoiceFloat.show{display:flex;}#hc229VoiceFloat.listening{border-color:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.18),0 12px 36px rgba(0,0,0,.28);}#hc229VoiceFloat .dot{width:8px;height:8px;border-radius:999px;background:var(--hc-theme-accent);}#hc229VoiceFloat.listening .dot{background:#ef4444;animation:hc229Pulse 1s infinite;}@keyframes hc229Pulse{50%{transform:scale(1.6);opacity:.5}}
+.hc229VoiceTarget{outline:2px solid color-mix(in srgb,var(--hc-theme-accent) 72%,transparent)!important;outline-offset:2px;}
+.hc229RxVoiceBtn{float:right;margin-left:8px;padding:4px 8px!important;min-height:28px!important;}.hc229RxVoiceReview{margin:6px 0 3px;padding:8px 10px;border:1px solid var(--hc-theme-line);border-radius:9px;background:var(--hc-theme-accent-soft);font-size:10.5px;line-height:1.4;color:var(--hc-theme-text);}.hc229RxVoiceReview b{font-weight:950;}.hc229VoiceModeOn{border-color:#ef4444!important;background:rgba(239,68,68,.14)!important;}
+
+@media(max-width:760px){
+  #hc229ShiftModal,#hc229AccountingModal{padding:0;align-items:stretch;}
+  .hc229ModalCard{width:100vw;max-width:none;height:100dvh;max-height:none;border-radius:0;border-left:0;border-right:0;}
+  .hc229Services{grid-template-columns:repeat(2,minmax(0,1fr));}.hc229ModeRow{grid-template-columns:1fr;}.hc229TimeGrid{grid-template-columns:1fr 1fr;}.hc229AccountingTools{grid-template-columns:1fr 1fr;}.hc229AccountingTools .hc229ExportBtn{grid-column:1/-1;}
+  #hc229VoiceFloat{right:10px;bottom:max(10px,env(safe-area-inset-bottom));max-width:calc(100vw - 20px);}
+  .topbar{gap:4px!important}.topbar>div:last-child{gap:4px!important;flex-wrap:wrap;justify-content:flex-end;}.topbar .btn.small{padding:6px 7px!important;font-size:10px!important;}
+}
+@media(max-width:420px){.hc229Services{grid-template-columns:1fr}.hc229TimeGrid{grid-template-columns:1fr}.hc229AccountingTools{grid-template-columns:1fr}.hc229AccountingTools .hc229ExportBtn{grid-column:auto;}}
+</style>
+
+<div id="hc229ShiftModal" aria-hidden="true">
+  <div class="hc229ModalCard" role="dialog" aria-modal="true" aria-labelledby="hc229ShiftTitle">
+    <div class="hc229ModalHead">
+      <div><h2 id="hc229ShiftTitle">Jornada de trabajo</h2><p id="hc229ShiftSub">Indicá dónde y cómo vas a trabajar hoy. Se registra en tu actividad y queda disponible para Administración/Contabilidad.</p></div>
+      <div class="hc229Spacer"></div><button class="btn small" id="hc229ShiftClose" type="button">Cerrar</button>
+    </div>
+    <div class="hc229ModalBody">
+      <div class="hc229Section"><div class="hc229SectionTitle">Servicios de hoy · podés elegir varios</div><div class="hc229Services" id="hc229ShiftServices"></div></div>
+      <div class="hc229Section"><div class="hc229SectionTitle">Modalidad</div><div class="hc229ModeRow" id="hc229ShiftModes"></div></div>
+      <div class="hc229Section"><div class="hc229SectionTitle">Horario previsto / realizado</div><div class="hc229TimeGrid"><div class="field"><label>Hora de ingreso</label><input id="hc229ShiftStart" type="time"></div><div class="field"><label>Hora de salida</label><input id="hc229ShiftEnd" type="time"></div></div></div>
+      <div class="hc229Hint">Si el horario cambia, abrí <b>Jornada</b> en la barra superior y modificalo. En una guardia que termina al día siguiente podés indicar una hora de salida menor que la de ingreso; Hospitalito la interpreta como cruce de medianoche.</div>
+      <div class="hc229Error" id="hc229ShiftError"></div>
+      <div class="hc229Actions"><button class="btn primary" id="hc229ShiftSave" type="button">Guardar jornada</button></div>
+    </div>
+  </div>
+</div>
+
+<div id="hc229AccountingModal" aria-hidden="true">
+  <div class="hc229ModalCard" role="dialog" aria-modal="true" aria-labelledby="hc229AccountingTitle">
+    <div class="hc229ModalHead"><div><h2 id="hc229AccountingTitle">Jornadas · Administración / Contabilidad</h2><p>Registro estructurado de servicios, modalidad y horarios declarados por los usuarios.</p></div><div class="hc229Spacer"></div><button class="btn small" id="hc229AccountingClose" type="button">Cerrar</button></div>
+    <div class="hc229ModalBody">
+      <div class="hc229AccountingTools"><div class="field"><label>Fecha</label><input id="hc229AccountingDate" type="date"></div><div class="field"><label>Buscar usuario / servicio</label><input id="hc229AccountingSearch" type="text" placeholder="Nombre, usuario, UTI, UCO..."></div><button class="btn small hc229ExportBtn" id="hc229AccountingExport" type="button">Exportar CSV</button></div>
+      <div class="hc229TableWrap"><table class="hc229AccountingTable"><thead><tr><th>Profesional / usuario</th><th>Rol</th><th>Servicios</th><th>Modalidad</th><th>Ingreso</th><th>Salida</th><th>Última modificación</th></tr></thead><tbody id="hc229AccountingBody"></tbody></table></div>
+      <div class="hc229Hint" style="margin-top:10px;">Las modificaciones conservan historial dentro del mismo registro diario. El registro se sincroniza como actividad institucional.</div>
+    </div>
+  </div>
+</div>
+
+<button id="hc229VoiceFloat" type="button" title="Dictar en el campo seleccionado"><span class="dot"></span><span id="hc229VoiceFloatText">Dictar aquí</span></button>
+
+<script id="hc-v229-integral-script">
+(function(){
+  "use strict";
+  if(window.__hcV229Installed)return;window.__hcV229Installed=true;
+  window.HC_DEMO_VERSION="v229";
+
+  const $=s=>document.querySelector(s);
+  const esc=s=>typeof escHTML==="function"?escHTML(String(s??"")):String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+  const norm=s=>String(s||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+  const localDate=()=>{const d=new Date(),p=n=>String(n).padStart(2,"0");return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;};
+  const localTime=()=>{const d=new Date(),p=n=>String(n).padStart(2,"0");return `${p(d.getHours())}:${p(d.getMinutes())}`;};
+  const isoNow=()=>typeof isoNowLocalFull==="function"?isoNowLocalFull():new Date().toISOString();
+  const dataInstitution=()=>{try{return String(localStorage.getItem(LS.backendRegistryId)||session?.institutionId||"").trim();}catch(_){return String(session?.institutionId||"");}};
+  const userName=()=>String(session?.username||"");
+  const activity=()=>{try{return Array.isArray(getActivity?.())?getActivity():[];}catch(_){return [];}};
+
+  /* ==================== JORNADAS ==================== */
+  const ROLE_SERVICES={
+    medico:["UTI","UCO","UCE","Clínica médica","Guardia Central","Consultorios","Interconsultas","Quirófano"],
+    enfermero:["UTI","UCO","UCE","Clínica médica","Guardia Central","Consultorios"],
+    farmaceutico:["Farmacia","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    bioquimico:["Laboratorio / Bioquímica","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    microbiologo:["Microbiología","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    imagenologo:["Imagenología","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    nutricionista:["Nutrición","UTI","UCO","UCE","Clínica médica"],
+    hemoterapia:["Hemoterapia","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    kinesiologo:["Kinesiología","UTI","UCO","UCE","Clínica médica","Guardia Central"],
+    admin:["Administración","Admisión","Contabilidad","Guardia / Recepción","Consultorios"],
+    administrativo:["Administración","Admisión","Contabilidad","Guardia / Recepción","Consultorios"]
+  };
+  const DUTY=[{id:"guardia_activa",label:"Guardia activa"},{id:"guardia_pasiva",label:"Guardia pasiva"},{id:"seguimiento",label:"Seguimiento"}];
+  let shiftRequired=false,shiftOpen=false,promptTimer=null,promptWaitCount=0;
+  function shiftId(date=localDate()){return `workshift:${dataInstitution()||"local"}:${userName()}:${date}`;}
+  function todayShift(){const id=shiftId();return activity().find(x=>String(x?.id||"")===id||(
+    x?.kind==="work_shift"&&String(x?.user||"")===userName()&&String(x?.dateLocal||"")===localDate()&&(!x?.institutionDataId||String(x.institutionDataId)===dataInstitution())
+  ))||null;}
+  function serviceList(){return ROLE_SERVICES[String(session?.role||"")]||["UTI","UCO","UCE","Clínica médica","Guardia Central","Consultorios","Otro servicio"];}
+  function addTopButton(id,text,afterId){
+    if(document.getElementById(id))return document.getElementById(id);
+    const b=document.createElement("button");b.id=id;b.type="button";b.className="btn small";b.textContent=text;b.style.display="none";
+    const after=document.getElementById(afterId||"btnAccount"),parent=after?.parentElement||document.querySelector(".topbar>div:last-child");
+    if(parent){if(after)parent.insertBefore(b,after);else parent.appendChild(b);}return b;
+  }
+  function refreshWorkButtons(){
+    const s=!!session;
+    const b=addTopButton("btnWorkShift","Jornada","btnAccount");if(b)b.style.display=s?"inline-flex":"none";
+    const a=addTopButton("btnWorkShiftAdmin","Jornadas","btnLogout");if(a)a.style.display=s&&["admin","administrativo","contabilidad"].includes(String(session?.role||""))?"inline-flex":"none";
+    const v=addTopButton("hc229VoiceModeBtn","🎙 Dictado","btnWorkShift");if(v)v.style.display=s&&String(session?.role||"")==="medico"?"inline-flex":"none";
+  }
+  function renderShiftForm(existing){
+    const chosen=new Set(Array.isArray(existing?.services)?existing.services:[]);
+    $("#hc229ShiftServices").innerHTML=serviceList().map((x,i)=>`<label class="hc229Choice"><input type="checkbox" name="hc229Service" value="${esc(x)}" ${chosen.has(x)?"checked":""}><span>${esc(x)}</span></label>`).join("");
+    const mode=String(existing?.dutyType||"guardia_activa");
+    $("#hc229ShiftModes").innerHTML=DUTY.map(x=>`<label class="hc229Choice"><input type="radio" name="hc229Duty" value="${x.id}" ${mode===x.id?"checked":""}><span>${x.label}</span></label>`).join("");
+    $("#hc229ShiftStart").value=String(existing?.startTime||localTime());
+    $("#hc229ShiftEnd").value=String(existing?.endTime||"");
+    const err=$("#hc229ShiftError");err.textContent="";err.classList.remove("show");
+  }
+  function openShift(required=false){
+    if(!session)return;shiftRequired=!!required;shiftOpen=true;const ex=todayShift();renderShiftForm(ex);
+    $("#hc229ShiftSub").textContent=ex?"Podés corregir servicios, modalidad u horario. La modificación queda auditada.":"Indicá dónde y cómo vas a trabajar hoy. Se registra en tu actividad y queda disponible para Administración/Contabilidad.";
+    const close=$("#hc229ShiftClose");if(close)close.style.display=shiftRequired&&!ex?"none":"inline-flex";
+    const m=$("#hc229ShiftModal");m.classList.add("show");m.setAttribute("aria-hidden","false");
+    document.body.style.overflow="hidden";
+  }
+  function closeShift(){if(shiftRequired&&!todayShift())return;shiftOpen=false;shiftRequired=false;const m=$("#hc229ShiftModal");m.classList.remove("show");m.setAttribute("aria-hidden","true");document.body.style.overflow="";}
+  function shiftLabel(id){return DUTY.find(x=>x.id===id)?.label||id||"—";}
+  function saveShift(){
+    if(!session)return;
+    const services=[...document.querySelectorAll('input[name="hc229Service"]:checked')].map(x=>x.value);
+    const duty=document.querySelector('input[name="hc229Duty"]:checked')?.value||"";
+    const start=$("#hc229ShiftStart")?.value||"",end=$("#hc229ShiftEnd")?.value||"";
+    const error=$("#hc229ShiftError");
+    const fail=t=>{error.textContent=t;error.classList.add("show");};
+    if(!services.length)return fail("Elegí al menos un servicio.");if(!duty)return fail("Elegí la modalidad de trabajo.");if(!start||!end)return fail("Indicá hora de ingreso y de salida.");
+    const acts=activity().slice();const id=shiftId();let idx=acts.findIndex(x=>String(x?.id||"")===id);if(idx<0)idx=acts.findIndex(x=>x?.kind==="work_shift"&&String(x?.user||"")===userName()&&String(x?.dateLocal||"")===localDate());
+    const old=idx>=0?acts[idx]:null,now=isoNow();
+    const snapshot={services:services.slice(),dutyType:duty,startTime:start,endTime:end,changedAt:now,changedBy:userName()};
+    const history=Array.isArray(old?.history)?old.history.slice(-30):[];
+    if(old)history.push({services:Array.isArray(old.services)?old.services:[],dutyType:old.dutyType||"",startTime:old.startTime||"",endTime:old.endTime||"",changedAt:old.lastModifiedAt||old.ts||old.createdAt||"",changedBy:old.user||userName()});
+    const rec={...(old||{}),id,kind:"work_shift",dateLocal:localDate(),user:userName(),name:session?.name||userName(),role:session?.role||"",institutionId:String(session?.institutionId||""),institutionDataId:dataInstitution(),institutionName:String(session?.institutionName||""),services,dutyType:duty,startTime:start,endTime:end,crossesMidnight:end<start,createdAt:old?.createdAt||now,lastModifiedAt:now,updatedAt:now,ts:now,history:history.slice(-30),message:`Jornada laboral: ${services.join(", ")} · ${shiftLabel(duty)} · ${start}–${end}${end<start?" (+1 día)":""}.`};
+    if(idx>=0)acts[idx]=rec;else acts.push(rec);
+    try{setActivity(acts);hcBackendScheduleUrgentPush?.();}catch(e){console.error("v229 jornada",e);return fail("No se pudo guardar la jornada en este dispositivo.");}
+    shiftRequired=false;closeShift();refreshAccountShiftCard();if($("#hc229AccountingModal")?.classList.contains("show"))renderAccounting();
+    try{toast?.(old?"Jornada actualizada":"Jornada registrada");}catch(_){ }
+  }
+  function maybePromptWorkShift(reason=""){
+    clearTimeout(promptTimer);if(!session||session.localSeed||shiftOpen||todayShift()){promptWaitCount=0;return false;}
+    let configured=false,scopeReady=true;
+    try{configured=typeof hcBackendConfigured==="function"&&hcBackendConfigured();if(configured&&typeof hcBackendScopeValidated!=="undefined")scopeReady=!!hcBackendScopeValidated;}catch(_){ }
+    /* En un segundo dispositivo esperamos el pull institucional antes de decidir que
+       falta la jornada. El llamado post-sync viene exactamente después de recibir activity. */
+    if(configured&&reason!=="post-sync"&&(!scopeReady||promptWaitCount<5)){
+      promptWaitCount++;promptTimer=setTimeout(()=>maybePromptWorkShift("espera-sync"),700);return false;
+    }
+    promptWaitCount=0;openShift(true);return true;
+  }
+  window.hc229MaybePromptWorkShift=maybePromptWorkShift;
+
+  function shiftRows(){return activity().filter(x=>x?.kind==="work_shift").slice().sort((a,b)=>String(b.lastModifiedAt||b.ts||"").localeCompare(String(a.lastModifiedAt||a.ts||"")));}
+  function renderAccounting(){
+    const date=$("#hc229AccountingDate")?.value||localDate(),q=norm($("#hc229AccountingSearch")?.value||"");
+    const rows=shiftRows().filter(x=>(!date||x.dateLocal===date)&&(!q||norm(`${x.name} ${x.user} ${x.role} ${(x.services||[]).join(" ")} ${shiftLabel(x.dutyType)}`).includes(q)));
+    $("#hc229AccountingBody").innerHTML=rows.length?rows.map(x=>`<tr><td><b>${esc(x.name||x.user||"—")}</b><div class="muted">@${esc(x.user||"")}</div></td><td>${esc(x.role||"—")}</td><td>${esc((x.services||[]).join(", ")||"—")}</td><td>${esc(shiftLabel(x.dutyType))}</td><td>${esc(x.startTime||"—")}</td><td>${esc(x.endTime||"—")}${x.crossesMidnight?" <span class=\"hc229ShiftBadge\">+1 día</span>":""}</td><td>${esc(typeof dmyhmFromISODateTime==="function"?dmyhmFromISODateTime(x.lastModifiedAt||x.ts):(x.lastModifiedAt||x.ts||"—"))}${Array.isArray(x.history)&&x.history.length?`<div class="muted">${x.history.length} modificación/es previas</div>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">Sin jornadas registradas para este filtro.</td></tr>`;
+  }
+  function openAccounting(){if(!session||!["admin","administrativo","contabilidad"].includes(String(session.role||"")))return;$("#hc229AccountingDate").value=localDate();$("#hc229AccountingSearch").value="";renderAccounting();const m=$("#hc229AccountingModal");m.classList.add("show");m.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";}
+  function closeAccounting(){const m=$("#hc229AccountingModal");m.classList.remove("show");m.setAttribute("aria-hidden","true");document.body.style.overflow="";}
+  function exportAccounting(){
+    const date=$("#hc229AccountingDate")?.value||"",q=norm($("#hc229AccountingSearch")?.value||"");const rows=shiftRows().filter(x=>(!date||x.dateLocal===date)&&(!q||norm(`${x.name} ${x.user} ${x.role} ${(x.services||[]).join(" ")} ${shiftLabel(x.dutyType)}`).includes(q)));
+    const csv=[["Fecha","Nombre","Usuario","Rol","Servicios","Modalidad","Ingreso","Salida","Cruza medianoche","Última modificación"],...rows.map(x=>[x.dateLocal,x.name,x.user,x.role,(x.services||[]).join(" | "),shiftLabel(x.dutyType),x.startTime,x.endTime,x.crossesMidnight?"Sí":"No",x.lastModifiedAt||x.ts||""])].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(";")).join("\r\n");
+    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`hospitalito_jornadas_${date||localDate()}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function refreshAccountShiftCard(){
+    const page=$("#hcSettingsContent .hcSettingsPage"),anchor=$("#hcsProfileName");if(!page||!anchor)return;let card=$("#hc229WorkAccountCard");if(card)card.remove();const x=todayShift();card=document.createElement("div");card.id="hc229WorkAccountCard";card.className="hcSettingsCard hc229WorkAccountCard";card.innerHTML=`<div class="hcSettingsCardTitle">Jornada de hoy</div><div class="hcSettingsCardSub">Registro laboral sincronizado para tu cuenta e institución.</div>${x?`<div><b>${esc((x.services||[]).join(", "))}</b></div><div class="hcSettingsMuted" style="margin-top:5px;">${esc(shiftLabel(x.dutyType))} · ${esc(x.startTime||"—")}–${esc(x.endTime||"—")}${x.crossesMidnight?" (+1 día)":""}</div>`:`<div class="hcSettingsMuted">Todavía no registraste tu jornada de hoy.</div>`}<div class="hcSettingsActions"><button class="hcSettingsBtn primary" type="button" id="hc229AccountEditShift">${x?"Modificar jornada":"Registrar jornada"}</button></div>`;
+    const grid=page.querySelector(".hcSettingsGrid");(grid||page).appendChild(card);
+  }
+
+  /* ==================== DICTADO CLÍNICO ==================== */
+  const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+  let voiceTarget=null,recognition=null,voiceBusy=false,tapMode=false,rxVoicePending=false;
+  function eligibleVoiceTarget(el){
+    if(!el||!el.closest?.("#medPanel"))return false;if(el.disabled||el.readOnly)return false;
+    if(el.matches('textarea'))return true;
+    if(el.matches('input[type="text"],input[type="search"],input:not([type])'))return true;
+    return false;
+  }
+  function fieldLabel(el){const f=el?.closest?.(".field"),lab=f?.querySelector?.("label")?.textContent?.trim();return lab||el?.getAttribute?.("placeholder")||el?.id||"campo clínico";}
+  function setVoiceTarget(el){if(voiceTarget===el)return;voiceTarget?.classList?.remove("hc229VoiceTarget");voiceTarget=eligibleVoiceTarget(el)?el:null;if(voiceTarget)voiceTarget.classList.add("hc229VoiceTarget");refreshVoiceFloat();}
+  function refreshVoiceFloat(){const b=$("#hc229VoiceFloat"),t=$("#hc229VoiceFloatText");if(!b)return;const visible=!!session&&String(session.role||"")==="medico"&&!!voiceTarget&&!rxVoicePending;b.classList.toggle("show",visible);if(t&&voiceTarget)t.textContent=voiceBusy?"Escuchando…":`Dictar: ${fieldLabel(voiceTarget).slice(0,32)}`;}
+  function formatDictation(text){
+    let t=String(text||"").trim();
+    t=t.replace(/\bpunto y aparte\b/gi,".\n").replace(/\bnueva l[ií]nea\b/gi,"\n").replace(/\bsigno coma\b/gi,",").replace(/\bdos puntos\b/gi,":").replace(/\bpunto y seguido\b/gi,".");
+    t=t.replace(/\s+([,.:;])/g,"$1").replace(/[ \t]+/g," ").replace(/\n +/g,"\n");
+    if(t)t=t.charAt(0).toUpperCase()+t.slice(1);return t;
+  }
+  function insertDictation(el,text){if(!eligibleVoiceTarget(el)||!text)return;const clean=formatDictation(text),old=String(el.value||"");const join=old&&!/[\s\n]$/.test(old)?(el.tagName==="TEXTAREA"?" ":" "):"";el.value=old+join+clean;el.dispatchEvent(new Event("input",{bubbles:true}));el.dispatchEvent(new Event("change",{bubbles:true}));try{el.setSelectionRange(el.value.length,el.value.length);}catch(_){}}
+  function startRecognition(opts={}){
+    if(!SpeechRecognition){alert("Este navegador no ofrece reconocimiento de voz web. En Android/PC probá Chrome actualizado. Para iPhone puede depender de la versión de Safari/Chrome y sus permisos de micrófono.");return false;}
+    if(voiceBusy){try{recognition?.stop();}catch(_){ }return false;}
+    recognition=new SpeechRecognition();recognition.lang="es-AR";recognition.continuous=false;recognition.interimResults=true;recognition.maxAlternatives=1;voiceBusy=true;let finalText="";
+    const float=$("#hc229VoiceFloat");float?.classList.add("listening");refreshVoiceFloat();
+    recognition.onresult=e=>{let interim="";for(let i=e.resultIndex;i<e.results.length;i++){const tr=e.results[i][0]?.transcript||"";if(e.results[i].isFinal)finalText+=tr+" ";else interim+=tr;}if(opts.onInterim)opts.onInterim(interim.trim());};
+    recognition.onerror=e=>{if(!["aborted","no-speech"].includes(String(e.error||"")))console.warn("Dictado v229",e.error);};
+    recognition.onend=()=>{voiceBusy=false;float?.classList.remove("listening");refreshVoiceFloat();const txt=finalText.trim();if(txt&&opts.onFinal)opts.onFinal(txt);if(opts.onEnd)opts.onEnd(txt);};
+    try{recognition.start();return true;}catch(e){voiceBusy=false;float?.classList.remove("listening");refreshVoiceFloat();alert("No se pudo iniciar el micrófono. Revisá el permiso del navegador.");return false;}
+  }
+
+  /* ==================== PRESCRIPCIÓN POR VOZ ==================== */
+  function bestDrug(text){
+    const api=window.hcRxCatalogAPI,drugs=Array.isArray(api?.drugs)?api.drugs:[];if(!drugs.length)return null;const nt=norm(text),tokens=new Set(nt.split(" ").filter(x=>x.length>2));let best=null,bestScore=0;
+    drugs.forEach(d=>{const names=[d.nombre,d.name,typeof api.displayName==="function"?api.displayName(d):"",d.id].filter(Boolean).map(norm);let score=0;names.forEach(n=>{if(!n)return;if(nt.includes(n))score=Math.max(score,100+n.length);else{const ts=n.split(" ").filter(x=>x.length>2);const hit=ts.filter(x=>tokens.has(x)).length;if(hit)score=Math.max(score,hit*12+(hit===ts.length?15:0));}});if(score>bestScore){bestScore=score;best=d;}});return bestScore>=12?best:null;
+  }
+  function findPresentation(drug,text){const arr=Array.isArray(drug?.presentaciones)?drug.presentaciones:[];if(!arr.length)return null;const n=norm(text);const cues=["comprimido","capsula","ampolla","frasco","jarabe","gota","bolsa","inyectable"];const cue=cues.find(x=>n.includes(x));if(cue){const p=arr.find(x=>norm(`${x.forma||""} ${x.label||""}`).includes(cue));if(p)return p;}return arr[0];}
+  function parseRoute(text){const n=norm(text);if(/\b(ev|endovenosa|endovenoso|intravenosa|intravenoso)\b/.test(n))return"EV";if(/\b(sc|subcutanea|subcutaneo)\b/.test(n))return"SC";if(/\b(im|intramuscular)\b/.test(n))return"IM";if(/\b(sng|sonda nasogastrica)\b/.test(n))return"SNG";if(/\b(sublingual)\b/.test(n))return"Sublingual";if(/\b(inhalatoria|inhalado|nebulizado)\b/.test(n))return"Inhalatoria";if(/\b(rectal)\b/.test(n))return"Rectal";if(/\b(ocular|oftalmica|oftalmico)\b/.test(n))return"Ocular";if(/\b(topica|topico)\b/.test(n))return"Tópica";if(/\b(intranasal|nasal)\b/.test(n))return"Intranasal";if(/\b(vo|via oral|oral)\b/.test(n))return"Oral";return"";}
+  function parseMode(text){const n=norm(text);if(/\bbolo\b/.test(n))return"bolo";if(/\b(no continua|programada|intermitente)\b/.test(n))return"programada";if(/\b(infusion continua|continua|bomba continua)\b/.test(n))return"continua";return"";}
+  function parseFrequency(text){const n=norm(text),m=n.match(/cada\s+(2|4|6|8|12|18|24|48|72)\s*(?:h|hora|horas)/);if(m)return`cada_${m[1]}h`;if(/dosis unica|unica vez|una vez/.test(n))return"dosis_unica";if(/semanal|por semana/.test(n))return"semanal";return"";}
+  function parseNumberUnit(text){
+    const n=norm(text).replace(/(\d),(\d)/g,"$1.$2");
+    const patterns=[[/(-?\d+(?:\.\d+)?)\s*(?:microgramos?|mcg|ug)\b/,"mcg"],[/(-?\d+(?:\.\d+)?)\s*(?:miligramos?|mg)\b/,"mg"],[/(-?\d+(?:\.\d+)?)\s*(?:gramos?|gr|g)\b/,"g"],[/(-?\d+(?:\.\d+)?)\s*(?:ui|unidades internacionales|unidades)\b/,"UI"],[/(-?\d+(?:\.\d+)?)\s*(?:gamma|gammas)\b/,"gamma"]];
+    for(const [re,u] of patterns){const m=n.match(re);if(m)return{value:Number(m[1]),unit:u};}return null;
+  }
+  function parseVolume(text){const n=norm(text).replace(/(\d),(\d)/g,"$1.$2"),m=n.match(/(?:en|volumen(?: final)?(?: de)?|diluir(?: en)?)\s*(\d+(?:\.\d+)?)\s*(?:ml|mililitros?)/);return m?Number(m[1]):null;}
+  function parseRateMlH(text){const n=norm(text).replace(/(\d),(\d)/g,"$1.$2"),m=n.match(/(\d+(?:\.\d+)?)\s*(?:ml|mililitros?)\s*(?:por|\/)?\s*(?:h|hora)/);return m?Number(m[1]):null;}
+  function parseAmpCount(text){const n=norm(text).replace(/(\d),(\d)/g,"$1.$2"),m=n.match(/(\d+(?:\.\d+)?)\s*(ampollas?|frascos?|bolsas?|comprimidos?|capsulas?)/);return m?Number(m[1]):null;}
+  function parseHours(text){const n=norm(text).replace(/(\d),(\d)/g,"$1.$2"),m=n.match(/(?:pasar(?:lo|la)? en|durante|en)\s*(\d+(?:\.\d+)?)\s*horas?/);return m?Number(m[1]):null;}
+  function parseDiluent(text){const n=norm(text);if(/dextrosa\s*(?:al)?\s*5|dextrosa cinco/.test(n))return"Dextrosa 5%";if(/solucion fisiologica|fisiologica|cloruro de sodio/.test(n))return"Solución fisiológica";return"";}
+  function oralDoseCount(drug,pres,dose){if(!dose||!pres)return dose?.value??null;const form=norm(`${pres.forma||""} ${drug?.forma||""} ${pres.label||""}`);if(!/(comprimido|capsula)/.test(form))return dose.value;const pu=norm(pres.amountUnit||"").replace("microgramos","mcg").replace("miligramos","mg");if(pu===norm(dose.unit)&&Number(pres.amount)>0)return dose.value/Number(pres.amount);return dose.value;}
+  function injectRxVoiceButton(){
+    const box=document.querySelector("#medPres .prNewRxCompact"),title=box?.querySelector(".labSectionTitle");if(!box||!title||title.querySelector("#hc229RxVoiceBtn"))return;
+    const b=document.createElement("button");b.id="hc229RxVoiceBtn";b.type="button";b.className="btn small hc229RxVoiceBtn";b.textContent="🎤 Prescribir por voz";title.appendChild(b);
+  }
+  function showRxReview(text,parts){setTimeout(()=>{injectRxVoiceButton();const box=document.querySelector("#medPres .prNewRxCompact");if(!box)return;box.querySelector(".hc229RxVoiceReview")?.remove();const d=document.createElement("div");d.className="hc229RxVoiceReview";d.innerHTML=`<b>Voz interpretada — revisar antes de guardar:</b> ${esc(parts.join(" · ")||"se reconoció el texto, pero faltan datos estructurados")}.<br><span class="muted">Dictado: “${esc(text)}”. Hospitalito NO guardó ni administró nada automáticamente.</span>`;const t=box.querySelector(".labSectionTitle");t?.insertAdjacentElement("afterend",d);},80);}
+  function applyVoicePrescription(text){
+    const root=$("#medPres"),api=window.hcRxCatalogAPI;if(!root||!api)return alert("Abrí Prescripciones de un paciente antes de usar la voz.");const drug=bestDrug(text);if(!drug)return alert("No pude identificar con suficiente seguridad el medicamento. Decí primero el nombre de la droga y luego dosis, vía y modalidad.");
+    const pres=findPresentation(drug,text),route=parseRoute(text)||"EV",mode=parseMode(text),freq=parseFrequency(text),dose=parseNumberUnit(text),vol=parseVolume(text),rate=parseRateMlH(text),amp=parseAmpCount(text),hours=parseHours(text),dil=parseDiluent(text);const parts=[];
+    root.dataset.prDrug=String(drug.id||"");root.dataset.prDrugSearch="";if(pres?.id)root.dataset.prPresentation=String(pres.id);root.dataset.prVia=route;parts.push(typeof api.displayName==="function"?api.displayName(drug):(drug.nombre||drug.id));parts.push(`vía ${route}`);
+    if(route==="EV"&&mode){root.dataset.prEVMode=mode;root.dataset.prContinua=mode==="continua"?"1":"0";parts.push(mode==="continua"?"infusión continua":mode==="bolo"?"bolo EV":"EV programada");}
+    if(freq){root.dataset.prRegularidad=freq;parts.push((api.frequencies||[]).find(x=>x.value===freq)?.label||freq);}
+    if(dose&&Number.isFinite(dose.value)&&dose.value>0){const val=oralDoseCount(drug,pres,dose);root.dataset.prDose=String(val);parts.push(`dosis dictada ${dose.value} ${dose.unit}${val!==dose.value?` → ${val} unidad/es de la presentación`:""}`);}
+    if(amp&&amp>0){root.dataset.prAmp=String(amp);parts.push(`${amp} envase/s`);}if(vol&&vol>0){root.dataset.prVol=String(vol);parts.push(`${vol} ml finales`);}if(hours&&hours>0){root.dataset.prHours=String(hours);root.dataset.prDurationUnit="hours";parts.push(`en ${hours} h`);}if(dil){root.dataset.prDil=dil;parts.push(dil);}if(rate&&drug.noGammas){root.dataset.prDose=String(rate);parts.push(`${rate} ml/h`);}
+    root.dataset.prVoiceTranscript=String(text).slice(0,1200);root.dataset.prVoiceAt=isoNow();
+    try{renderPrescripciones();}catch(e){console.error(e);return alert("Se reconoció la indicación, pero no se pudo actualizar el formulario.");}showRxReview(text,parts);
+  }
+  function startRxVoice(){rxVoicePending=true;setVoiceTarget(null);const ok=startRecognition({onFinal:t=>{applyVoicePrescription(t);},onEnd:()=>{rxVoicePending=false;refreshVoiceFloat();}});if(!ok){rxVoicePending=false;refreshVoiceFloat();}}
+
+  /* ==================== Preferencia de tema entre dispositivos ==================== */
+  const PREF_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-preferences";
+  const PUB_KEY="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
+  const themeOut=k=>k==="blue-dark"?"navy":k;
+  const themeIn=k=>k==="navy"?"blue-dark":k;
+  let prefSyncBusy=false,lastThemeSaved="";
+  async function prefReq(action,extra={}){const token=String(localStorage.getItem(LS.globalAuthToken)||"");const institutionId=String(localStorage.getItem(LS.globalAuthCurrentInstitution)||session?.institutionId||"");if(!token||!institutionId)return null;const r=await fetch(PREF_URL,{method:"POST",headers:{"Content-Type":"application/json","apikey":PUB_KEY},body:JSON.stringify({action,token,institutionId,...extra}),cache:"no-store",signal:AbortSignal.timeout?AbortSignal.timeout(9000):undefined});const j=await r.json();if(!r.ok||!j?.ok)throw new Error(j?.error||"Preferencias no disponibles");return j;}
+  function preferencePayload(theme){return{theme:themeOut(theme),shareTheme:true,density:"comfortable",textSize:document.body.classList.contains("hcUiLargeText")?"large":"normal",reduceMotion:document.body.classList.contains("hcUiReduceMotion"),enterToSend:true};}
+  async function loadRemoteTheme(){if(prefSyncBusy||!session||session.localSeed)return;prefSyncBusy=true;try{const j=await prefReq("get");const k=themeIn(j?.preferences?.theme||"");if(["blue-dark","light","dark","red","pink","lime","sky"].includes(k)){lastThemeSaved=k;try{localStorage.setItem(`hc.ui.theme.v228.${userName()}`,k);}catch(_){ }window.hcSettingsApplyTheme?.(k);}}catch(e){console.warn("v229 preferencias remotas",e);}finally{prefSyncBusy=false;}}
+  async function saveRemoteTheme(k){if(!session||session.localSeed||prefSyncBusy||!k||k===lastThemeSaved)return;prefSyncBusy=true;try{await prefReq("save",{preferences:preferencePayload(k)});lastThemeSaved=k;}catch(e){console.warn("v229 guardar tema remoto",e);}finally{prefSyncBusy=false;}}
+
+  /* ==================== Eventos / integración ==================== */
+  document.addEventListener("click",ev=>{
+    if(ev.target.closest?.("#btnWorkShift,#hc229AccountEditShift")){openShift(false);return;}
+    if(ev.target.closest?.("#btnWorkShiftAdmin")){openAccounting();return;}
+    if(ev.target.closest?.("#hc229ShiftClose")){closeShift();return;}if(ev.target.closest?.("#hc229ShiftSave")){saveShift();return;}
+    if(ev.target.closest?.("#hc229AccountingClose")){closeAccounting();return;}if(ev.target.closest?.("#hc229AccountingExport")){exportAccounting();return;}
+    if(ev.target.closest?.("#hc229VoiceFloat")){if(voiceTarget)startRecognition({onFinal:t=>insertDictation(voiceTarget,t)});return;}
+    if(ev.target.closest?.("#hc229RxVoiceBtn")){startRxVoice();return;}
+    if(ev.target.closest?.("#hc229VoiceModeBtn")){tapMode=!tapMode;const b=$("#hc229VoiceModeBtn");b?.classList.toggle("hc229VoiceModeOn",tapMode);if(b)b.textContent=tapMode?"🎙 Dictado: toque":"🎙 Dictado";try{toast?.(tapMode?"Dictado por toque activado":"Dictado por toque desactivado");}catch(_){ }return;}
+    const theme=ev.target.closest?.("[data-hcs-theme]")?.getAttribute?.("data-hcs-theme");if(theme)setTimeout(()=>saveRemoteTheme(theme),250);
+  },true);
+  document.addEventListener("input",ev=>{if(ev.target.matches?.("#hc229AccountingSearch,#hc229AccountingDate"))renderAccounting();},true);
+  document.addEventListener("change",ev=>{if(ev.target.matches?.("#hc229AccountingDate"))renderAccounting();},true);
+  document.addEventListener("focusin",ev=>{if(eligibleVoiceTarget(ev.target)){setVoiceTarget(ev.target);if(tapMode&&!voiceBusy&&!ev.target.matches("#prDrugSearchInput"))setTimeout(()=>{if(document.activeElement===ev.target)startRecognition({onFinal:t=>insertDictation(ev.target,t)});},70);}},true);
+  document.addEventListener("pointerdown",ev=>{if(tapMode&&eligibleVoiceTarget(ev.target)&&!voiceBusy&&!ev.target.matches("#prDrugSearchInput")){setVoiceTarget(ev.target);}},true);
+  document.addEventListener("keydown",ev=>{if(ev.key==="Escape"){if($("#hc229AccountingModal")?.classList.contains("show"))closeAccounting();else if($("#hc229ShiftModal")?.classList.contains("show")&&!shiftRequired)closeShift();}},true);
+
+  const pres=$("#medPres");if(pres&&typeof MutationObserver!=="undefined")new MutationObserver(()=>injectRxVoiceButton()).observe(pres,{childList:true,subtree:true});
+  const settings=$("#hcSettingsContent");if(settings&&typeof MutationObserver!=="undefined")new MutationObserver(()=>refreshAccountShiftCard()).observe(settings,{childList:true,subtree:false});
+  const bodyObs=typeof MutationObserver!=="undefined"?new MutationObserver(muts=>{for(const m of muts){if(m.type==="attributes"&&m.attributeName==="data-hc-theme"){const k=document.body.dataset.hcTheme||"blue-dark";setTimeout(()=>saveRemoteTheme(k),300);break;}}}):null;bodyObs?.observe(document.body,{attributes:true,attributeFilter:["data-hc-theme"]});
+
+  /* Envuelve el refresco de sesión sin tocar autenticación ni roles. */
+  try{
+    const oldSync=window.syncSessionUI;
+    if(typeof oldSync==="function"&&!oldSync.__hc229){const wrapped=function(){const r=oldSync.apply(this,arguments);setTimeout(()=>{refreshWorkButtons();injectRxVoiceButton();refreshAccountShiftCard();loadRemoteTheme();maybePromptWorkShift("session");},650);return r;};wrapped.__hc229=true;window.syncSessionUI=wrapped;}
+  }catch(e){console.warn("v229 hook sesión",e);}
+
+  /* Refuerzo móvil: si el drawer/censo queda esperando, fuerza reconciliación sin borrar caché. */
+  let mobileRetry=0;
+  function mobileCensusWatch(){
+    if(!session||!document.body.classList.contains("hcMobile"))return;const c=$("#medCenso");if(!c)return;const occupied=c.querySelectorAll(".censoItem:not(.empty)").length,total=c.querySelectorAll(".censoItem").length;
+    if((!total||/validando censo/i.test(c.textContent||""))&&mobileRetry<4){mobileRetry++;try{hcBackendEnsureSyncLoop?.();}catch(_){ }setTimeout(()=>{try{renderMedCenso?.();}catch(_){ }},250);}else if(total)mobileRetry=0;
+  }
+  window.addEventListener("online",()=>setTimeout(mobileCensusWatch,200));window.addEventListener("focus",()=>setTimeout(mobileCensusWatch,300));document.addEventListener("visibilitychange",()=>{if(!document.hidden)setTimeout(mobileCensusWatch,300);});setInterval(mobileCensusWatch,4500);
+
+  refreshWorkButtons();injectRxVoiceButton();refreshAccountShiftCard();setTimeout(()=>{loadRemoteTheme();maybePromptWorkShift("boot");mobileCensusWatch();},1000);
+  console.info("HC v229: jornadas, dictado clínico, voz en prescripciones, temas integrales y sync móvil reforzados.");
 })();
 </script>
 
