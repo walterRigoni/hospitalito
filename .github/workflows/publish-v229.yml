@@ -1,0 +1,82 @@
+name: Publish Hospitalito v229
+
+on:
+  push:
+    paths:
+      - ".github/workflows/publish-v229.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruct and validate v229
+        id: apply
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'HC Demo v229 · Supabase' index.html; then
+            echo 'v229 already present; nothing to apply.'
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          BASE_SHA='a0f8b4bec0ac10bdfd31d8d05d194899b4e58d6a'
+          PATCH_B64_SHA='fbd7b56b05a55d6b19264ff71700d297aa2bcfeff49968622b2933577247f421'
+          PATCH_SHA='bb45ac2bebee6871cb91f910eacf2d1222edb14509e0df7caf89ae22a4e8e4d9'
+          RESULT_SHA='8e4de17c18cd16712163716d297524038e545b46'
+
+          current_sha="$(git hash-object index.html)"
+          echo "Current index blob: $current_sha"
+          test "$current_sha" = "$BASE_SHA"
+
+          cat .hospitalito/v229_parts/part01.b64 \
+              .hospitalito/v229_parts/part02.b64 \
+              .hospitalito/v229_parts/part03.b64 \
+              .hospitalito/v229_parts/part04.b64 > /tmp/v229.patch.gz.b64
+
+          echo "$PATCH_B64_SHA  /tmp/v229.patch.gz.b64" | sha256sum -c -
+          base64 -d /tmp/v229.patch.gz.b64 | gzip -d > /tmp/v229.patch
+          echo "$PATCH_SHA  /tmp/v229.patch" | sha256sum -c -
+
+          git apply --check /tmp/v229.patch
+          git apply /tmp/v229.patch
+
+          grep -q 'HC Demo v229 · Supabase' index.html
+          grep -q 'id="hc229ShiftModal"' index.html
+          grep -q 'hc229WarmActiveClinical' index.html
+          grep -q 'Prescribir por voz' index.html
+
+          python - <<'PY'
+          import re, pathlib, subprocess, tempfile
+          html=pathlib.Path('index.html').read_text(encoding='utf-8')
+          scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script\s*>', html, flags=re.I|re.S)
+          print('Inline scripts:', len(scripts))
+          for i,src in enumerate(scripts,1):
+              p=pathlib.Path('/tmp')/f'hc_v229_script_{i:02d}.js'
+              p.write_text(src,encoding='utf-8')
+              subprocess.run(['node','--check',str(p)],check=True)
+          PY
+
+          result_sha="$(git hash-object index.html)"
+          echo "Result index blob: $result_sha"
+          test "$result_sha" = "$RESULT_SHA"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+
+      - name: Commit and publish
+        if: steps.apply.outputs.changed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "ChatGPT Hospitalito"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html
+          git commit -m "Hospitalito v229: jornadas, voz, móvil, temas y sync"
+          git push
