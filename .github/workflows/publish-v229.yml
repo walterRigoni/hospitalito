@@ -46,6 +46,13 @@ jobs:
           base64 -d /tmp/v229.patch.gz.b64 | gzip -d > /tmp/v229.patch
           echo "$PATCH_SHA  /tmp/v229.patch" | sha256sum -c -
 
+          # El diff fue generado contra los archivos locales validados; para GitHub
+          # reescribimos únicamente los encabezados de ruta, no el contenido del parche.
+          sed -i \
+            -e 's|^--- mnt/data/index_228_supabase_configuracion_temas.html$|--- a/index.html|' \
+            -e 's|^+++ mnt/data/index_229_supabase_jornadas_voz_sync_mobile_temas.html$|+++ b/index.html|' \
+            /tmp/v229.patch
+
           git apply --check /tmp/v229.patch
           git apply /tmp/v229.patch
 
@@ -55,7 +62,7 @@ jobs:
           grep -q 'Prescribir por voz' index.html
 
           python - <<'PY'
-          import re, pathlib, subprocess, tempfile
+          import re, pathlib, subprocess
           html=pathlib.Path('index.html').read_text(encoding='utf-8')
           scripts=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script\s*>', html, flags=re.I|re.S)
           print('Inline scripts:', len(scripts))
