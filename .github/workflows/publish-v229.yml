@@ -46,11 +46,11 @@ jobs:
           base64 -d /tmp/v229.patch.gz.b64 | gzip -d > /tmp/v229.patch
           echo "$PATCH_SHA  /tmp/v229.patch" | sha256sum -c -
 
-          # El diff fue generado contra los archivos locales validados; para GitHub
-          # reescribimos únicamente los encabezados de ruta, no el contenido del parche.
+          # El diff fue generado contra copias locales validadas. Sólo normalizamos
+          # los dos encabezados (ruta + timestamp) para aplicarlo a index.html.
           sed -i \
-            -e 's|^--- mnt/data/index_228_supabase_configuracion_temas.html$|--- a/index.html|' \
-            -e 's|^+++ mnt/data/index_229_supabase_jornadas_voz_sync_mobile_temas.html$|+++ b/index.html|' \
+            -e 's|^--- /mnt/data/index_228_supabase_configuracion_temas.html.*$|--- a/index.html|' \
+            -e 's|^+++ /mnt/data/index_229_supabase_jornadas_voz_sync_mobile_temas.html.*$|+++ b/index.html|' \
             /tmp/v229.patch
 
           git apply --check /tmp/v229.patch
