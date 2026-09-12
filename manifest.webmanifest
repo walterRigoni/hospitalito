@@ -2,13 +2,12 @@
   "name": "Hospitalito · Historia Clínica Digital",
   "short_name": "Hospitalito",
   "description": "Sistema Digital de Historia Clínica",
-  "start_url": "./?app=pwa",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#071a33",
   "theme_color": "#071a33",
-  "lang": "es-AR",
-  "categories": ["medical", "productivity"],
+  "orientation": "any",
   "icons": [
     {"src":"hospitalito-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
   ]
