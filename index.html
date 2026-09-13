@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v235 · Supabase</title>
+<title>HC Demo v236 · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42786,6 +42786,7 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
         if(attempt<attempts-1)await new Promise(res=>setTimeout(res,350+attempt*450));
       }
     }
+    /* Sólo si el endpoint rápido no respondió: último intento con el auth completo. */
     if(isLogin){
       try{return await hc235AuthFetch(AUTH_URL,action,payload,60000);}catch(e){last=e;}
     }
@@ -43074,7 +43075,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v235 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v235 · Supabase';lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v236 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v236 · Supabase';lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -43211,13 +43212,13 @@ body.hcSeedTool #btnAccount{display:none!important}body.hcSeedTool #hcSettingsNa
 'use strict';
 if(window.__hcV232Installed)return;window.__hcV232Installed=true;window.HC_DEMO_VERSION='v232';
 const $=s=>document.querySelector(s), KEY='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
-const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth',COLLAB='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-collab',PLATFORM='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-platform';
+const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth',COLLAB='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-collab',CALL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-call',PLATFORM='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-platform';
 const esc=s=>typeof escHTML==='function'?escHTML(String(s??'')):String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
 const token=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminToken):localStorage.getItem(LS.globalAuthToken))||session?.globalToken||'');
 const inst=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminInstitutionId):localStorage.getItem(LS.globalAuthCurrentInstitution))||session?.institutionId||'');
 const actorKey=()=>session?.localSeed?`seed:${inst()}`:`user:${session?.username||''}`;
-async function post(url,action,payload={}){const ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),12000);try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({action,...payload}),cache:'no-store',signal:ctl.signal}),j=await r.json();if(!r.ok||!j?.ok)throw Error(j?.error||`HTTP ${r.status}`);return j;}finally{clearTimeout(tm)}}
-const authReq=(a,p={})=>window.hc230AuthRequest?window.hc230AuthRequest(a,p):post(AUTH,a,p),collabReq=(a,p={})=>post(COLLAB,a,{token:token(),institutionId:inst(),...p}),platformReq=(a,p={})=>post(PLATFORM,a,{token:token(),...p});
+async function post(url,action,payload={},timeoutMs=30000){const ctl=new AbortController(),tm=setTimeout(()=>{try{ctl.abort()}catch(_){}},timeoutMs);try{const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({action,...payload}),cache:'no-store',signal:ctl.signal});const text=await r.text();let j={};try{j=text?JSON.parse(text):{}}catch(_){throw Error('Supabase devolvió una respuesta inválida.')}if(!r.ok||!j?.ok)throw Error(j?.error||`HTTP ${r.status}`);return j;}catch(e){if(e?.name==='AbortError'||/aborted|abort/i.test(String(e?.message||'')))throw Error('Supabase tardó demasiado en responder. Reintentá en unos segundos.');throw e;}finally{clearTimeout(tm)}}
+const authReq=(a,p={})=>window.hc230AuthRequest?window.hc230AuthRequest(a,p):post(AUTH,a,p,30000),collabReq=(a,p={})=>post(COLLAB,a,{token:token(),institutionId:inst(),...p},30000),callReq=(a,p={})=>post(CALL,a,{token:token(),institutionId:inst(),...p},30000),platformReq=(a,p={})=>post(PLATFORM,a,{token:token(),...p},30000);
 
 /* -------- Admin semilla vuelve a ser herramienta local -------- */
 const loginNormal=window.login||login;
@@ -43279,12 +43280,12 @@ async function openFloatChat(type='global',peer=''){floatMode={type,peer};const 
 async function sendFloatChat(){const inp=$('#hc232ChatInput'),text=String(inp?.value||'').trim();if(!text)return;if(floatMode.type==='global'){await collabReq('sendGlobal',{body:text});inp.value='';await refreshGlobalChat();return;}await window.hc231SendDirectMessage?.(floatMode.peer,text,null);inp.value='';if(floatMode.peer==='admin'||session?.localSeed){await refreshSeedConversation(floatMode.peer,false);renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer);}else{setTimeout(()=>renderFloatMessages(window.hc231GetConversation?.(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer),150);}}
 
 /* -------- Llamadas WebRTC: Supabase sólo señaliza; audio/video viaja P2P -------- */
-let callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false};
+let callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false,pulseBusy:false};
 const rtcConfig={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun.cloudflare.com:3478']}],iceCandidatePoolSize:4};
-async function refreshActiveCalls(render=false){if(!session||session.role==='superadmin'||!token()||!inst())return;try{const j=await collabReq('activeCalls');activeCalls=Array.isArray(j.calls)?j.calls:[];const badge=$('#hc232CallBadge');if(badge){badge.textContent=String(activeCalls.length);badge.style.display=activeCalls.length?'inline-flex':'none';}if(render)renderCallLobby();const mine=actorKey();const incoming=activeCalls.find(c=>(c.participants||[]).some(p=>p.participant_key===mine&&!p.joined_at&&!p.left_at));if(incoming&&incoming.id!==lastIncomingCall){lastIncomingCall=incoming.id;try{toast?.(`Llamada: ${incoming.title||'Hospitalito'}`);}catch(_){ }}}catch(e){console.warn('v232 calls',e)}}
+async function refreshActiveCalls(render=false){if(!session||session.role==='superadmin'||!token()||!inst())return;try{const j=await callReq('activeCalls');activeCalls=Array.isArray(j.calls)?j.calls:[];const badge=$('#hc232CallBadge');if(badge){badge.textContent=String(activeCalls.length);badge.style.display=activeCalls.length?'inline-flex':'none';}if(render)renderCallLobby();const mine=actorKey();const incoming=activeCalls.find(c=>(c.participants||[]).some(p=>p.participant_key===mine&&!p.joined_at&&!p.left_at));if(incoming&&incoming.id!==lastIncomingCall){lastIncomingCall=incoming.id;try{toast?.(`Llamada: ${incoming.title||'Hospitalito'}`);}catch(_){ }}}catch(e){console.warn('v232 calls',e)}}
 function renderCallLobby(){const grid=$('#hc232InviteGrid');if(grid){const me=actorKey();grid.innerHTML=collabDirectory.filter(x=>x.key!==me).map(x=>`<label class="hc232Invite"><input type="checkbox" name="hc232Invite" value="${esc(x.key)}"><span><b>${esc(x.name)}</b><br><span class="muted">${esc(x.role||'')}</span></span></label>`).join('')||'<div class="muted">No hay otros integrantes disponibles.</div>';}const list=$('#hc232ActiveCalls');if(list)list.innerHTML=activeCalls.length?activeCalls.map(c=>`<div class="hc232ActiveCall"><div><b>${esc(c.title||'Llamada')}</b><div class="muted">${esc(c.created_by_name||'')} · ${(c.participants||[]).filter(p=>p.joined_at&&!p.left_at).length} conectado/s</div></div><button class="btn small primary" data-hc232-join="${esc(c.id)}">Unirme</button></div>`).join(''):'<div class="muted" style="margin-top:8px;">No hay llamadas activas.</div>';}
 async function openCallLobby(){await refreshCollabDirectory(false);await refreshActiveCalls(true);$('#hc232CallLobby')?.classList.add('show');$('#hc232CallLobby')?.setAttribute('aria-hidden','false');}
-async function createCall(){const invitees=[...document.querySelectorAll('input[name="hc232Invite"]:checked')].map(x=>x.value),title=String($('#hc232CallTitle')?.value||'Ateneo / llamada Hospitalito').trim();try{const j=await collabReq('createCall',{title,invitees});$('#hc232CallLobby')?.classList.remove('show');await enterCall(j.call.id);}catch(e){alert(e.message||e)}}
+async function createCall(){const invitees=[...document.querySelectorAll('input[name="hc232Invite"]:checked')].map(x=>x.value),title=String($('#hc232CallTitle')?.value||'Ateneo / llamada Hospitalito').trim();try{const j=await callReq('createCall',{title,invitees});$('#hc232CallLobby')?.classList.remove('show');await enterCall(j.call.id);}catch(e){alert(e.message||e)}}
 async function getLocalMedia(){if(callCtx.localStream)return callCtx.localStream;let s=null;try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:true});}catch(_){try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});}catch(__){s=new MediaStream();}}callCtx.localStream=s;callCtx.cam=s.getVideoTracks().some(t=>t.enabled);callCtx.mic=s.getAudioTracks().some(t=>t.enabled);return s;}
 function participantName(key){const p=callCtx.call?.participants?.find(x=>x.participant_key===key);return p?.display_name||collabDirectory.find(x=>x.key===key)?.name||key.replace(/^user:/,'').replace(/^seed:.*/,'Admin semilla');}
 function videoTile(key,stream,isLocal=false){const grid=$('#hc232VideoGrid');if(!grid)return;let tile=grid.querySelector(`[data-peer="${CSS.escape(key)}"]`);if(!tile){tile=document.createElement('div');tile.className='hc232VideoTile';tile.dataset.peer=key;tile.innerHTML=`<video autoplay playsinline ${isLocal?'muted':''}></video><span class="hc232VideoLabel"></span><span class="hc232PresenterBadge" style="display:none;">Presentador</span>`;grid.appendChild(tile);}const v=tile.querySelector('video');if(v.srcObject!==stream)v.srcObject=stream;tile.querySelector('.hc232VideoLabel').textContent=isLocal?'Vos':participantName(key);tile.querySelector('.hc232PresenterBadge').style.display=callCtx.call?.presenter_key===key?'inline-flex':'none';}
@@ -43316,7 +43317,7 @@ function renderCallState(){
   try{paintPeerStates?.();}catch(_){ }
 }
 
-async function sendSignal(toKey,kind,payload){if(!callCtx.call)return;try{await collabReq('sendSignal',{callId:callCtx.call.id,toKey,kind,payload});}catch(e){console.warn('signal send',e)}}
+async function sendSignal(toKey,kind,payload){if(!callCtx.call)return;try{await callReq('sendSignal',{callId:callCtx.call.id,toKey,kind,payload});}catch(e){console.warn('signal send',e)}}
 function ensurePeer(peerKey){
   if(callCtx.peers.has(peerKey))return callCtx.peers.get(peerKey);
   const pc=new RTCPeerConnection(rtcConfig);pc._hcOffered=false;pc._hcMakingOffer=false;pc._hcRetryAt=0;
@@ -43333,16 +43334,73 @@ function ensurePeer(peerKey){
 }
 async function flushIce(peerKey,pc){const q=callCtx.pendingIce.get(peerKey)||[];if(!pc.remoteDescription)return;while(q.length){const c=q.shift();try{await pc.addIceCandidate(new RTCIceCandidate(c))}catch(e){console.warn('ice flush',e)}}}
 async function offerPeer(peerKey,force=false){const pc=ensurePeer(peerKey),now=Date.now();if(pc._hcMakingOffer)return;if(!force&&pc._hcOffered&&pc.connectionState!=='failed'&&pc.connectionState!=='disconnected')return;if(pc.signalingState!=='stable')return;if(!force&&pc._hcRetryAt&&now<pc._hcRetryAt)return;pc._hcMakingOffer=true;pc._hcOffered=true;pc._hcRetryAt=now+5000;try{const offer=await pc.createOffer(force?{iceRestart:true}:undefined);await pc.setLocalDescription(offer);await sendSignal(peerKey,'offer',pc.localDescription?.toJSON?pc.localDescription.toJSON():offer);}catch(e){pc._hcOffered=false;console.warn('offer',e)}finally{pc._hcMakingOffer=false}}
-async function handleSignals(){if(!callCtx.call)return;try{const j=await collabReq('getSignals',{callId:callCtx.call.id,afterId:callCtx.lastSignal});callCtx.lastSignal=Number(j.lastId||callCtx.lastSignal);for(const sg of j.signals||[]){const from=String(sg.from_key||''),pc=ensurePeer(from);try{if(sg.kind==='offer'){if(pc.signalingState!=='stable'){try{await pc.setLocalDescription({type:'rollback'})}catch(_){ }}await pc.setRemoteDescription(new RTCSessionDescription(sg.payload));await flushIce(from,pc);const ans=await pc.createAnswer();await pc.setLocalDescription(ans);await sendSignal(from,'answer',pc.localDescription?.toJSON?pc.localDescription.toJSON():ans);pc._hcOffered=false;}else if(sg.kind==='answer'){if(pc.signalingState==='have-local-offer'){await pc.setRemoteDescription(new RTCSessionDescription(sg.payload));await flushIce(from,pc);}}else if(sg.kind==='ice'&&sg.payload){if(pc.remoteDescription)await pc.addIceCandidate(new RTCIceCandidate(sg.payload));else(callCtx.pendingIce.get(from)||[]).push(sg.payload);}}catch(e){console.warn('signal process',sg.kind,e)}}}catch(e){console.warn('signals',e)}}
-async function refreshCallState(){if(!callCtx.call)return;try{const j=await collabReq('callState',{callId:callCtx.call.id});callCtx.call=j.call;renderCallState();const me=actorKey(),active=(j.call.participants||[]).filter(p=>p.joined_at&&!p.left_at&&p.participant_key!==me);for(const p of active){const pc=ensurePeer(p.participant_key);if(me.localeCompare(p.participant_key)<0&&(pc.connectionState==='new'||pc.connectionState==='disconnected'||pc.connectionState==='failed'))await offerPeer(p.participant_key,pc.connectionState==='failed');}for(const [k,pc] of callCtx.peers){if(!active.some(p=>p.participant_key===k)){try{pc.close()}catch(_){ }callCtx.peers.delete(k);callCtx.pendingIce.delete(k);$('#hc232VideoGrid')?.querySelector(`[data-peer="${CSS.escape(k)}"]`)?.remove();}}}catch(e){const msg=String(e.message||e);if(/finaliz|no encontrada/i.test(msg)){stopCallMedia(true);try{toast?.('La llamada ya finalizó.')}catch(_){ }}else console.warn('call state',e)}}
-async function enterCall(callId){try{const j=await collabReq('joinCall',{callId});callCtx.call=j.call;callCtx.lastSignal=Number(j.signalCursor||0);await getLocalMedia();$('#hc232CallWindow').classList.add('show');$('#hc232CallWindow').classList.remove('minimized');videoTile(actorKey(),callCtx.localStream,true);renderCallState();clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);await handleSignals();await refreshCallState();callCtx.signalTimer=setInterval(handleSignals,180);callCtx.stateTimer=setInterval(refreshCallState,650);}catch(e){const msg=String(e.message||e);if(/finaliz|no encontrada/i.test(msg)){try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);return;}alert('No se pudo entrar a la llamada: '+msg)}}
-async function updateMedia(){if(!callCtx.call)return;try{await collabReq('updateCallMedia',{callId:callCtx.call.id,mic_enabled:callCtx.mic,camera_enabled:callCtx.cam,screen_sharing:callCtx.sharing});}catch(_){ }}
+async function processSignals(signals=[]){
+  for(const sg of signals||[]){
+    const from=String(sg.from_key||'');if(!from)continue;
+    const pc=ensurePeer(from);
+    try{
+      if(sg.kind==='offer'){
+        if(pc.signalingState!=='stable'){try{await pc.setLocalDescription({type:'rollback'})}catch(_){ }}
+        await pc.setRemoteDescription(new RTCSessionDescription(sg.payload));
+        await flushIce(from,pc);
+        const ans=await pc.createAnswer();await pc.setLocalDescription(ans);
+        await sendSignal(from,'answer',pc.localDescription?.toJSON?pc.localDescription.toJSON():ans);pc._hcOffered=false;
+      }else if(sg.kind==='answer'){
+        if(pc.signalingState==='have-local-offer'){await pc.setRemoteDescription(new RTCSessionDescription(sg.payload));await flushIce(from,pc);}
+      }else if(sg.kind==='ice'&&sg.payload){
+        if(pc.remoteDescription)await pc.addIceCandidate(new RTCIceCandidate(sg.payload));else(callCtx.pendingIce.get(from)||[]).push(sg.payload);
+      }
+    }catch(e){console.warn('signal process',sg.kind,e)}
+  }
+}
+async function reconcilePeers(call){
+  const me=actorKey(),active=(call?.participants||[]).filter(p=>p.joined_at&&!p.left_at&&p.participant_key!==me);
+  for(const p of active){
+    const pc=ensurePeer(p.participant_key);
+    if(me.localeCompare(p.participant_key)<0&&(pc.connectionState==='new'||pc.connectionState==='disconnected'||pc.connectionState==='failed'))await offerPeer(p.participant_key,pc.connectionState==='failed');
+  }
+  for(const [k,pc] of callCtx.peers){
+    if(!active.some(p=>p.participant_key===k)){
+      try{pc.close()}catch(_){ }callCtx.peers.delete(k);callCtx.pendingIce.delete(k);$('#hc232VideoGrid')?.querySelector(`[data-peer="${CSS.escape(k)}"]`)?.remove();
+    }
+  }
+}
+async function callPulse(){
+  if(!callCtx.call||callCtx.pulseBusy)return;
+  callCtx.pulseBusy=true;
+  try{
+    const j=await callReq('callPulse',{callId:callCtx.call.id,afterId:callCtx.lastSignal});
+    callCtx.call=j.call;callCtx.lastSignal=Number(j.lastId||callCtx.lastSignal);
+    await processSignals(j.signals||[]);await reconcilePeers(j.call);renderCallState();
+  }catch(e){
+    const msg=String(e?.message||e);
+    if(/finaliz|no encontrada/i.test(msg)){stopCallMedia(true);try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);}
+    else console.warn('call pulse',e);
+  }finally{callCtx.pulseBusy=false;}
+}
+async function handleSignals(){return callPulse();}
+async function refreshCallState(){return callPulse();}
+async function enterCall(callId){
+  if(!callId)return;
+  try{
+    if(callCtx.call&&String(callCtx.call.id)!==String(callId))stopCallMedia(true);
+    const j=await callReq('joinCall',{callId});callCtx.call=j.call;callCtx.lastSignal=Number(j.signalCursor||0);
+    await getLocalMedia();$('#hc232CallWindow')?.classList.add('show');$('#hc232CallWindow')?.classList.remove('minimized');
+    videoTile(actorKey(),callCtx.localStream,true);renderCallState();clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);callCtx.stateTimer=null;
+    await callPulse();callCtx.signalTimer=setInterval(callPulse,800);
+  }catch(e){
+    const msg=String(e?.message||e);
+    if(/finaliz|no encontrada/i.test(msg)){try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);return;}
+    alert('No se pudo entrar a la llamada: '+msg);
+  }
+}
+async function updateMedia(){if(!callCtx.call)return;try{await callReq('updateCallMedia',{callId:callCtx.call.id,mic_enabled:callCtx.mic,camera_enabled:callCtx.cam,screen_sharing:callCtx.sharing});}catch(_){ }}
 function toggleMic(){callCtx.mic=!callCtx.mic;for(const t of callCtx.localStream?.getAudioTracks?.()||[])t.enabled=callCtx.mic;updateMedia();renderCallState()}
 function toggleCam(){callCtx.cam=!callCtx.cam;for(const t of callCtx.localStream?.getVideoTracks?.()||[])t.enabled=callCtx.cam;updateMedia();renderCallState()}
 async function toggleShare(){if(!callCtx.call)return;if(callCtx.sharing){stopScreenShare();return;}try{try{toast?.("En el selector elegí 'Esta pestaña' / la ventana actual de Hospitalito.");}catch(_){ }let st=null;try{st=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'browser'},audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'exclude',monitorTypeSurfaces:'exclude'});}catch(first){if(first?.name==='NotAllowedError')throw first;st=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});}callCtx.screenStream=st;callCtx.sharing=true;const track=st.getVideoTracks()[0];for(const pc of callCtx.peers.values()){let sender=pc.getSenders().find(x=>x.track?.kind==='video');if(!sender){const tr=pc.getTransceivers().find(x=>x.receiver?.track?.kind==='video');sender=tr?.sender;}if(sender)await sender.replaceTrack(track);}track.onended=stopScreenShare;videoTile(actorKey(),st,true);updateMedia();renderCallState();}catch(e){if(e?.name!=='NotAllowedError')console.warn('share',e)}}
 async function stopScreenShare(){if(!callCtx.sharing)return;callCtx.sharing=false;for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }callCtx.screenStream=null;const camTrack=callCtx.localStream?.getVideoTracks?.()[0]||null;for(const pc of callCtx.peers.values()){const sender=pc.getSenders().find(x=>x.track?.kind==='video');if(sender)try{await sender.replaceTrack(camTrack)}catch(_){ }}videoTile(actorKey(),callCtx.localStream,true);updateMedia();renderCallState();}
-async function leaveCall(endAll=false){if(!callCtx.call)return;const id=callCtx.call.id;try{await collabReq(endAll?'endCall':'leaveCall',{callId:id});}catch(e){console.warn('leave',e)}stopCallMedia(true);await refreshActiveCalls(false)}
-function stopCallMedia(stopTracks=true){clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);callCtx.signalTimer=callCtx.stateTimer=null;for(const pc of callCtx.peers.values())try{pc.close()}catch(_){ }callCtx.peers.clear();callCtx.remoteStreams.clear();if(stopTracks){for(const t of callCtx.localStream?.getTracks?.()||[])try{t.stop()}catch(_){ }for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }}callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false};$('#hc232VideoGrid').innerHTML='';$('#hc232CallWindow')?.classList.remove('show');}
+async function leaveCall(endAll=false){if(!callCtx.call)return;const id=callCtx.call.id;try{await callReq(endAll?'endCall':'leaveCall',{callId:id});}catch(e){console.warn('leave',e)}stopCallMedia(true);await refreshActiveCalls(false)}
+function stopCallMedia(stopTracks=true){clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);callCtx.signalTimer=callCtx.stateTimer=null;for(const pc of callCtx.peers.values())try{pc.close()}catch(_){ }callCtx.peers.clear();callCtx.remoteStreams.clear();if(stopTracks){for(const t of callCtx.localStream?.getTracks?.()||[])try{t.stop()}catch(_){ }for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }}callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false,pulseBusy:false};$('#hc232VideoGrid').innerHTML='';$('#hc232CallWindow')?.classList.remove('show');}
 
 /* -------- Notificaciones accionables -------- */
 let notifMap=new Map();async function renderActionableNotifications(){if(!session||session.localSeed||session.role==='superadmin'||!token())return;try{const j=await authReq('getNotifications',{token:token(),institutionId:inst(),limit:60}),box=$('#hc231NotificationsList');if(!box)return;notifMap=new Map((j.notifications||[]).map(n=>[String(n.id),n]));box.innerHTML=(j.notifications||[]).map(n=>`<button type="button" class="hc231Notification ${n.read_at?'':'unread'}" data-hc232-notif="${esc(n.id)}" style="width:100%;text-align:left;color:inherit;cursor:pointer;"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='call'?'📞':n.kind==='contact'?'👤':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(fmtTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></button>`).join('')||'<div class="muted">No hay notificaciones.</div>';}catch(e){console.warn('notif action',e)}}
@@ -43384,7 +43442,7 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#hc232CreateCall')){createCall();return}
   const join=e.target.closest('[data-hc232-join]');if(join){$('#hc232CallLobby').classList.remove('show');enterCall(join.dataset.hc232Join);return}
   if(e.target.closest('#hc232MicBtn')){toggleMic();return}if(e.target.closest('#hc232CamBtn')){toggleCam();return}if(e.target.closest('#hc232ShareBtn')){toggleShare();return}if(e.target.closest('#hc232LeaveBtn')){leaveCall(false);return}if(e.target.closest('#hc232EndBtn')){if(confirm('¿Finalizar la llamada para todos?'))leaveCall(true);return}if(e.target.closest('#hc232CallMin')){$('#hc232CallWindow').classList.toggle('minimized');return}
-  const pr=e.target.closest('[data-hc232-presenter]');if(pr){try{await collabReq('transferPresenter',{callId:callCtx.call.id,targetKey:pr.dataset.hc232Presenter});await refreshCallState()}catch(x){alert(x.message||x)}return}
+  const pr=e.target.closest('[data-hc232-presenter]');if(pr){try{await callReq('transferPresenter',{callId:callCtx.call.id,targetKey:pr.dataset.hc232Presenter});await callPulse()}catch(x){alert(x.message||x)}return}
   const nf=e.target.closest('[data-hc232-notif]');if(nf){const n=notifMap.get(nf.dataset.hc232Notif);if(n)goNotification(n);return}
   if(e.target.closest('#hc231NotifyBtn,#hc231OpenNotificationsSettings'))setTimeout(renderActionableNotifications,350);
   if(e.target.closest('#hc232SeedMembers,#hc232SeedMembersInline')){window.hcSettingsOpen?.('members');setTimeout(()=>{refreshCollabDirectory(true);augmentMembersV232()},60);return}
@@ -43411,8 +43469,8 @@ $('#hc232ChatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shif
 /* -------- Tiempo real práctico: cambios locales salen ya; pull visible sub-segundo -------- */
 function kickSync(){try{if(session&&session.role!=='superadmin'){hc215ScheduleSync?.(5);setTimeout(()=>{try{if(hc207Connected&&!hc215Syncing)hc215SyncCycle?.()}catch(_){ }},15)}}catch(_){ }}
 for(const name of ['setClinical','setPatients','setBeds','setRegistry','setAppointments','setActivity','setChats']){try{const old=window[name]||globalThis[name];if(typeof old==='function'&&!old.__hc232){const w=function(){const r=old.apply(this,arguments);kickSync();return r};w.__hc232=true;window[name]=w;try{globalThis[name]=w}catch(_){ }}}catch(_){ }}
-setInterval(()=>{if(!session||session.role==='superadmin')return;if(!document.hidden)kickSync();},450);
-setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;refreshCollabDirectory(false);refreshActiveCalls(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')){if(floatMode.type==='global')refreshGlobalChat();else if(floatMode.peer==='admin'||session?.localSeed)refreshSeedConversation(floatMode.peer,false).then(()=>renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer));}},650);
+setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;try{if(Date.now()-Number(window.hc215LastCycleAt||0)>5000)kickSync();}catch(_){ }},5000);
+setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;refreshActiveCalls(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')||$('#hc232CallLobby')?.classList.contains('show')||$('#hcSettingsModal')?.classList.contains('show'))refreshCollabDirectory(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')){if(floatMode.type==='global')refreshGlobalChat();else if(floatMode.peer==='admin'||session?.localSeed)refreshSeedConversation(floatMode.peer,false).then(()=>renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer));}},3000);
 window.addEventListener('online',()=>{kickSync();refreshCollabDirectory(true);refreshActiveCalls(false)});window.addEventListener('focus',()=>{kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)}});
 
 /* -------- Bootstrap -------- */
@@ -43450,7 +43508,7 @@ body[data-hc-theme="light"] #medPres .hcServiceRxItemTop .isPaused,body[data-hc-
 </style>
 <script id="hc-v233-patch">
 (()=>{
-'use strict';window.HC_DEMO_VERSION='v235';const $=s=>document.querySelector(s);
+'use strict';window.HC_DEMO_VERSION='v236';const $=s=>document.querySelector(s);
 function pendingRequest(arr){return Array.isArray(arr)&&arr.some(r=>r&&!r.completed&&!r.deletedAt&&String(r.status||'').toLowerCase()!=='completado');}
 function rolePatientAttention(pid){try{const role=String(session?.role||'').toLowerCase(),cur=(typeof getClinical==='function'?getClinical():{})?.[pid]||{};if(role==='enfermero'&&typeof patientHasPendingNurseAlertGlobal==='function'&&patientHasPendingNurseAlertGlobal(pid))return true;if(role==='medico'&&typeof hcDoctorGetUnreadModules==='function'&&(hcDoctorGetUnreadModules(pid)||[]).length)return true;if(role==='imagenologo'&&pendingRequest(cur.imageRequests))return true;if(role==='bioquimico'&&pendingRequest(cur.labRequests))return true;if(role==='microbiologo'&&pendingRequest(cur.microRequests))return true;if(role==='kinesiologo'&&pendingRequest(cur.kinesiologiaRequests))return true;if(role==='nutricionista'&&pendingRequest(cur.nutritionRequests))return true;if(role==='hemoterapia'&&pendingRequest(cur.hemotherapyRequests))return true;}catch(_){ }return false;}
 function censoItemPid(el){try{if(el?.dataset?.bedId){const a=(getRegistry?.()||[]).find(x=>x&&x.active!==false&&String(x.bedId||'')===String(el.dataset.bedId));return String(a?.patientId||'');}return typeof hcDoctorPatientIdFromCensoItem==='function'?String(hcDoctorPatientIdFromCensoItem(el)||''):'';}catch(_){return ''}}
@@ -43458,7 +43516,7 @@ function updateMobileCensoAlert(){const b=$('#hcMobileCensoBtn');if(!b)return;le
 const censoRoot=$('#medCenso');if(censoRoot){const obs=new MutationObserver(()=>setTimeout(updateMobileCensoAlert,0));obs.observe(censoRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}setInterval(updateMobileCensoAlert,500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(updateMobileCensoAlert,80)});window.addEventListener('focus',()=>setTimeout(updateMobileCensoAlert,80));
 function paintPeerStates(){try{document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(tile=>{const key=tile.dataset.peer||'';let st=tile.querySelector('.hc233PeerState');if(!st){st=document.createElement('div');st.className='hc233PeerState';tile.appendChild(st);}const mine=(session?.localSeed)?`seed:${String(localStorage.getItem(LS.seedAdminInstitutionId)||session?.institutionId||'')}`:`user:${session?.username||''}`;if(key===mine){st.textContent='Este dispositivo';return;}const pc=callCtx?.peers?.get?.(key),cs=pc?.connectionState||'new';st.textContent=cs==='connected'?'Conectado':cs==='failed'?'Red bloqueada / reintentando':cs==='disconnected'?'Reconectando…':'Conectando…';});}catch(_){ }}setInterval(paintPeerStates,600);
 const bodyCall=$('#hc232CallWindow .hc232VideoArea');if(bodyCall&&!$('#hc233CallHint')){const h=document.createElement('div');h.id='hc233CallHint';h.className='hc233CallHint';h.textContent='Para compartir el sistema, elegí “Esta pestaña” o la ventana actual de Hospitalito en el selector del navegador.';bodyCall.appendChild(h);}
-document.title='HC Demo v235 · Supabase';setTimeout(updateMobileCensoAlert,200);
+document.title='HC Demo v236 · Supabase';setTimeout(updateMobileCensoAlert,200);
 })();
 </script>
 
@@ -43466,8 +43524,76 @@ document.title='HC Demo v235 · Supabase';setTimeout(updateMobileCensoAlert,200)
 <script id="hc-v235-login-fix">
 (()=>{
   'use strict';
-  window.HC_DEMO_VERSION='v235';
-  try{document.title='HC Demo v235 · Supabase';}catch(_){ }
+  window.HC_DEMO_VERSION='v236';
+  try{document.title='HC Demo v236 · Supabase';}catch(_){ }
+})();
+</script>
+
+<script id="hc-v236-login-call-fix">
+(()=>{
+  'use strict';
+  window.HC_DEMO_VERSION='v236';
+  try{document.title='HC Demo v236 · Supabase';}catch(_){ }
+  const LOGIN_URL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login';
+  const PUB='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
+  async function quickLogin(username,password){
+    let last=null;
+    for(let attempt=0;attempt<2;attempt++){
+      const ctl=new AbortController();const tm=setTimeout(()=>{try{ctl.abort()}catch(_){}},18000);
+      try{
+        const r=await fetch(LOGIN_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':PUB},body:JSON.stringify({action:'authenticateUser',username,password}),cache:'no-store',signal:ctl.signal});
+        const text=await r.text();let j={};try{j=text?JSON.parse(text):{}}catch(_){throw Error('Supabase devolvió una respuesta de login inválida.');}
+        if(!r.ok||!j?.ok)throw Error(j?.error||`Supabase HTTP ${r.status}`);return j;
+      }catch(e){last=e;if(!(/AbortError/i.test(String(e?.name||''))||/aborted|abort/i.test(String(e?.message||''))))throw e;if(attempt===0)await new Promise(r=>setTimeout(r,300));}
+      finally{clearTimeout(tm);}
+    }
+    throw Error('Supabase está tardando más de lo normal. Reintentá; Hospitalito no perdió ningún dato local.');
+  }
+  async function enterFast(institutionId){
+    const auth=hcGlobalPendingAuth||{token:hcGlobalAuthToken?.(),institutions:hcGlobalStoredInstitutions?.()||[],user:loadJSON(LS.globalAuthUser,{})};
+    const token=String(auth?.token||'');if(!token)return alert('La sesión venció. Iniciá sesión nuevamente.');
+    const rows=Array.isArray(auth?.institutions)?auth.institutions:[];
+    const instRow=rows.find(x=>String(x.id)===String(institutionId));if(!instRow)return alert('La institución elegida no está habilitada para esta cuenta.');
+    try{
+      const dataId=String(instRow.dataInstitutionId||instRow.data_institution_id||instRow.id||'');
+      const backend={id:dataId,authInstitutionId:String(instRow.id),name:String(instRow.name||instRow.displayName||instRow.id),dataInstitutionId:dataId};
+      const usr={...(auth.user||{}),role:String(instRow.role||auth.user?.role||auth.user?.default_role||'medico')};
+      hcBackendApplyResolvedBackend?.(backend,{status:false});
+      localStorage.setItem(LS.globalAuthCurrentInstitution,String(instRow.id));localStorage.setItem(LS.globalAuthToken,token);
+      saveJSON(LS.globalAuthUser,usr);saveJSON(LS.globalAuthInstitutions,rows);hcGlobalCacheUser?.(usr,instRow);
+      session={username:usr.username,name:usr.name||usr.username,role:usr.role||'medico',backendScope:hcBackendCurrentScope?.()||'',globalToken:token,institutionId:String(instRow.id),institutionName:String(instRow.name||backend.name||'')};
+      saveJSON(LS.session,session);hcGlobalPendingAuth=null;hcInstitutionChooserClose?.();hcLoginMessage?.('');syncSessionUI?.();
+      hcBackendSetStatus?.('Supabase · ingresado · sincronizando…','warn');
+      setTimeout(()=>{try{hcBackendEnsureSyncLoop?.();}catch(_){ }},0);
+      setTimeout(async()=>{try{await hcGlobalRefreshInstitutionUsers?.();}catch(e){console.warn('v236 usuarios',e)}},50);
+      setTimeout(()=>{try{hcBackendPull?.(false);}catch(_){ }},120);
+      return true;
+    }catch(e){hcBackendSetStatus?.('Supabase · error','err');alert('No se pudo abrir la institución: '+String(e?.message||e));return false;}
+  }
+  try{hcGlobalEnterInstitution=enterFast;window.hcGlobalEnterInstitution=enterFast;}catch(_){ }
+  const seedLocal=typeof hcLocalSeedAdminLoginAvailable==='function'?hcLocalSeedAdminLoginAvailable:null;
+  const seedEnter=typeof hcEnterLocalSeedAdmin==='function'?hcEnterLocalSeedAdmin:null;
+  const login236=async function(username,password){
+    const u=String(username||'').trim(),p=String(password||'');
+    if(!u||!p){hcLoginMessage?.('Completá usuario y contraseña.');return;}
+    if(seedLocal?.(u,p)){await seedEnter?.();return;}
+    hcLoginMessage?.('Ingresando…','info');hcBackendSetStatus?.('Supabase · autenticando…','warn');
+    try{
+      const a=await quickLogin(u,p),institutions=Array.isArray(a.institutions)?a.institutions:[];
+      if(!a.token||!a.user)throw Error('Supabase no devolvió una sesión válida.');
+      if(a.user.isGlobalAdmin){
+        localStorage.setItem(LS.globalAuthToken,a.token);saveJSON(LS.globalAuthUser,a.user);saveJSON(LS.globalAuthInstitutions,institutions);localStorage.removeItem(LS.globalAuthCurrentInstitution);
+        session={username:a.user.username,name:a.user.name||a.user.username,role:'superadmin',globalToken:a.token,platform:true};saveJSON(LS.session,session);hcGlobalPendingAuth=null;hcLoginMessage?.('');window.hc231EnterPlatform?.(a);return;
+      }
+      if(!institutions.length)throw Error('La cuenta no tiene instituciones habilitadas.');
+      hcGlobalPendingAuth={token:a.token,user:a.user,institutions};localStorage.setItem(LS.globalAuthToken,a.token);saveJSON(LS.globalAuthUser,a.user);saveJSON(LS.globalAuthInstitutions,institutions);localStorage.removeItem(LS.globalAuthCurrentInstitution);hcLoginMessage?.('');
+      const params=new URLSearchParams(location.search),wanted=params.get('institution')||params.get('institucion')||'';
+      const preferred=wanted?institutions.find(i=>String(i.id)===String(wanted)||String(i.name||'').toLowerCase()===String(wanted).toLowerCase()):null;
+      if(preferred){await enterFast(preferred.id);return;}if(institutions.length===1){await enterFast(institutions[0].id);return;}
+      hcBackendSetStatus?.('Supabase · elegí institución','warn');hcInstitutionChooserOpen?.(institutions,{required:true});
+    }catch(e){hcBackendSetStatus?.('Supabase · error','err');hcLoginMessage?.(String(e?.message||e)||'No se pudo iniciar sesión.');}
+  };
+  try{login=login236;window.login=login236;}catch(_){ }
 })();
 </script>
 </body>
