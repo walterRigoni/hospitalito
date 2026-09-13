@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v236 · Supabase</title>
+<title>HC Demo v237 · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5323,6 +5323,8 @@ html::-webkit-scrollbar-corner{
 </head>
 
 <body>
+<!-- Hospitalito v237: pantalla completa por participante + controles exclusivos del presentador -->
+
 
 <div class="topbar">
   <div style="display:flex; align-items:center; gap:10px;">
@@ -43075,7 +43077,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v236 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v236 · Supabase';lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v237 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v237 · Supabase';lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -43173,6 +43175,25 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA"!important;}
 #hc232CallLobby{z-index:2147483644}.hc232CallCreate{display:grid;grid-template-columns:1fr;gap:10px}.hc232InviteGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:280px;overflow:auto}.hc232Invite{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--hc-theme-line);border-radius:10px;background:var(--hc-theme-surface-2);font-size:12px}.hc232Invite input{width:auto!important}.hc232ActiveCall{display:flex;gap:8px;align-items:center;border:1px solid var(--hc-theme-line);border-radius:11px;padding:9px;margin-top:7px;background:var(--hc-theme-surface-2)}.hc232ActiveCall>div:first-child{flex:1;min-width:0}
 #hc232CallWindow{width:min(1050px,96vw);height:min(760px,88dvh);left:18px;right:auto;bottom:18px;min-width:560px;min-height:430px;}
 .hc232CallLayout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:8px;height:100%;min-height:0}.hc232VideoArea{min-width:0;display:flex;flex-direction:column;gap:8px}.hc232VideoGrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}.hc232VideoTile{position:relative;background:#05070a;border:1px solid var(--hc-theme-line);border-radius:11px;overflow:hidden;min-height:150px;display:grid;place-items:center}.hc232VideoTile video{width:100%;height:100%;object-fit:cover;background:#05070a}.hc232VideoLabel{position:absolute;left:7px;bottom:7px;background:rgba(0,0,0,.62);color:#fff;padding:3px 7px;border-radius:999px;font-size:10px}.hc232PresenterBadge{position:absolute;right:7px;top:7px;background:#f59e0b;color:#111827;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900}.hc232CallControls{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;padding:7px}.hc232CallRoster{border-left:1px solid var(--hc-theme-line);padding-left:8px;overflow:auto}.hc232RosterItem{padding:8px;border:1px solid var(--hc-theme-line);border-radius:9px;background:var(--hc-theme-surface-2);margin-bottom:6px;font-size:11px}.hc232RosterTop{display:flex;gap:6px;align-items:center}.hc232RosterTop b{flex:1}.hc232CallBadge{position:absolute;right:-6px;top:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;display:none;align-items:center;justify-content:center;font-weight:900;border:2px solid var(--hc-theme-topbar)}
+/* v237 · pantalla completa + controles del presentador */
+.hc237CallHeadActions{display:flex;align-items:center;gap:6px;margin-left:auto}
+.hc237TileFullscreen{position:absolute;left:7px;top:7px;z-index:4;width:30px;height:30px;padding:0!important;display:grid!important;place-items:center;background:rgba(0,0,0,.56)!important;border-color:rgba(255,255,255,.28)!important;color:#fff!important}
+.hc237ScreenBadge{position:absolute;right:7px;top:34px;z-index:3;background:rgba(2,132,199,.92);color:#fff;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900;display:none}
+.hc237PresenterPanel{position:absolute;right:10px;top:54px;width:min(390px,calc(100% - 20px));max-height:calc(100% - 68px);overflow:auto;z-index:18;background:var(--hc-theme-surface);border:1px solid var(--hc-theme-line);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.48);padding:12px;display:none}
+.hc237PresenterPanel.show{display:block}
+.hc237PresenterHead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+.hc237PresenterHead b{font-size:13px}
+.hc237PresenterMember{border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface-2);border-radius:11px;padding:9px;margin-top:7px}
+.hc237PresenterMemberTop{display:flex;align-items:center;gap:7px;margin-bottom:7px}.hc237PresenterMemberTop b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hc237PresenterActions{display:flex;gap:6px;flex-wrap:wrap}.hc237PresenterActions .btn{font-size:10px;padding:5px 7px}
+.hc237PresenterFooter{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px;padding-top:10px;border-top:1px solid var(--hc-theme-line)}
+.hc237MediaLocked{color:#fbbf24;font-weight:900}.hc237MediaAllowed{color:var(--hc-theme-muted)}
+#hc232CallWindow:fullscreen,#hc232CallWindow:-webkit-full-screen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;left:0!important;right:0!important;top:0!important;bottom:0!important;border-radius:0!important;min-width:0!important;min-height:0!important}
+#hc232CallWindow:fullscreen .hc232FloatBody,#hc232CallWindow:-webkit-full-screen .hc232FloatBody{height:calc(100vh - 52px)!important}
+.hc232VideoTile:fullscreen,.hc232VideoTile:-webkit-full-screen{width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;border:0!important;border-radius:0!important;background:#000!important}
+.hc232VideoTile:fullscreen video,.hc232VideoTile:-webkit-full-screen video{object-fit:contain!important;background:#000!important}
+@media(max-width:760px){.hc237PresenterPanel{right:6px;left:6px;width:auto;top:50px;max-height:calc(100% - 58px)}.hc237CallHeadActions .btn{padding:5px 7px;font-size:11px}.hc237TileFullscreen{width:34px;height:34px}.hc232CallRoster{min-height:130px}}
+
 
 /* Plataforma avanzada */
 .hc232PlatformAdvanced{max-width:1400px;margin:16px auto 40px;display:grid;gap:14px}.hc232PlatformGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.hc232PlatformInst,.hc232PlatformUser{border:1px solid var(--hc-theme-line);border-radius:12px;background:var(--hc-theme-surface-2);padding:11px}.hc232PlatformForm{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}.hc232PlatformForm .full{grid-column:1/-1}.hc232LogoPreview{width:64px;height:64px;border-radius:12px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);object-fit:contain}.hc232PlatformActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.hc232Danger{background:rgba(220,38,38,.15)!important;border-color:rgba(248,113,113,.55)!important;color:#fecaca!important}.hc232Inspect{white-space:pre-wrap;font:11px/1.45 ui-monospace,monospace;background:var(--hc-theme-input);border:1px solid var(--hc-theme-line);border-radius:9px;padding:8px;margin-top:8px;max-height:240px;overflow:auto}
@@ -43203,8 +43224,9 @@ body.hcSeedTool #btnAccount{display:none!important}body.hcSeedTool #hcSettingsNa
 </div>
 
 <div id="hc232CallWindow" class="hc232Float" aria-hidden="true">
-  <div class="hc232FloatHead" data-hc232-drag="call"><div><div class="hc232FloatTitle" id="hc232CallWindowTitle">Llamada</div><div class="hc232FloatSub" id="hc232CallWindowSub">Conectando…</div></div><button class="btn small" id="hc232CallMin" type="button">—</button></div>
+  <div class="hc232FloatHead" data-hc232-drag="call"><div><div class="hc232FloatTitle" id="hc232CallWindowTitle">Llamada</div><div class="hc232FloatSub" id="hc232CallWindowSub">Conectando…</div></div><div class="hc237CallHeadActions"><button class="btn small" id="hc237CallFullscreen" type="button" title="Pantalla completa">⛶</button><button class="btn small primary" id="hc237PresenterSettings" type="button" style="display:none;" title="Controles del presentador">⚙ Presentador</button><button class="btn small" id="hc232CallMin" type="button">—</button></div></div>
   <div class="hc232FloatBody"><div class="hc232CallLayout"><div class="hc232VideoArea"><div class="hc232VideoGrid" id="hc232VideoGrid"></div><div class="hc232CallControls"><button class="btn small" id="hc232MicBtn">🎙 Micrófono</button><button class="btn small" id="hc232CamBtn">📷 Cámara</button><button class="btn small" id="hc232ShareBtn">▣ Compartir Hospitalito</button><button class="btn small danger" id="hc232LeaveBtn">Salir</button><button class="btn small danger" id="hc232EndBtn" style="display:none;">Finalizar para todos</button></div></div><aside class="hc232CallRoster"><b>Integrantes</b><div id="hc232Roster" style="margin-top:8px;"></div></aside></div></div>
+  <div id="hc237PresenterPanel" class="hc237PresenterPanel" aria-hidden="true"><div class="hc237PresenterHead"><div><b>Controles del presentador</b><div class="muted" style="font-size:10px;margin-top:2px;">Administración de la llamada</div></div><button class="btn small" id="hc237PresenterClose" type="button">×</button></div><div id="hc237PresenterMembers"></div><div class="hc237PresenterFooter"><button class="btn small danger" id="hc237EndAll" type="button">Finalizar para todos</button></div></div>
 </div>
 
 <script id="hc-v232-script">
@@ -43280,42 +43302,65 @@ async function openFloatChat(type='global',peer=''){floatMode={type,peer};const 
 async function sendFloatChat(){const inp=$('#hc232ChatInput'),text=String(inp?.value||'').trim();if(!text)return;if(floatMode.type==='global'){await collabReq('sendGlobal',{body:text});inp.value='';await refreshGlobalChat();return;}await window.hc231SendDirectMessage?.(floatMode.peer,text,null);inp.value='';if(floatMode.peer==='admin'||session?.localSeed){await refreshSeedConversation(floatMode.peer,false);renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer);}else{setTimeout(()=>renderFloatMessages(window.hc231GetConversation?.(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer),150);}}
 
 /* -------- Llamadas WebRTC: Supabase sólo señaliza; audio/video viaja P2P -------- */
-let callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false,pulseBusy:false};
+let callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,userMic:true,userCam:true,micAllowed:true,camAllowed:true,sharing:false,pulseBusy:false};
 const rtcConfig={iceServers:[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302','stun:stun.cloudflare.com:3478']}],iceCandidatePoolSize:4};
 async function refreshActiveCalls(render=false){if(!session||session.role==='superadmin'||!token()||!inst())return;try{const j=await callReq('activeCalls');activeCalls=Array.isArray(j.calls)?j.calls:[];const badge=$('#hc232CallBadge');if(badge){badge.textContent=String(activeCalls.length);badge.style.display=activeCalls.length?'inline-flex':'none';}if(render)renderCallLobby();const mine=actorKey();const incoming=activeCalls.find(c=>(c.participants||[]).some(p=>p.participant_key===mine&&!p.joined_at&&!p.left_at));if(incoming&&incoming.id!==lastIncomingCall){lastIncomingCall=incoming.id;try{toast?.(`Llamada: ${incoming.title||'Hospitalito'}`);}catch(_){ }}}catch(e){console.warn('v232 calls',e)}}
 function renderCallLobby(){const grid=$('#hc232InviteGrid');if(grid){const me=actorKey();grid.innerHTML=collabDirectory.filter(x=>x.key!==me).map(x=>`<label class="hc232Invite"><input type="checkbox" name="hc232Invite" value="${esc(x.key)}"><span><b>${esc(x.name)}</b><br><span class="muted">${esc(x.role||'')}</span></span></label>`).join('')||'<div class="muted">No hay otros integrantes disponibles.</div>';}const list=$('#hc232ActiveCalls');if(list)list.innerHTML=activeCalls.length?activeCalls.map(c=>`<div class="hc232ActiveCall"><div><b>${esc(c.title||'Llamada')}</b><div class="muted">${esc(c.created_by_name||'')} · ${(c.participants||[]).filter(p=>p.joined_at&&!p.left_at).length} conectado/s</div></div><button class="btn small primary" data-hc232-join="${esc(c.id)}">Unirme</button></div>`).join(''):'<div class="muted" style="margin-top:8px;">No hay llamadas activas.</div>';}
 async function openCallLobby(){await refreshCollabDirectory(false);await refreshActiveCalls(true);$('#hc232CallLobby')?.classList.add('show');$('#hc232CallLobby')?.setAttribute('aria-hidden','false');}
 async function createCall(){const invitees=[...document.querySelectorAll('input[name="hc232Invite"]:checked')].map(x=>x.value),title=String($('#hc232CallTitle')?.value||'Ateneo / llamada Hospitalito').trim();try{const j=await callReq('createCall',{title,invitees});$('#hc232CallLobby')?.classList.remove('show');await enterCall(j.call.id);}catch(e){alert(e.message||e)}}
-async function getLocalMedia(){if(callCtx.localStream)return callCtx.localStream;let s=null;try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:true});}catch(_){try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});}catch(__){s=new MediaStream();}}callCtx.localStream=s;callCtx.cam=s.getVideoTracks().some(t=>t.enabled);callCtx.mic=s.getAudioTracks().some(t=>t.enabled);return s;}
+async function getLocalMedia(){if(callCtx.localStream)return callCtx.localStream;let s=null;try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:true});}catch(_){try{s=await navigator.mediaDevices.getUserMedia({audio:true,video:false});}catch(__){s=new MediaStream();}}callCtx.localStream=s;callCtx.cam=s.getVideoTracks().some(t=>t.enabled);callCtx.mic=s.getAudioTracks().some(t=>t.enabled);callCtx.userCam=callCtx.cam;callCtx.userMic=callCtx.mic;callCtx.camAllowed=true;callCtx.micAllowed=true;return s;}
 function participantName(key){const p=callCtx.call?.participants?.find(x=>x.participant_key===key);return p?.display_name||collabDirectory.find(x=>x.key===key)?.name||key.replace(/^user:/,'').replace(/^seed:.*/,'Admin semilla');}
-function videoTile(key,stream,isLocal=false){const grid=$('#hc232VideoGrid');if(!grid)return;let tile=grid.querySelector(`[data-peer="${CSS.escape(key)}"]`);if(!tile){tile=document.createElement('div');tile.className='hc232VideoTile';tile.dataset.peer=key;tile.innerHTML=`<video autoplay playsinline ${isLocal?'muted':''}></video><span class="hc232VideoLabel"></span><span class="hc232PresenterBadge" style="display:none;">Presentador</span>`;grid.appendChild(tile);}const v=tile.querySelector('video');if(v.srcObject!==stream)v.srcObject=stream;tile.querySelector('.hc232VideoLabel').textContent=isLocal?'Vos':participantName(key);tile.querySelector('.hc232PresenterBadge').style.display=callCtx.call?.presenter_key===key?'inline-flex':'none';}
+function videoTile(key,stream,isLocal=false){const grid=$('#hc232VideoGrid');if(!grid)return;let tile=grid.querySelector(`[data-peer="${CSS.escape(key)}"]`);if(!tile){tile=document.createElement('div');tile.className='hc232VideoTile';tile.dataset.peer=key;tile.innerHTML=`<video autoplay playsinline ${isLocal?'muted':''}></video><button class="btn small hc237TileFullscreen" type="button" data-hc237-fullscreen title="Ver esta pantalla en pantalla completa">⛶</button><span class="hc232VideoLabel"></span><span class="hc232PresenterBadge" style="display:none;">Presentador</span><span class="hc237ScreenBadge">Compartiendo pantalla</span>`;grid.appendChild(tile);}const v=tile.querySelector('video');if(v.srcObject!==stream)v.srcObject=stream;tile.querySelector('.hc232VideoLabel').textContent=isLocal?'Vos':participantName(key);tile.querySelector('.hc232PresenterBadge').style.display=callCtx.call?.presenter_key===key?'inline-flex':'none';const p=callCtx.call?.participants?.find(x=>x.participant_key===key);const sb=tile.querySelector('.hc237ScreenBadge');if(sb)sb.style.display=p?.screen_sharing?'inline-flex':'none';}
 function renderCallState(){
   const c=callCtx.call;if(!c)return;
-  const me=actorKey();
+  const me=actorKey(),isPresenter=String(c.presenter_key||'')===me;
   const title=$('#hc232CallWindowTitle'),sub=$('#hc232CallWindowSub'),roster=$('#hc232Roster');
   if(title)title.textContent=c.title||'Llamada Hospitalito';
-  if(sub){
-    const presenter=participantName(c.presenter_key);
-    const connected=(c.participants||[]).filter(p=>p.joined_at&&!p.left_at).length;
-    sub.textContent=`Presentador: ${presenter} · ${connected} conectado${connected===1?'':'s'}`;
-  }
+  if(sub){const presenter=participantName(c.presenter_key),connected=(c.participants||[]).filter(p=>p.joined_at&&!p.left_at&&!p.removed_at).length;sub.textContent=`Presentador: ${presenter} · ${connected} conectado${connected===1?'':'s'}`;}
   videoTile(me,callCtx.sharing?callCtx.screenStream:callCtx.localStream,true);
-  const canTransfer=c.presenter_key===me||c.created_by_key===me;
-  if(roster)roster.innerHTML=(c.participants||[]).map(p=>{
-    const joined=!!(p.joined_at&&!p.left_at);
-    const pc=p.participant_key===me?null:callCtx.peers.get(p.participant_key);
-    const conn=p.participant_key===me?'local':String(pc?.connectionState||'new');
+  if(roster)roster.innerHTML=(c.participants||[]).filter(p=>!p.removed_at).map(p=>{
+    const joined=!!(p.joined_at&&!p.left_at),pc=p.participant_key===me?null:callCtx.peers.get(p.participant_key),conn=p.participant_key===me?'local':String(pc?.connectionState||'new');
     const connText=p.participant_key===me?'Este dispositivo':conn==='connected'?'Conectado':conn==='connecting'?'Conectando…':conn==='disconnected'?'Reconectando…':conn==='failed'?'Red bloqueada / reintentando':joined?'En la llamada':'Invitado';
-    return `<div class="hc232RosterItem"><div class="hc232RosterTop"><b>${esc(p.display_name||p.username||p.participant_key)}</b>${p.participant_key===c.presenter_key?'<span class="hc229ShiftBadge">Presentador</span>':''}</div><div class="muted">${esc(connText)} · ${p.mic_enabled?'🎙':'🔇'} ${p.camera_enabled?'📷':'◼'}${p.screen_sharing?' · 🖥 compartiendo':''}</div>${canTransfer&&joined&&p.participant_key!==c.presenter_key?`<button class="btn small" data-hc232-presenter="${esc(p.participant_key)}" style="margin-top:5px;">Hacer presentador</button>`:''}</div>`;
+    const micState=p.mic_allowed===false?'<span class="hc237MediaLocked">🔇 bloqueado</span>':(p.mic_enabled?'🎙':'🔇');
+    const camState=p.camera_allowed===false?'<span class="hc237MediaLocked">📷 bloqueada</span>':(p.camera_enabled?'📷':'◼');
+    return `<div class="hc232RosterItem"><div class="hc232RosterTop"><b>${esc(p.display_name||p.username||p.participant_key)}</b>${p.participant_key===c.presenter_key?'<span class="hc229ShiftBadge">Presentador</span>':''}</div><div class="muted">${esc(connText)} · ${micState} ${camState}${p.screen_sharing?' · 🖥 compartiendo':''}</div></div>`;
   }).join('');
-  const end=$('#hc232EndBtn'),mic=$('#hc232MicBtn'),cam=$('#hc232CamBtn'),share=$('#hc232ShareBtn');
-  if(end)end.style.display=c.created_by_key===me?'inline-flex':'none';
-  if(mic)mic.textContent=callCtx.mic?'🎙 Micrófono':'🔇 Micrófono';
-  if(cam)cam.textContent=callCtx.cam?'📷 Cámara':'▣ Cámara';
+  const end=$('#hc232EndBtn'),mic=$('#hc232MicBtn'),cam=$('#hc232CamBtn'),share=$('#hc232ShareBtn'),gear=$('#hc237PresenterSettings'),panel=$('#hc237PresenterPanel');
+  if(end)end.style.display=isPresenter?'inline-flex':'none';
+  if(gear)gear.style.display=isPresenter?'inline-flex':'none';
+  if(!isPresenter&&panel){panel.classList.remove('show');panel.setAttribute('aria-hidden','true');}
+  if(mic){mic.textContent=!callCtx.micAllowed?'🔇 Micrófono bloqueado':(callCtx.mic?'🎙 Micrófono':'🔇 Micrófono');mic.disabled=!callCtx.micAllowed;}
+  if(cam){cam.textContent=!callCtx.camAllowed?'▣ Cámara bloqueada':(callCtx.cam?'📷 Cámara':'▣ Cámara');cam.disabled=!callCtx.camAllowed;}
   if(share)share.textContent=callCtx.sharing?'■ Dejar de compartir':'▣ Compartir Hospitalito';
-  document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(t=>{const b=t.querySelector('.hc232PresenterBadge');if(b)b.style.display=t.dataset.peer===c.presenter_key?'inline-flex':'none';});
+  document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(t=>{const key=t.dataset.peer,b=t.querySelector('.hc232PresenterBadge'),sb=t.querySelector('.hc237ScreenBadge'),p=(c.participants||[]).find(x=>x.participant_key===key);if(b)b.style.display=key===c.presenter_key?'inline-flex':'none';if(sb)sb.style.display=p?.screen_sharing?'inline-flex':'none';});
+  renderPresenterPanel();
   try{paintPeerStates?.();}catch(_){ }
 }
+
+function renderPresenterPanel(){
+  const c=callCtx.call,panel=$('#hc237PresenterPanel'),box=$('#hc237PresenterMembers');if(!panel||!box||!c)return;
+  const me=actorKey(),isPresenter=String(c.presenter_key||'')===me;if(!isPresenter){panel.classList.remove('show');panel.setAttribute('aria-hidden','true');box.innerHTML='';return;}
+  const rows=(c.participants||[]).filter(p=>p.participant_key!==me&&p.joined_at&&!p.left_at&&!p.removed_at);
+  box.innerHTML=rows.length?rows.map(p=>{
+    const micAllowed=p.mic_allowed!==false,camAllowed=p.camera_allowed!==false;
+    return `<div class="hc237PresenterMember"><div class="hc237PresenterMemberTop"><b>${esc(p.display_name||p.username||p.participant_key)}</b><span class="muted">${p.mic_enabled?'🎙':'🔇'} ${p.camera_enabled?'📷':'◼'}</span></div><div class="hc237PresenterActions"><button class="btn small" data-hc237-mic="${esc(p.participant_key)}" data-allow="${micAllowed?'false':'true'}">${micAllowed?'Silenciar mic.':'Activar mic.'}</button><button class="btn small" data-hc237-cam="${esc(p.participant_key)}" data-allow="${camAllowed?'false':'true'}">${camAllowed?'Apagar cámara':'Activar cámara'}</button><button class="btn small primary" data-hc237-presenter="${esc(p.participant_key)}">Hacer presentador</button><button class="btn small danger" data-hc237-kick="${esc(p.participant_key)}">Retirar</button></div></div>`;
+  }).join(''):'<div class="muted">No hay otros integrantes conectados.</div>';
+}
+
+async function requestFullscreenElement(el){
+  if(!el)return;try{if(document.fullscreenElement||document.webkitFullscreenElement){if(document.exitFullscreen)await document.exitFullscreen();else if(document.webkitExitFullscreen)document.webkitExitFullscreen();return;}if(el.requestFullscreen)await el.requestFullscreen();else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();else{const v=el.querySelector?.('video');if(v?.webkitEnterFullscreen)v.webkitEnterFullscreen();}}catch(e){console.warn('fullscreen',e)}
+}
+
+async function enforcePresenterMedia(call){
+  const me=actorKey(),p=(call?.participants||[]).find(x=>x.participant_key===me);if(!p||!callCtx.localStream)return;
+  const micAllowed=p.mic_allowed!==false,camAllowed=p.camera_allowed!==false;callCtx.micAllowed=micAllowed;callCtx.camAllowed=camAllowed;
+  const hasMic=callCtx.localStream.getAudioTracks().length>0,hasCam=callCtx.localStream.getVideoTracks().length>0;
+  const nextMic=!!callCtx.userMic&&micAllowed&&hasMic,nextCam=!!callCtx.userCam&&camAllowed&&hasCam;
+  let changed=callCtx.mic!==nextMic||callCtx.cam!==nextCam;
+  for(const t of callCtx.localStream.getAudioTracks())t.enabled=nextMic;for(const t of callCtx.localStream.getVideoTracks())t.enabled=nextCam;callCtx.mic=nextMic;callCtx.cam=nextCam;
+  if(changed||p.mic_enabled!==nextMic||p.camera_enabled!==nextCam){callReq('updateCallMedia',{callId:call.id,mic_enabled:nextMic,camera_enabled:nextCam,screen_sharing:callCtx.sharing}).catch(()=>{});}
+}
+
 
 async function sendSignal(toKey,kind,payload){if(!callCtx.call)return;try{await callReq('sendSignal',{callId:callCtx.call.id,toKey,kind,payload});}catch(e){console.warn('signal send',e)}}
 function ensurePeer(peerKey){
@@ -43371,10 +43416,10 @@ async function callPulse(){
   try{
     const j=await callReq('callPulse',{callId:callCtx.call.id,afterId:callCtx.lastSignal});
     callCtx.call=j.call;callCtx.lastSignal=Number(j.lastId||callCtx.lastSignal);
-    await processSignals(j.signals||[]);await reconcilePeers(j.call);renderCallState();
+    await enforcePresenterMedia(j.call);await processSignals(j.signals||[]);await reconcilePeers(j.call);renderCallState();
   }catch(e){
     const msg=String(e?.message||e);
-    if(/finaliz|no encontrada/i.test(msg)){stopCallMedia(true);try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);}
+    if(/finaliz|no encontrada|retir[oó]/i.test(msg)){stopCallMedia(true);try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);}
     else console.warn('call pulse',e);
   }finally{callCtx.pulseBusy=false;}
 }
@@ -43390,17 +43435,17 @@ async function enterCall(callId){
     await callPulse();callCtx.signalTimer=setInterval(callPulse,800);
   }catch(e){
     const msg=String(e?.message||e);
-    if(/finaliz|no encontrada/i.test(msg)){try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);return;}
+    if(/finaliz|no encontrada|retir[oó]/i.test(msg)){try{toast?.('La llamada ya finalizó.')}catch(_){ }await refreshActiveCalls(false);return;}
     alert('No se pudo entrar a la llamada: '+msg);
   }
 }
 async function updateMedia(){if(!callCtx.call)return;try{await callReq('updateCallMedia',{callId:callCtx.call.id,mic_enabled:callCtx.mic,camera_enabled:callCtx.cam,screen_sharing:callCtx.sharing});}catch(_){ }}
-function toggleMic(){callCtx.mic=!callCtx.mic;for(const t of callCtx.localStream?.getAudioTracks?.()||[])t.enabled=callCtx.mic;updateMedia();renderCallState()}
-function toggleCam(){callCtx.cam=!callCtx.cam;for(const t of callCtx.localStream?.getVideoTracks?.()||[])t.enabled=callCtx.cam;updateMedia();renderCallState()}
+function toggleMic(){if(!callCtx.micAllowed){try{toast?.('El presentador deshabilitó tu micrófono.')}catch(_){ }return;}callCtx.userMic=!callCtx.userMic;callCtx.mic=callCtx.userMic&&callCtx.micAllowed&&(callCtx.localStream?.getAudioTracks?.().length>0);for(const t of callCtx.localStream?.getAudioTracks?.()||[])t.enabled=callCtx.mic;updateMedia();renderCallState()}
+function toggleCam(){if(!callCtx.camAllowed){try{toast?.('El presentador deshabilitó tu cámara.')}catch(_){ }return;}callCtx.userCam=!callCtx.userCam;callCtx.cam=callCtx.userCam&&callCtx.camAllowed&&(callCtx.localStream?.getVideoTracks?.().length>0);for(const t of callCtx.localStream?.getVideoTracks?.()||[])t.enabled=callCtx.cam;updateMedia();renderCallState()}
 async function toggleShare(){if(!callCtx.call)return;if(callCtx.sharing){stopScreenShare();return;}try{try{toast?.("En el selector elegí 'Esta pestaña' / la ventana actual de Hospitalito.");}catch(_){ }let st=null;try{st=await navigator.mediaDevices.getDisplayMedia({video:{displaySurface:'browser'},audio:false,preferCurrentTab:true,selfBrowserSurface:'include',surfaceSwitching:'exclude',monitorTypeSurfaces:'exclude'});}catch(first){if(first?.name==='NotAllowedError')throw first;st=await navigator.mediaDevices.getDisplayMedia({video:true,audio:false});}callCtx.screenStream=st;callCtx.sharing=true;const track=st.getVideoTracks()[0];for(const pc of callCtx.peers.values()){let sender=pc.getSenders().find(x=>x.track?.kind==='video');if(!sender){const tr=pc.getTransceivers().find(x=>x.receiver?.track?.kind==='video');sender=tr?.sender;}if(sender)await sender.replaceTrack(track);}track.onended=stopScreenShare;videoTile(actorKey(),st,true);updateMedia();renderCallState();}catch(e){if(e?.name!=='NotAllowedError')console.warn('share',e)}}
 async function stopScreenShare(){if(!callCtx.sharing)return;callCtx.sharing=false;for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }callCtx.screenStream=null;const camTrack=callCtx.localStream?.getVideoTracks?.()[0]||null;for(const pc of callCtx.peers.values()){const sender=pc.getSenders().find(x=>x.track?.kind==='video');if(sender)try{await sender.replaceTrack(camTrack)}catch(_){ }}videoTile(actorKey(),callCtx.localStream,true);updateMedia();renderCallState();}
 async function leaveCall(endAll=false){if(!callCtx.call)return;const id=callCtx.call.id;try{await callReq(endAll?'endCall':'leaveCall',{callId:id});}catch(e){console.warn('leave',e)}stopCallMedia(true);await refreshActiveCalls(false)}
-function stopCallMedia(stopTracks=true){clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);callCtx.signalTimer=callCtx.stateTimer=null;for(const pc of callCtx.peers.values())try{pc.close()}catch(_){ }callCtx.peers.clear();callCtx.remoteStreams.clear();if(stopTracks){for(const t of callCtx.localStream?.getTracks?.()||[])try{t.stop()}catch(_){ }for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }}callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,sharing:false,pulseBusy:false};$('#hc232VideoGrid').innerHTML='';$('#hc232CallWindow')?.classList.remove('show');}
+function stopCallMedia(stopTracks=true){clearInterval(callCtx.signalTimer);clearInterval(callCtx.stateTimer);callCtx.signalTimer=callCtx.stateTimer=null;for(const pc of callCtx.peers.values())try{pc.close()}catch(_){ }callCtx.peers.clear();callCtx.remoteStreams.clear();if(stopTracks){for(const t of callCtx.localStream?.getTracks?.()||[])try{t.stop()}catch(_){ }for(const t of callCtx.screenStream?.getTracks?.()||[])try{t.stop()}catch(_){ }}callCtx={call:null,localStream:null,screenStream:null,peers:new Map(),remoteStreams:new Map(),pendingIce:new Map(),lastSignal:0,signalTimer:null,stateTimer:null,mic:true,cam:true,userMic:true,userCam:true,micAllowed:true,camAllowed:true,sharing:false,pulseBusy:false};$('#hc232VideoGrid').innerHTML='';$('#hc232CallWindow')?.classList.remove('show');}
 
 /* -------- Notificaciones accionables -------- */
 let notifMap=new Map();async function renderActionableNotifications(){if(!session||session.localSeed||session.role==='superadmin'||!token())return;try{const j=await authReq('getNotifications',{token:token(),institutionId:inst(),limit:60}),box=$('#hc231NotificationsList');if(!box)return;notifMap=new Map((j.notifications||[]).map(n=>[String(n.id),n]));box.innerHTML=(j.notifications||[]).map(n=>`<button type="button" class="hc231Notification ${n.read_at?'':'unread'}" data-hc232-notif="${esc(n.id)}" style="width:100%;text-align:left;color:inherit;cursor:pointer;"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='call'?'📞':n.kind==='contact'?'👤':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(fmtTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></button>`).join('')||'<div class="muted">No hay notificaciones.</div>';}catch(e){console.warn('notif action',e)}}
@@ -43441,6 +43486,15 @@ document.addEventListener('click',async e=>{
   if(e.target.closest('#hc232InviteAll')){document.querySelectorAll('input[name="hc232Invite"]').forEach(x=>x.checked=true);return}
   if(e.target.closest('#hc232CreateCall')){createCall();return}
   const join=e.target.closest('[data-hc232-join]');if(join){$('#hc232CallLobby').classList.remove('show');enterCall(join.dataset.hc232Join);return}
+  if(e.target.closest('#hc237CallFullscreen')){requestFullscreenElement($('#hc232CallWindow'));return}
+  const tfs=e.target.closest('[data-hc237-fullscreen]');if(tfs){requestFullscreenElement(tfs.closest('.hc232VideoTile'));return}
+  if(e.target.closest('#hc237PresenterSettings')){if(callCtx.call?.presenter_key!==actorKey())return;const p=$('#hc237PresenterPanel');p?.classList.toggle('show');p?.setAttribute('aria-hidden',p?.classList.contains('show')?'false':'true');renderPresenterPanel();return}
+  if(e.target.closest('#hc237PresenterClose')){const p=$('#hc237PresenterPanel');p?.classList.remove('show');p?.setAttribute('aria-hidden','true');return}
+  const pm=e.target.closest('[data-hc237-mic]');if(pm){try{await callReq('moderateParticipant',{callId:callCtx.call.id,targetKey:pm.dataset.hc237Mic,micAllowed:pm.dataset.allow==='true'});await callPulse()}catch(x){alert(x.message||x)}return}
+  const pc=e.target.closest('[data-hc237-cam]');if(pc){try{await callReq('moderateParticipant',{callId:callCtx.call.id,targetKey:pc.dataset.hc237Cam,cameraAllowed:pc.dataset.allow==='true'});await callPulse()}catch(x){alert(x.message||x)}return}
+  const pk=e.target.closest('[data-hc237-kick]');if(pk){if(!confirm('¿Retirar a este integrante de la llamada?'))return;try{await callReq('removeParticipant',{callId:callCtx.call.id,targetKey:pk.dataset.hc237Kick});await callPulse()}catch(x){alert(x.message||x)}return}
+  const pnew=e.target.closest('[data-hc237-presenter]');if(pnew){if(!confirm('¿Transferir el rol de presentador? Vas a perder los controles de moderación.'))return;try{await callReq('transferPresenter',{callId:callCtx.call.id,targetKey:pnew.dataset.hc237Presenter});$('#hc237PresenterPanel')?.classList.remove('show');await callPulse()}catch(x){alert(x.message||x)}return}
+  if(e.target.closest('#hc237EndAll')){if(confirm('¿Finalizar la llamada para todos?'))leaveCall(true);return}
   if(e.target.closest('#hc232MicBtn')){toggleMic();return}if(e.target.closest('#hc232CamBtn')){toggleCam();return}if(e.target.closest('#hc232ShareBtn')){toggleShare();return}if(e.target.closest('#hc232LeaveBtn')){leaveCall(false);return}if(e.target.closest('#hc232EndBtn')){if(confirm('¿Finalizar la llamada para todos?'))leaveCall(true);return}if(e.target.closest('#hc232CallMin')){$('#hc232CallWindow').classList.toggle('minimized');return}
   const pr=e.target.closest('[data-hc232-presenter]');if(pr){try{await callReq('transferPresenter',{callId:callCtx.call.id,targetKey:pr.dataset.hc232Presenter});await callPulse()}catch(x){alert(x.message||x)}return}
   const nf=e.target.closest('[data-hc232-notif]');if(nf){const n=notifMap.get(nf.dataset.hc232Notif);if(n)goNotification(n);return}
@@ -43465,6 +43519,7 @@ document.addEventListener('click',async e=>{
   const asave=e.target.closest('[data-access-save]');if(asave){const u=asave.dataset.accessSave,rows=[...document.querySelectorAll('#hc232AccessModal [data-ai]')];try{for(const cb of rows){const id=cb.dataset.ai,role=document.querySelector(`#hc232AccessModal [data-ar="${CSS.escape(id)}"]`).value;await authReq('platformSetMembership',{token:token(),username:u,institutionId:id,role,active:cb.checked});}$('#hc232AccessModal')?.remove();loadPlatformAdvanced()}catch(x){alert(x.message||x)}return}
 },true);
 $('#hc232ChatInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();$('#hc232ChatSend')?.click()}});
+document.addEventListener('dblclick',e=>{const tile=e.target.closest?.('.hc232VideoTile');if(tile)requestFullscreenElement(tile);});
 
 /* -------- Tiempo real práctico: cambios locales salen ya; pull visible sub-segundo -------- */
 function kickSync(){try{if(session&&session.role!=='superadmin'){hc215ScheduleSync?.(5);setTimeout(()=>{try{if(hc207Connected&&!hc215Syncing)hc215SyncCycle?.()}catch(_){ }},15)}}catch(_){ }}
@@ -43508,7 +43563,7 @@ body[data-hc-theme="light"] #medPres .hcServiceRxItemTop .isPaused,body[data-hc-
 </style>
 <script id="hc-v233-patch">
 (()=>{
-'use strict';window.HC_DEMO_VERSION='v236';const $=s=>document.querySelector(s);
+'use strict';window.HC_DEMO_VERSION='v237';const $=s=>document.querySelector(s);
 function pendingRequest(arr){return Array.isArray(arr)&&arr.some(r=>r&&!r.completed&&!r.deletedAt&&String(r.status||'').toLowerCase()!=='completado');}
 function rolePatientAttention(pid){try{const role=String(session?.role||'').toLowerCase(),cur=(typeof getClinical==='function'?getClinical():{})?.[pid]||{};if(role==='enfermero'&&typeof patientHasPendingNurseAlertGlobal==='function'&&patientHasPendingNurseAlertGlobal(pid))return true;if(role==='medico'&&typeof hcDoctorGetUnreadModules==='function'&&(hcDoctorGetUnreadModules(pid)||[]).length)return true;if(role==='imagenologo'&&pendingRequest(cur.imageRequests))return true;if(role==='bioquimico'&&pendingRequest(cur.labRequests))return true;if(role==='microbiologo'&&pendingRequest(cur.microRequests))return true;if(role==='kinesiologo'&&pendingRequest(cur.kinesiologiaRequests))return true;if(role==='nutricionista'&&pendingRequest(cur.nutritionRequests))return true;if(role==='hemoterapia'&&pendingRequest(cur.hemotherapyRequests))return true;}catch(_){ }return false;}
 function censoItemPid(el){try{if(el?.dataset?.bedId){const a=(getRegistry?.()||[]).find(x=>x&&x.active!==false&&String(x.bedId||'')===String(el.dataset.bedId));return String(a?.patientId||'');}return typeof hcDoctorPatientIdFromCensoItem==='function'?String(hcDoctorPatientIdFromCensoItem(el)||''):'';}catch(_){return ''}}
@@ -43516,7 +43571,7 @@ function updateMobileCensoAlert(){const b=$('#hcMobileCensoBtn');if(!b)return;le
 const censoRoot=$('#medCenso');if(censoRoot){const obs=new MutationObserver(()=>setTimeout(updateMobileCensoAlert,0));obs.observe(censoRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}setInterval(updateMobileCensoAlert,500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(updateMobileCensoAlert,80)});window.addEventListener('focus',()=>setTimeout(updateMobileCensoAlert,80));
 function paintPeerStates(){try{document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(tile=>{const key=tile.dataset.peer||'';let st=tile.querySelector('.hc233PeerState');if(!st){st=document.createElement('div');st.className='hc233PeerState';tile.appendChild(st);}const mine=(session?.localSeed)?`seed:${String(localStorage.getItem(LS.seedAdminInstitutionId)||session?.institutionId||'')}`:`user:${session?.username||''}`;if(key===mine){st.textContent='Este dispositivo';return;}const pc=callCtx?.peers?.get?.(key),cs=pc?.connectionState||'new';st.textContent=cs==='connected'?'Conectado':cs==='failed'?'Red bloqueada / reintentando':cs==='disconnected'?'Reconectando…':'Conectando…';});}catch(_){ }}setInterval(paintPeerStates,600);
 const bodyCall=$('#hc232CallWindow .hc232VideoArea');if(bodyCall&&!$('#hc233CallHint')){const h=document.createElement('div');h.id='hc233CallHint';h.className='hc233CallHint';h.textContent='Para compartir el sistema, elegí “Esta pestaña” o la ventana actual de Hospitalito en el selector del navegador.';bodyCall.appendChild(h);}
-document.title='HC Demo v236 · Supabase';setTimeout(updateMobileCensoAlert,200);
+document.title='HC Demo v237 · Supabase';setTimeout(updateMobileCensoAlert,200);
 })();
 </script>
 
@@ -43524,16 +43579,16 @@ document.title='HC Demo v236 · Supabase';setTimeout(updateMobileCensoAlert,200)
 <script id="hc-v235-login-fix">
 (()=>{
   'use strict';
-  window.HC_DEMO_VERSION='v236';
-  try{document.title='HC Demo v236 · Supabase';}catch(_){ }
+  window.HC_DEMO_VERSION='v237';
+  try{document.title='HC Demo v237 · Supabase';}catch(_){ }
 })();
 </script>
 
-<script id="hc-v236-login-call-fix">
+<script id="hc-v237-login-call-fix">
 (()=>{
   'use strict';
-  window.HC_DEMO_VERSION='v236';
-  try{document.title='HC Demo v236 · Supabase';}catch(_){ }
+  window.HC_DEMO_VERSION='v237';
+  try{document.title='HC Demo v237 · Supabase';}catch(_){ }
   const LOGIN_URL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login';
   const PUB='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
   async function quickLogin(username,password){
