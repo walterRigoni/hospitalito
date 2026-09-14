@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v237 · Supabase</title>
+<title>HC Demo v238 · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5323,7 +5323,7 @@ html::-webkit-scrollbar-corner{
 </head>
 
 <body>
-<!-- Hospitalito v237: pantalla completa por participante + controles exclusivos del presentador -->
+<!-- Hospitalito v238: pantalla completa por participante + controles exclusivos del presentador -->
 
 
 <div class="topbar">
@@ -8176,7 +8176,7 @@ function hcBackendRenderInstitutionPanel(){
 
   if(regEl){
     regEl.innerHTML = hcGlobalRegistryConfigured()
-      ? `Autenticación institucional disponible en Supabase. No se usan links ni claves de backend en este equipo.`
+      ? `Autenticación institucional disponible en Supabase. La contraseña institucional se valida y queda guardada de forma segura en Supabase.`
       : `<span style="color:#fbd38d;">No se pudo inicializar la autenticación institucional de Supabase.</span>`;
   }
 
@@ -42755,6 +42755,7 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
 
   const AUTH_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth";
   const LOGIN_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login";
+  const SEED_BIND_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-seed-bind";
   const PUB_KEY="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
   let authReadyPromise=null;
 
@@ -42802,7 +42803,7 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
   try{hcGlobalRegistryUrl=()=>AUTH_URL;}catch(_){ }
   try{hcGlobalRegistryRequest=async(action,payload={})=>authRequest(action,payload);}catch(_){ }
   try{hcGlobalAccountRequest=async(action,payload={})=>authRequest(action,payload);}catch(_){ }
-  try{hcGlobalRegistryResolveInstitution=async(name,password)=>authRequest("resolveBackend",{name:String(name||"").trim(),password:String(password||"")});}catch(_){ }
+  try{hcGlobalRegistryResolveInstitution=async(name,password)=>hc235AuthFetch(SEED_BIND_URL,"resolveBackend",{name:String(name||"").trim(),password:String(password||"")},45000);}catch(_){ }
   try{
     hcGlobalRegistryFindUser=async(username,password,options={})=>{
       const a=await authRequest("authenticateUser",{username:String(username||"").trim(),password:String(password||"")});
@@ -42997,7 +42998,8 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
       if(!name||!password){alert("Completá nombre de institución y contraseña.");return false;}
       hcBackendSetStatus("Supabase · buscando institución...","warn");
       try{
-        const resolved=await authRequest("resolveBackend",{name,password});
+        const resolved=await hc235AuthFetch(SEED_BIND_URL,"resolveBackend",{name,password},45000);
+        if(resolved?.migratedPassword)hcBackendSetStatus("Supabase · contraseña institucional migrada","warn");
         const backend=resolved.backend||{},institution=resolved.institution||{};
         const seedToken=String(resolved.seedAdminToken||resolved.token||"").trim();
         if(!seedToken)throw new Error("Supabase no devolvió autorización para el admin semilla.");
@@ -43077,7 +43079,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v237 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v237 · Supabase';lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo v238 · Supabase`;}catch(_){}}else if(!n)document.title='HC Demo v238 · Supabase';lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -43175,7 +43177,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA"!important;}
 #hc232CallLobby{z-index:2147483644}.hc232CallCreate{display:grid;grid-template-columns:1fr;gap:10px}.hc232InviteGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;max-height:280px;overflow:auto}.hc232Invite{display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--hc-theme-line);border-radius:10px;background:var(--hc-theme-surface-2);font-size:12px}.hc232Invite input{width:auto!important}.hc232ActiveCall{display:flex;gap:8px;align-items:center;border:1px solid var(--hc-theme-line);border-radius:11px;padding:9px;margin-top:7px;background:var(--hc-theme-surface-2)}.hc232ActiveCall>div:first-child{flex:1;min-width:0}
 #hc232CallWindow{width:min(1050px,96vw);height:min(760px,88dvh);left:18px;right:auto;bottom:18px;min-width:560px;min-height:430px;}
 .hc232CallLayout{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:8px;height:100%;min-height:0}.hc232VideoArea{min-width:0;display:flex;flex-direction:column;gap:8px}.hc232VideoGrid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;overflow:auto}.hc232VideoTile{position:relative;background:#05070a;border:1px solid var(--hc-theme-line);border-radius:11px;overflow:hidden;min-height:150px;display:grid;place-items:center}.hc232VideoTile video{width:100%;height:100%;object-fit:cover;background:#05070a}.hc232VideoLabel{position:absolute;left:7px;bottom:7px;background:rgba(0,0,0,.62);color:#fff;padding:3px 7px;border-radius:999px;font-size:10px}.hc232PresenterBadge{position:absolute;right:7px;top:7px;background:#f59e0b;color:#111827;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900}.hc232CallControls{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;padding:7px}.hc232CallRoster{border-left:1px solid var(--hc-theme-line);padding-left:8px;overflow:auto}.hc232RosterItem{padding:8px;border:1px solid var(--hc-theme-line);border-radius:9px;background:var(--hc-theme-surface-2);margin-bottom:6px;font-size:11px}.hc232RosterTop{display:flex;gap:6px;align-items:center}.hc232RosterTop b{flex:1}.hc232CallBadge{position:absolute;right:-6px;top:-7px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#dc2626;color:#fff;font-size:10px;display:none;align-items:center;justify-content:center;font-weight:900;border:2px solid var(--hc-theme-topbar)}
-/* v237 · pantalla completa + controles del presentador */
+/* v238 · pantalla completa + controles del presentador */
 .hc237CallHeadActions{display:flex;align-items:center;gap:6px;margin-left:auto}
 .hc237TileFullscreen{position:absolute;left:7px;top:7px;z-index:4;width:30px;height:30px;padding:0!important;display:grid!important;place-items:center;background:rgba(0,0,0,.56)!important;border-color:rgba(255,255,255,.28)!important;color:#fff!important}
 .hc237ScreenBadge{position:absolute;right:7px;top:34px;z-index:3;background:rgba(2,132,199,.92);color:#fff;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:900;display:none}
@@ -43563,7 +43565,7 @@ body[data-hc-theme="light"] #medPres .hcServiceRxItemTop .isPaused,body[data-hc-
 </style>
 <script id="hc-v233-patch">
 (()=>{
-'use strict';window.HC_DEMO_VERSION='v237';const $=s=>document.querySelector(s);
+'use strict';window.HC_DEMO_VERSION='v238';const $=s=>document.querySelector(s);
 function pendingRequest(arr){return Array.isArray(arr)&&arr.some(r=>r&&!r.completed&&!r.deletedAt&&String(r.status||'').toLowerCase()!=='completado');}
 function rolePatientAttention(pid){try{const role=String(session?.role||'').toLowerCase(),cur=(typeof getClinical==='function'?getClinical():{})?.[pid]||{};if(role==='enfermero'&&typeof patientHasPendingNurseAlertGlobal==='function'&&patientHasPendingNurseAlertGlobal(pid))return true;if(role==='medico'&&typeof hcDoctorGetUnreadModules==='function'&&(hcDoctorGetUnreadModules(pid)||[]).length)return true;if(role==='imagenologo'&&pendingRequest(cur.imageRequests))return true;if(role==='bioquimico'&&pendingRequest(cur.labRequests))return true;if(role==='microbiologo'&&pendingRequest(cur.microRequests))return true;if(role==='kinesiologo'&&pendingRequest(cur.kinesiologiaRequests))return true;if(role==='nutricionista'&&pendingRequest(cur.nutritionRequests))return true;if(role==='hemoterapia'&&pendingRequest(cur.hemotherapyRequests))return true;}catch(_){ }return false;}
 function censoItemPid(el){try{if(el?.dataset?.bedId){const a=(getRegistry?.()||[]).find(x=>x&&x.active!==false&&String(x.bedId||'')===String(el.dataset.bedId));return String(a?.patientId||'');}return typeof hcDoctorPatientIdFromCensoItem==='function'?String(hcDoctorPatientIdFromCensoItem(el)||''):'';}catch(_){return ''}}
@@ -43571,7 +43573,7 @@ function updateMobileCensoAlert(){const b=$('#hcMobileCensoBtn');if(!b)return;le
 const censoRoot=$('#medCenso');if(censoRoot){const obs=new MutationObserver(()=>setTimeout(updateMobileCensoAlert,0));obs.observe(censoRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}setInterval(updateMobileCensoAlert,500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(updateMobileCensoAlert,80)});window.addEventListener('focus',()=>setTimeout(updateMobileCensoAlert,80));
 function paintPeerStates(){try{document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(tile=>{const key=tile.dataset.peer||'';let st=tile.querySelector('.hc233PeerState');if(!st){st=document.createElement('div');st.className='hc233PeerState';tile.appendChild(st);}const mine=(session?.localSeed)?`seed:${String(localStorage.getItem(LS.seedAdminInstitutionId)||session?.institutionId||'')}`:`user:${session?.username||''}`;if(key===mine){st.textContent='Este dispositivo';return;}const pc=callCtx?.peers?.get?.(key),cs=pc?.connectionState||'new';st.textContent=cs==='connected'?'Conectado':cs==='failed'?'Red bloqueada / reintentando':cs==='disconnected'?'Reconectando…':'Conectando…';});}catch(_){ }}setInterval(paintPeerStates,600);
 const bodyCall=$('#hc232CallWindow .hc232VideoArea');if(bodyCall&&!$('#hc233CallHint')){const h=document.createElement('div');h.id='hc233CallHint';h.className='hc233CallHint';h.textContent='Para compartir el sistema, elegí “Esta pestaña” o la ventana actual de Hospitalito en el selector del navegador.';bodyCall.appendChild(h);}
-document.title='HC Demo v237 · Supabase';setTimeout(updateMobileCensoAlert,200);
+document.title='HC Demo v238 · Supabase';setTimeout(updateMobileCensoAlert,200);
 })();
 </script>
 
@@ -43579,16 +43581,16 @@ document.title='HC Demo v237 · Supabase';setTimeout(updateMobileCensoAlert,200)
 <script id="hc-v235-login-fix">
 (()=>{
   'use strict';
-  window.HC_DEMO_VERSION='v237';
-  try{document.title='HC Demo v237 · Supabase';}catch(_){ }
+  window.HC_DEMO_VERSION='v238';
+  try{document.title='HC Demo v238 · Supabase';}catch(_){ }
 })();
 </script>
 
-<script id="hc-v237-login-call-fix">
+<script id="hc-v238-login-call-fix">
 (()=>{
   'use strict';
-  window.HC_DEMO_VERSION='v237';
-  try{document.title='HC Demo v237 · Supabase';}catch(_){ }
+  window.HC_DEMO_VERSION='v238';
+  try{document.title='HC Demo v238 · Supabase';}catch(_){ }
   const LOGIN_URL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login';
   const PUB='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
   async function quickLogin(username,password){
