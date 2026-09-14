@@ -1,0 +1,78 @@
+name: Apply Hospitalito v238
+
+on:
+  push:
+    paths:
+      - ".github/workflows/apply-v238.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch v237 to v238
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          if 'HC Demo v237 · Supabase' not in s:
+              raise SystemExit('La base publicada no es v237')
+          s=s.replace('v237','v238')
+          needle='const LOGIN_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login";\n  const PUB_KEY='
+          if needle not in s:
+              raise SystemExit('No se encontró punto de inserción SEED_BIND_URL')
+          s=s.replace(needle,'const LOGIN_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login";\n  const SEED_BIND_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-seed-bind";\n  const PUB_KEY=',1)
+          old='hcGlobalRegistryResolveInstitution=async(name,password)=>authRequest("resolveBackend",{name:String(name||"").trim(),password:String(password||"")});'
+          new='hcGlobalRegistryResolveInstitution=async(name,password)=>hc235AuthFetch(SEED_BIND_URL,"resolveBackend",{name:String(name||"").trim(),password:String(password||"")},45000);'
+          if old not in s:
+              raise SystemExit('No se encontró wrapper resolveBackend')
+          s=s.replace(old,new,1)
+          old2='const resolved=await authRequest("resolveBackend",{name,password});'
+          new2='const resolved=await hc235AuthFetch(SEED_BIND_URL,"resolveBackend",{name,password},45000);\n        if(resolved?.migratedPassword)hcBackendSetStatus("Supabase · contraseña institucional migrada","warn");'
+          if old2 not in s:
+              raise SystemExit('No se encontró handler de admin semilla')
+          s=s.replace(old2,new2,1)
+          s=s.replace('Autenticación institucional disponible en Supabase. No se usan links ni claves de backend en este equipo.','Autenticación institucional disponible en Supabase. La contraseña institucional se valida y queda guardada de forma segura en Supabase.')
+          if 'hospitalito-seed-bind' not in s or 'HC Demo v238 · Supabase' not in s:
+              raise SystemExit('Validación final v238 falló')
+          p.write_text(s,encoding='utf-8')
+
+          sw=Path('service-worker.js')
+          if sw.exists():
+              t=sw.read_text(encoding='utf-8').replace("hospitalito-v237","hospitalito-v238")
+              sw.write_text(t,encoding='utf-8')
+          PY
+
+      - name: Validate JavaScript
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re, subprocess, sys
+          s=Path('index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>',s,re.S|re.I)
+          for i,b in enumerate(blocks,1):
+              f=Path(f'/tmp/hc238_{i}.js'); f.write_text(b,encoding='utf-8')
+              r=subprocess.run(['node','--check',str(f)],capture_output=True,text=True)
+              if r.returncode:
+                  print(r.stderr); sys.exit(r.returncode)
+          print(f'{len(blocks)}/{len(blocks)} scripts OK')
+          PY
+
+      - name: Commit v238
+        shell: bash
+        run: |
+          git config user.name "ChatGPT Hospitalito"
+          git config user.email "actions@users.noreply.github.com"
+          git add index.html service-worker.js
+          git commit -m "Hospitalito v238: corregir vinculación admin semilla"
+          git push
