@@ -1,0 +1,5228 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>HC Demo</title>
+<style>
+  :root{
+    --bg:#071a33;
+    --card:rgba(255,255,255,.06);
+    --line:rgba(255,255,255,.12);
+    --txt:#fff;
+    --muted:rgba(255,255,255,.75);
+    --black:#0a0a0a;
+    --blue:#0b4ea2;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    background:radial-gradient(1200px 600px at 15% 0%, #0a2a59 0%, var(--bg) 55%, #06142a 100%);
+    color:var(--txt);
+  }
+  .muted{ color:var(--muted); }
+  .btn{
+    background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.14);
+    color:#fff; padding:10px 12px; border-radius:12px; cursor:pointer;
+    font-weight:700;
+  }
+  .btn:hover{ background:rgba(255,255,255,.14); }
+  .btn.small{ padding:6px 10px; border-radius:10px; font-size:12px; }
+  .btn.primary{ background:rgba(20,110,255,.28); border-color:rgba(80,160,255,.35); }
+  .btn.danger{ background:rgba(255,60,60,.18); border-color:rgba(255,120,120,.25); }
+  input,select,textarea{
+    width:100%; padding:10px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.14);
+    background:rgba(10,20,40,.35); color:#fff; outline:none;
+  }
+  textarea{ min-height:160px; resize:vertical; }
+  label{ font-size:12px; opacity:.9; }
+  .row{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .card{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:10px; /* más bajo */
+    box-shadow: 0 12px 30px rgba(0,0,0,.18);
+  }
+  .topbar{
+    position:sticky; top:0; z-index:10;
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.10);
+    background:rgba(6,16,32,.72); backdrop-filter: blur(10px);
+  }
+  .tabs{ display:flex; gap:8px; flex-wrap:wrap; margin:6px 0 8px; }
+  .tab{
+    padding:8px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.08); cursor:pointer; font-weight:800; font-size:12px;
+  }
+  .tab.active{ background:rgba(20,110,255,.25); border-color:rgba(80,160,255,.35); }
+
+  /* ====== APP LAYOUTS ====== */
+  #loginWrap{ max-width:520px; margin:40px auto; padding:0 12px; }
+  #appAdmin, #appMed{ display:none; }
+
+  /* Admin full width (no se corta) + más compacto */
+  #appAdmin{
+    width:100vw; max-width:none;
+    display:grid; grid-template-columns: 1fr; gap:10px;
+    padding:10px;
+  }
+
+  /* Médico: censo + panel (censo 40% más angosto) */
+  #appMed{
+    width:100vw; max-width:none;
+    display:grid;
+    grid-template-columns: 260px 1fr; /* censo angosto */
+    gap:10px;
+    padding:10px;
+  }
+  #medCenso{
+    max-width:260px;
+    display:flex; flex-direction:column; gap:8px;
+    height: calc(100vh - 88px);
+    overflow:auto;
+    padding-right:6px;
+  }
+  .censoItem{
+    display:flex; justify-content:space-between; gap:8px; align-items:center;
+    padding:8px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.05); cursor:pointer; font-size:12px;
+  }
+  .censoItem.empty{ opacity:.6; cursor:default; }
+  .censoItem.active{ background:rgba(20,110,255,.18); border-color:rgba(80,160,255,.32); }
+
+  /* Headers (pantalla) */
+  .instBar{
+    background:var(--black); color:#fff; padding:10px 12px; border-radius:12px;
+    border:1px solid rgba(255,255,255,.10);
+  }
+  .instBar .l1{ font-weight:900; font-size:14px; }
+  .instBar .l2{ font-size:12px; opacity:.95; margin-top:2px; }
+  .instBar .l3{ font-size:11px; opacity:.92; margin-top:2px; line-height:1.25; }
+  .pacBar{ background: linear-gradient(180deg, var(--blue), #083f84); }
+
+  /* Panel médico */
+  #medPanel{ height: calc(100vh - 88px); overflow:auto; }
+  .panelTitle{ font-size:14px; font-weight:900; margin:0 0 8px; }
+  .chipRow{ display:flex; gap:8px; flex-wrap:wrap; }
+  label.chip{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05);
+    padding:6px 10px; border-radius:999px; cursor:pointer; font-size:12px;
+  }
+
+  /* Preview modal */
+  #previewModal{
+    position:fixed; inset:0; display:none; place-items:center;
+    background:rgba(0,0,0,.55); z-index:50;
+  }
+  #previewModal.show{ display:grid; }
+  #previewCard{
+    width:min(980px, 92vw); height:min(82vh, 820px);
+    background:#0b1222; border:1px solid rgba(255,255,255,.14);
+    border-radius:16px; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  #previewCard .bar{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px; border-bottom:1px solid rgba(255,255,255,.12);
+  }
+  #previewFrame{ width:100%; height:100%; border:0; background:#fff; }
+
+  table{ width:100%; border-collapse:collapse; }
+  th,td{ padding:6px; border-bottom:1px solid rgba(255,255,255,.10); font-size:12px; text-align:left; }
+
+  /* ===== Evolución editor split ===== */
+  .evoSplit{
+    display:grid;
+    grid-template-columns: 1.35fr .85fr;
+    gap:10px;
+    align-items:start;
+  }
+  .evoRightCol{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+  .miniBox{
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.04);
+    border-radius:14px;
+    padding:10px;
+  }
+  .miniBox h4{
+    margin:0 0 6px 0;
+    font-size:12px;
+    font-weight:900;
+  }
+  .miniBox .muted{ font-size:12px; opacity:.85; }
+  .hrLine{
+    height:1px;
+    background:rgba(255,255,255,.10);
+    margin:10px 0;
+  }
+
+  /* grupos de checkboxes tipo chip en evolución */
+  .chkRow{
+    display:flex; flex-wrap:wrap; gap:8px;
+  }
+  .chk{
+    display:inline-flex; align-items:center; gap:8px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05);
+    padding:6px 10px; border-radius:999px;
+    cursor:pointer; font-size:12px;
+  }
+  .chk input{ width:auto; margin:0; }
+
+  /* Textareas “1 renglón” que crecen solos */
+  .ta1{
+    min-height: 40px;     /* ~1 línea + padding */
+    height: 40px;
+    resize: none;         /* que no lo estiren a mano */
+    overflow: hidden;     /* para que no aparezca scrollbar */
+  }
+
+  /* ===== Cuenta > Miembros + Chat ===== */
+  .accTopRow{
+    display:flex; align-items:center; gap:10px;
+  }
+  .accBackBtn{ display:none; }
+
+  .memberList{
+    margin-top:10px;
+    display:flex; flex-direction:column; gap:8px;
+  }
+  .memberItem{
+    display:flex; align-items:center; gap:10px;
+    padding:10px 12px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.05);
+    border-radius:14px;
+    cursor:pointer;
+  }
+  .memberItem:hover{ background:rgba(255,255,255,.08); }
+  .memberAvatar{
+    width:42px; height:42px;
+    border-radius:12px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.06);
+    display:grid; place-items:center;
+    flex:0 0 auto;
+  }
+  .memberAvatar img{ width:100%; height:100%; object-fit:cover; }
+  .memberNameBox{ display:flex; flex-direction:column; min-width:0; }
+  .memberNameBox .n1{ font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .memberNameBox .n2{ font-size:12px; opacity:.8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .memberDetailCenter{
+    display:flex; flex-direction:column; align-items:center; gap:10px;
+    margin-top:12px;
+  }
+  .memberDetailPhoto{
+    width:120px; height:120px;
+    border-radius:18px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.06);
+    display:grid; place-items:center;
+  }
+  .memberDetailPhoto img{ width:100%; height:100%; object-fit:cover; }
+  .memberDetailUser{
+    font-size:12px; opacity:.8;
+  }
+  .memberDetailName{
+    font-size:20px; font-weight:1000;
+  }
+  .activityBox{
+    margin-top:14px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.04);
+    border-radius:14px;
+    padding:10px;
+  }
+  .activityRow{
+    padding:8px 10px;
+    border:1px solid rgba(255,255,255,.10);
+    background:rgba(255,255,255,.04);
+    border-radius:12px;
+    margin-top:8px;
+    font-size:12px;
+  }
+  .activityRow .t{ opacity:.85; font-size:11px; }
+  .activityRow .m{ margin-top:4px; white-space:pre-wrap; }
+
+  /* Chat */
+  .chatWrap{
+    margin-top:10px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.04);
+    border-radius:14px;
+    padding:10px;
+    display:flex;
+    flex-direction:column;
+    height:55vh;
+  }
+  .chatMsgs{
+    flex:1;
+    overflow:auto;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    padding-right:6px;
+  }
+  .bubble{
+    max-width:78%;
+    padding:8px 10px;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.06);
+    font-size:12px;
+    white-space:pre-wrap;
+  }
+  .bubble.me{
+    margin-left:auto;
+    background:rgba(20,110,255,.18);
+    border-color:rgba(80,160,255,.32);
+  }
+  .bubble .meta{
+    font-size:11px; opacity:.75; margin-top:4px;
+  }
+  .bubble img{
+    max-width:100%;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.12);
+    margin-top:6px;
+  }
+  .chatSend{
+    display:flex;
+    gap:8px;
+    margin-top:10px;
+    align-items:center;
+  }
+
+  /* INPUT TEXTO: que ocupe casi todo */
+  .chatSend input[type="text"]{
+    flex:1;
+    min-width:0;
+    padding:8px 10px;
+  }
+
+  /* INPUT IMAGEN: pequeño */
+  .chatSend input[type="file"]{
+    width:110px;
+  }
+
+
+  .svTableWrap{
+  overflow:auto;
+  border:1px solid rgba(255,255,255,.10);
+  border-radius:12px;
+  margin-top:8px;
+}
+
+.svTable{
+  width:100%;
+  border-collapse:collapse;
+  min-width:920px;
+}
+
+.svTable th{
+  background:rgba(255,255,255,.08);
+  font-weight:900;
+  font-size:12px;
+  padding:8px;
+  text-align:left;
+  border-bottom:1px solid rgba(255,255,255,.14);
+}
+
+.svTable td{
+  padding:8px;
+  font-size:12px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  vertical-align:middle;
+}
+
+.sv-ok{
+  color:#68d391;
+  font-weight:900;
+}
+
+.sv-bad{
+  color:#fc8181;
+  font-weight:900;
+}
+
+.sv-neutral{
+  color:rgba(255,255,255,.85);
+}
+
+
+
+</style>
+</head>
+
+<body>
+
+<div class="topbar">
+  <div style="display:flex; align-items:center; gap:10px;">
+    <div style="font-weight:1000;">Historia Clínica</div>
+    <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <button class="btn small" id="btnDemo" type="button">Demo</button>
+    <button class="btn small danger" id="btnReset" type="button">Reset</button>
+    <button class="btn small" id="btnAccount" type="button" style="display:none;">Cuenta</button>
+    <button class="btn small" id="btnLogout" type="button" style="display:none;">Salir</button>
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginWrap">
+  <div class="card">
+    <h3 style="margin:6px 0 10px;">Ingreso</h3>
+    <div class="row">
+      <div class="field">
+        <label>Usuario</label>
+        <input id="loginUser" autocomplete="username" />
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input id="loginPass" type="password" autocomplete="current-password" />
+      </div>
+    </div>
+    <div style="margin-top:10px; display:flex; gap:8px;">
+      <button class="btn primary" id="btnLogin" type="button">Entrar</button>
+    </div>
+    <div class="muted" style="font-size:12px; margin-top:10px;">
+      Demo: admin/admin • medico/medico
+    </div>
+  </div>
+</div>
+
+<!-- ADMIN -->
+<div id="appAdmin">
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" data-admin-tab="intern" type="button">Internación</button>
+      <button class="tab" data-admin-tab="users" type="button">Usuarios</button>
+      <button class="tab" data-admin-tab="arch" type="button">Altas/Defunciones</button>
+      <button class="tab" data-admin-tab="conf" type="button">Institución</button>
+    </div>
+
+    <!-- INTERNACIÓN -->
+    <div id="adminIntern">
+      <div class="row">
+        <div class="field">
+          <label>Área</label>
+          <select id="pArea"></select>
+        </div>
+        <div class="field">
+          <label>Cama libre</label>
+          <select id="pBed"></select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Apellido</label>
+          <input id="pLast" placeholder="Ej: García" />
+        </div>
+        <div class="field">
+          <label>Nombres</label>
+          <input id="pFirst" placeholder="Ej: Juan Carlos" />
+        </div>
+      </div>
+
+      <div class="row3" style="margin-top:10px;">
+        <div class="field">
+          <label>DNI</label>
+          <input id="pDni" />
+        </div>
+        <div class="field">
+          <label>Fecha nacimiento</label>
+          <input id="pDob" type="date" />
+        </div>
+        <div class="field">
+          <label>Edad</label>
+          <input id="pAge" value="—" disabled />
+        </div>
+      </div>
+
+      <div class="row3" style="margin-top:10px;">
+        <div class="field">
+          <label>Sexo</label>
+          <select id="pSex">
+            <option value="">—</option>
+            <option value="M">M</option>
+            <option value="F">F</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Obra social</label>
+          <input id="pOS" />
+        </div>
+        <div class="field">
+          <label>Afiliado</label>
+          <input id="pAff" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Tel familiar</label>
+          <input id="pFamPhone" />
+        </div>
+        <div class="field">
+          <label>Dx ingreso</label>
+          <input id="pDx" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Domicilio - Calle</label>
+          <input id="pStreet" />
+        </div>
+        <div class="field">
+          <label>Número</label>
+          <input id="pStreetNo" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Barrio</label>
+          <input id="pNeighborhood" />
+        </div>
+        <div class="field">
+          <label>Ciudad</label>
+          <input id="pCity" />
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Provincia</label>
+          <input id="pProvince" />
+        </div>
+        <div class="field">
+          <label>Fecha/Hora ingreso</label>
+          <input id="pAdmDate" disabled />
+        </div>
+      </div>
+
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn primary" id="btnAdmit" type="button">Ingresar</button>
+        <button class="btn" id="btnClearAdm" type="button">Limpiar</button>
+        <button class="btn" id="btnPrintAdminCenso" type="button">Imprimir censo</button>
+        <span class="muted" id="admHint" style="font-size:12px; align-self:center;">Mover: click origen → click destino libre</span>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-weight:900;">Censo</div>
+        </div>
+        <div style="overflow:auto; max-height:48vh;">
+          <table>
+            <thead>
+              <tr>
+                <th>Área</th><th>Cama</th><th>Paciente</th><th>DNI</th><th>FN</th><th>Edad</th><th>Sexo</th><th>OS</th><th>Afiliado</th><th>Domicilio</th><th>Dx</th><th>Ingreso</th>
+              </tr>
+            </thead>
+            <tbody id="censoTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- USUARIOS -->
+    <div id="adminUsers" style="display:none;">
+      <div class="row">
+        <div class="field">
+          <label>Usuario</label>
+          <input id="uUser" />
+        </div>
+        <div class="field">
+          <label>Contraseña</label>
+          <input id="uPass" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <div class="field">
+          <label>Nombre visible</label>
+          <input id="uName" />
+        </div>
+        <div class="field">
+          <label>Rol</label>
+          <select id="uRole">
+            <option value="medico">medico</option>
+            <option value="enfermero">enfermero</option>
+            <option value="bioquimico">bioquimico</option>
+            <option value="microbiologo">microbiologo</option>
+            <option value="farmaceutico">farmaceutico</option>
+            <option value="administrativo">administrativo</option>
+            <option value="admin">admin</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn primary" id="btnAddUser" type="button">Crear usuario</button>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <div style="font-weight:900;">Usuarios</div>
+        <div style="overflow:auto; max-height:48vh;">
+          <table>
+            <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th></th></tr></thead>
+            <tbody id="usersTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ARCH (Altas/Defunciones) -->
+    <div id="adminArch" style="display:none;">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">
+        (Queda listo el panel. El alta/defunción se guarda automáticamente cuando el médico “cierra” la epicrisis: lo conecto en la Parte 3.)
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Buscar por DNI</label>
+          <input id="archSearchDni" placeholder="Ej: 12345678" />
+        </div>
+        <div class="field">
+          <label>Buscar por Apellido y/o Nombre</label>
+          <input id="archSearchName" placeholder="Ej: García" />
+        </div>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="btn" id="btnArchSearch" type="button">Buscar</button>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <div style="font-weight:900;">Resultados</div>
+        <div id="archResults" class="muted" style="font-size:12px; margin-top:8px;">—</div>
+      </div>
+    </div>
+
+    <!-- CONF -->
+    <div id="adminConf" style="display:none;">
+      <div class="row">
+        <div class="field"><label>Línea 1</label><input id="inst1" /></div>
+        <div class="field"><label>Línea 2</label><input id="inst2" /></div>
+      </div>
+      <div class="field" style="margin-top:10px;"><label>Línea 3</label><input id="inst3" /></div>
+      <div style="margin-top:10px;">
+        <button class="btn primary" id="btnSaveInst" type="button">Guardar institución</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MÉDICO -->
+<div id="appMed">
+  <div class="card" style="display:flex; flex-direction:column; gap:10px;">
+    <div class="field">
+      <label>Filtro por área</label>
+      <select id="medAreaFilter"></select>
+    </div>
+    <div id="medCenso"></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn small" id="btnPrintMedCenso" type="button">Imprimir censo</button>
+    </div>
+  </div>
+
+  <div id="medPanel" class="card">
+    <div id="instHdrBar" class="instBar"></div>
+    <div id="pacHdrBar" class="instBar pacBar" style="margin-top:8px;"></div>
+
+    <div class="tabs" style="margin-top:10px;">
+      <button class="tab active" data-medtab="ingreso" type="button">Ingreso</button>
+      <button class="tab" data-medtab="evolucion" type="button">Evolución</button>
+      <button class="tab" data-medtab="prescripciones" type="button">Prescripciones</button>
+      <button class="tab" data-medtab="sv" type="button">Signos vitales</button>
+      <button class="tab" data-medtab="bal" type="button">Balances</button>
+      <button class="tab" data-medtab="invasiones" type="button">Invasiones</button>
+      <button class="tab" data-medtab="laboratorio" type="button">Laboratorio</button>
+      <button class="tab" data-medtab="micro" type="button">Microbiología</button>
+      <button class="tab" data-medtab="imagenes" type="button">Estudios/Imágenes</button>
+      <button class="tab" data-medtab="epicrisis" type="button">Epicrisis</button>
+    </div>
+
+    <h3 class="panelTitle" id="medPanelTitle">Ingreso</h3>
+
+    <!-- Contenidos por tab -->
+    <div id="medIngreso">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="btn" type="button" id="btnNuevoIngreso">Nuevo ingreso</button>
+        <button class="btn" type="button" id="btnGuardarIngreso" style="display:none;">Guardar ingreso</button>
+        <button class="btn" type="button" id="btnGuardarCambiosIngreso" style="display:none;">Guardar cambios</button>
+        <button class="btn" type="button" id="btnCancelarIngreso" style="display:none;">Cancelar</button>
+        <button class="btn" type="button" id="btnEditarIngreso" style="display:none;">Editar</button>
+        <button class="btn" type="button" id="btnPrintIngreso">Imprimir</button>
+      </div>
+
+      <div id="ingresoStatus" class="muted" style="font-size:12px; opacity:.8; margin-bottom:10px;"></div>
+
+      <div id="ingresoFormWrap" style="display:none;">
+        <!-- acá va tu plantilla con checks ant_pat/ant_quir/ant_tox/ant_alerg + campos -->
+      </div>
+
+      <div id="ingresoPrettyWrap" style="display:none;">
+        <div id="ingresoMeta" class="muted" style="font-size:12px; opacity:.8; margin-bottom:6px;"></div>
+        <pre id="ingresoPretty" style="white-space:pre-wrap; margin:0;"></pre>
+      </div>
+
+      <div id="ingresoPrevList"></div>
+
+    </div>
+      <div id="medEvol" style="display:none;">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="btn" type="button" id="btnNuevaEvo">Nueva evolución</button>
+          <button class="btn" type="button" id="btnSaveEvo">Guardar</button>
+          <button class="btn" type="button" id="btnSaveEvoFree">Guardar</button>
+        </div>
+
+        <div id="evoStatus" class="muted" style="font-size:12px;opacity:.8; margin-bottom:8px;"></div>
+
+        <!-- Tabs modo -->
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <button type="button" class="btn small evoTab active" data-evomode="plantilla">Plantilla</button>
+          <button type="button" class="btn small evoTab" data-evomode="libre">Texto libre</button>
+        </div>
+
+        <!-- Editor -->
+        <div id="evoFormWrap"></div>
+        <div id="evoFreeWrap" style="display:none;">
+          <textarea id="evoFreeText"></textarea>
+          <button class="btn small" type="button" id="btnCancelEvoFree">Cancelar</button>
+        </div>
+
+        <!-- Viewer de abierta -->
+        <div id="evoOpenViewer" style="display:none; margin-top:10px;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+            <button class="btn small" id="btnEditEvoOpen" type="button">Editar</button>
+            <button class="btn small" id="btnPrintEvoOpen" type="button">Imprimir</button>
+          </div>
+          <div id="evoOpenMeta" class="muted" style="font-size:12px;opacity:.8;"></div>
+          <pre id="evoOpenText" style="white-space:pre-wrap;"></pre>
+        </div>
+
+        <!-- Lista -->
+        <div class="muted" id="evoCount" style="font-size:12px; opacity:.8; margin-top:10px;"></div>
+        <div id="evoList"></div>
+
+        <!-- Select para imprimir si querés (opcional) -->
+        <select id="evoPrintSelect" style="display:none;"></select>
+
+      </div>
+
+    <div id="medPres" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo de Prescripciones en preparación.)</div>
+    </div>
+
+    <div id="medSV" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo en preparación: se agrega igual que Ingreso/Evolución con texto bonito y lista previa.)</div>
+    </div>
+    <div id="medBAL" style="display:none;"></div>
+    <div id="medInv" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo en preparación.)</div>
+    </div>
+    <div id="medLab" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo en preparación.)</div>
+    </div>
+    <div id="medMicro" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo en preparación.)</div>
+    </div>
+    <div id="medImg" style="display:none;">
+      <div class="muted" style="font-size:12px;">(Módulo en preparación.)</div>
+    </div>
+
+    <div id="medEpic" style="display:none;"></div>
+
+  </div>
+</div>
+
+<!-- PREVIEW -->
+<div id="previewModal">
+  <div id="previewCard">
+    <div class="bar">
+      <div style="font-weight:900;">Vista previa</div>
+      <button class="btn small" id="btnClosePreview" type="button">Cerrar</button>
+    </div>
+    <iframe id="previewFrame"></iframe>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   Utils + Storage
+========================================================= */
+const $ = (q) => {
+  if (!q) return null;
+
+  // Si es selector CSS real, usamos querySelector
+  if (
+    q.startsWith("#") ||
+    q.startsWith(".") ||
+    q.startsWith("[") ||
+    q.includes(" ") ||
+    q.includes(">") ||
+    q.includes(":")
+  ) {
+    return document.querySelector(q);
+  }
+
+  // Si no parece selector, lo tratamos como id directo
+  return document.getElementById(q);
+};
+
+
+function escHTML(s){
+  return String(s ?? "").replace(/[&<>"']/g, m => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[m]));
+}
+function uid(prefix="id"){
+  return prefix + "_" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+}
+function pad2(n){ return String(n).padStart(2,"0"); }
+function nowDateObj(){ return new Date(); }
+function nowStr(){
+  const d = nowDateObj();
+  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function dmyFromDateISO(iso){
+  if(!iso) return "";
+  const [y,m,d] = String(iso).split("-");
+  if(!y||!m||!d) return "";
+  return `${d}/${m}/${y}`;
+}
+function dmyhmFromISODateTime(iso){
+  if(!iso) return "";
+  const s = String(iso).replace(" ", "T");
+  const [date, time] = s.split("T");
+  const dmy = dmyFromDateISO(date);
+  if(!time) return dmy;
+  const hhmm = time.slice(0,5);
+  return `${dmy} ${hhmm}`;
+}
+function hm24FromISO(iso){
+  if(!iso) return "";
+  const s = String(iso).replace(" ", "T");
+  const parts = s.split("T");
+  if(parts.length < 2) return "";
+  return parts[1].slice(0,5);
+}
+function calcTAM(sys, dia){
+  const s = parseFloat(sys);
+  const d = parseFloat(dia);
+  if(!isFinite(s) || !isFinite(d)) return "";
+  return Math.round((s + (2 * d)) / 3);
+}
+
+function svValueClass(type, value){
+  const v = parseFloat(value);
+  if(!isFinite(v)) return "sv-neutral";
+
+  switch(type){
+    case "tas": return (v >= 90 && v <= 140) ? "sv-ok" : "sv-bad";
+    case "tad": return (v >= 60 && v <= 90) ? "sv-ok" : "sv-bad";
+    case "tam": return (v >= 65 && v <= 105) ? "sv-ok" : "sv-bad";
+    case "fc":  return (v >= 60 && v <= 100) ? "sv-ok" : "sv-bad";
+    case "fr":  return (v >= 12 && v <= 20) ? "sv-ok" : "sv-bad";
+    case "temp":return (v >= 36 && v <= 37.5) ? "sv-ok" : "sv-bad";
+    case "sat": return (v >= 95) ? "sv-ok" : "sv-bad";
+    default:    return "sv-neutral";
+  }
+}
+
+function svBadge(type, value, suffix=""){
+  if(value === "" || value === null || value === undefined){
+    return `<span class="sv-neutral">—</span>`;
+  }
+  return `<span class="${svValueClass(type, value)}">${escHTML(String(value))}${suffix}</span>`;
+}
+function getBalancePrintHTML(pid){
+  const { cur } = getBalanceData(pid);
+  const arr = Array.isArray(cur?.balances) ? cur.balances : [];
+
+  if(!arr.length){
+    return `
+      <div class="box">
+        <div class="line">Sin registros de balances.</div>
+      </div>
+    `;
+  }
+
+  const sorted = arr.slice().sort((a,b)=>{
+    return String(a.dateTime || "").localeCompare(String(b.dateTime || ""));
+  });
+
+  const groups = {};
+  sorted.forEach(r=>{
+    const dayKey = String(r.dateTime || "").slice(0,10);
+    if(!groups[dayKey]) groups[dayKey] = [];
+    groups[dayKey].push(r);
+  });
+
+  const dayKeys = Object.keys(groups).sort().reverse();
+
+  let html = "";
+
+  dayKeys.forEach(dayKey=>{
+    const rows = groups[dayKey];
+    let acumuladoDia = 0;
+    const detalleIngresosDia = {};
+    const detalleEgresosDia = {};
+
+    const trs = rows.map(r=>{
+      const fecha = dmyFromDateISO(String(r.dateTime || "").slice(0,10));
+      const hora = hm24FromISO(r.dateTime);
+
+      const ingresos = Number(r.ingresos || 0);
+      const egresos = Number(r.egresos || 0);
+      const parcial = ingresos - egresos;
+      acumuladoDia += parcial;
+
+      const ingresoDetalleNorm = normalizeBalanceDetail(r.ingresoDetalle || "");
+      const egresoDetalleNorm  = normalizeBalanceDetail(r.egresoDetalle || "");
+
+      if(ingresoDetalleNorm){
+        detalleIngresosDia[ingresoDetalleNorm] = (detalleIngresosDia[ingresoDetalleNorm] || 0) + ingresos;
+      }
+      if(egresoDetalleNorm){
+        detalleEgresosDia[egresoDetalleNorm] = (detalleEgresosDia[egresoDetalleNorm] || 0) + egresos;
+      }
+
+      const totalIngresoDetalle = ingresoDetalleNorm ? detalleIngresosDia[ingresoDetalleNorm] : 0;
+      const totalEgresoDetalle  = egresoDetalleNorm ? detalleEgresosDia[egresoDetalleNorm] : 0;
+
+      const ingresoTxt = ingresos
+        ? `${ingresos} ml${ingresoDetalleNorm ? ` (${escHTML(ingresoDetalleNorm)} · total día: ${totalIngresoDetalle} ml)` : ""}`
+        : "—";
+
+      const egresoTxt = egresos
+        ? `${egresos} ml${egresoDetalleNorm ? ` (${escHTML(egresoDetalleNorm)} · total día: ${totalEgresoDetalle} ml)` : ""}`
+        : "—";
+
+      return `
+        <tr>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${escHTML(fecha)} ${escHTML(hora)}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${escHTML(r.user || "—")}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${ingresoTxt}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${egresoTxt}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd; font-weight:900;">
+            ${parcial > 0 ? "+" : ""}${parcial} ml
+          </td>
+          <td style="padding:6px; border-bottom:1px solid #ddd; font-weight:900;">
+            ${acumuladoDia > 0 ? "+" : ""}${acumuladoDia} ml
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    // totales del día
+    let totIngDia = 0;
+    let totEgrDia = 0;
+    rows.forEach(r=>{
+      totIngDia += Number(r.ingresos || 0);
+      totEgrDia += Number(r.egresos || 0);
+    });
+    const balDia = totIngDia - totEgrDia;
+
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:900; font-size:13px; margin-bottom:6px;">
+          ${escHTML(dmyFromDateISO(dayKey))}
+        </div>
+
+        <div style="margin-bottom:6px; font-size:12px;">
+          Ingresos Totales: <b>${totIngDia} ml</b> |
+          Egresos Totales: <b>${totEgrDia} ml</b> |
+          Balance Total: <b>${balDia > 0 ? "+" : ""}${balDia} ml</b>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Fecha / Hora</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Usuario</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Ingresos</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Egresos</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Balance parcial</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Balance acumulado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trs}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  return html;
+}
+function isoFromNow(){
+  const d = nowDateObj();
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth()+1);
+  const da = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  return `${y}-${m}-${da}T${hh}:${mm}`;
+}
+function isoNowLocalFull(){
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = pad2(d.getMonth()+1);
+  const da = pad2(d.getDate());
+  const hh = pad2(d.getHours());
+  const mm = pad2(d.getMinutes());
+  const ss = pad2(d.getSeconds());
+  return `${y}-${m}-${da}T${hh}:${mm}:${ss}`;
+}
+function calcAge(dobISO){
+  if(!dobISO) return "";
+  const b = new Date(dobISO);
+  if(isNaN(b.getTime())) return "";
+  const t = new Date();
+  let age = t.getFullYear() - b.getFullYear();
+  const m = t.getMonth() - b.getMonth();
+  if(m < 0 || (m === 0 && t.getDate() < b.getDate())) age--;
+  return age;
+}
+function toast(msg){ console.log("[toast]", msg); }
+
+
+function logAction(message, patientId=null){
+  if(!session) return;
+  const arr = getActivity();
+  arr.push({
+    id: uid("act"),
+    ts: isoNowLocalFull(),
+    user: session.username,
+    name: session.name || session.username,
+    role: session.role || "",
+    patientId: patientId || null,
+    message: String(message||"").trim()
+  });
+  // limitar tamaño
+  while(arr.length > 400) arr.shift();
+  setActivity(arr);
+}
+
+
+const LS = {
+  session: "hc.session",
+  users: "hc.users",
+  beds: "hc.beds",
+  registry: "hc.registry",
+  patients: "hc.patients",
+  clinical: "hc.clinical",
+  inst: "hc.inst",
+  archive: "hc.archive", // altas/defunciones
+  activity: "hc.activity", // registro de acciones
+  chats: "hc.chats",        // chats entre usuarios
+};
+
+function loadJSON(key, fallback){
+  try{
+    const raw = localStorage.getItem(key);
+    if(!raw) return fallback;
+    return JSON.parse(raw);
+  }catch(e){ return fallback; }
+}
+function saveJSON(key, obj){ localStorage.setItem(key, JSON.stringify(obj)); }
+
+function getUsers(){ return loadJSON(LS.users, []); }
+function setUsers(v){ saveJSON(LS.users, v); }
+
+function getBeds(){ return loadJSON(LS.beds, []); }
+function setBeds(v){ saveJSON(LS.beds, v); }
+
+function getRegistry(){ return loadJSON(LS.registry, []); }
+function setRegistry(v){ saveJSON(LS.registry, v); }
+
+function getPatients(){ return loadJSON(LS.patients, []); }
+function setPatients(v){ saveJSON(LS.patients, v); }
+
+function getClinical(){ return loadJSON(LS.clinical, {}); }
+function setClinical(v){ saveJSON(LS.clinical, v); }
+
+function getInst(){
+  return loadJSON(LS.inst, {
+    line1:"Institución (configurar)",
+    line2:"Sede • Dirección",
+    line3:"Teléfono • Email • Pie / notas"
+  });
+}
+function setInst(v){ saveJSON(LS.inst, v); }
+
+function getArchive(){ return loadJSON(LS.archive, []); }
+function setArchive(v){ saveJSON(LS.archive, v); }
+
+function getActivity(){ return loadJSON(LS.activity, []); }
+function setActivity(v){ saveJSON(LS.activity, v); }
+
+function getChats(){ return loadJSON(LS.chats, {}); }
+function setChats(v){ saveJSON(LS.chats, v); }
+
+
+/* =========================================================
+   Nombre: Apellido / Nombres
+========================================================= */
+function splitNameToParts(full){
+  const s = String(full||"").trim();
+  if(!s) return { lastName:"", firstNames:"" };
+  const m = s.split(",");
+  if(m.length>=2) return { lastName: m[0].trim(), firstNames: m.slice(1).join(",").trim() };
+  const parts = s.split(/\s+/);
+  if(parts.length===1) return { lastName: s, firstNames:"" };
+  return { lastName: parts.slice(-1).join(" "), firstNames: parts.slice(0,-1).join(" ") };
+}
+function buildPatientDisplayName(p){
+  const last = String(p?.lastName||"").trim();
+  const first = String(p?.firstNames||"").trim();
+  if(last && first) return `${last}, ${first}`;
+  if(last) return last;
+  if(first) return first;
+  return String(p?.name||"").trim() || "—";
+}
+function migratePatientsNameParts(){
+  const arr = getPatients();
+  let changed = false;
+  arr.forEach(p=>{
+    if(!p) return;
+    if(!p.lastName && !p.firstNames && p.name){
+      const parts = splitNameToParts(p.name);
+      p.lastName = parts.lastName;
+      p.firstNames = parts.firstNames;
+      changed = true;
+    }
+  });
+  if(changed) setPatients(arr);
+}
+/* =========================================================
+   Data helpers
+========================================================= */
+function findPatient(pid){
+  return getPatients().find(p=>p.id===pid) || null;
+}
+function getAdmissionByBedId(bedId){
+  return getRegistry().find(a=>a.bedId===bedId && a.active!==false) || null;
+}
+function getAdmissionByPatientId(pid){
+  return getRegistry().find(a=>a.patientId===pid && a.active!==false) || null;
+}
+function domStringFromPatient(p){
+  if(!p) return "";
+  const parts = [];
+  const street = (p.street||"").trim();
+  const no = (p.streetNo||"").trim();
+  const nb = (p.neighborhood||"").trim();
+  const city = (p.city||"").trim();
+  const prov = (p.province||"").trim();
+  const line1 = [street, no].filter(Boolean).join(" ");
+  if(line1) parts.push(line1);
+  if(nb) parts.push(nb);
+  if(city) parts.push(city);
+  if(prov) parts.push(prov);
+  return parts.join(" • ");
+}
+
+function fillAreaSelectors(){
+  const beds = getBeds();
+  const areas = Array.from(new Set(beds.map(b=>String(b.area||"").trim()).filter(Boolean))).sort();
+  const selA = $("#pArea");
+  if(selA){
+    selA.innerHTML = `<option value="">—</option>` + areas.map(a=>`<option value="${escHTML(a)}">${escHTML(a)}</option>`).join("");
+  }
+  const selM = $("#medAreaFilter");
+  if(selM){
+    selM.innerHTML = `<option value="Todo">Todo</option>` + areas.map(a=>`<option value="${escHTML(a)}">${escHTML(a)}</option>`).join("");
+  }
+}
+function fillBedSelectOnlyFree(){
+  const area = ($("#pArea").value||"").trim();
+  const beds = getBeds().filter(b=> !area || b.area===area );
+  const free = beds.filter(b=> !getAdmissionByBedId(b.id) );
+  const sel = $("#pBed");
+  sel.innerHTML = `<option value="">—</option>` + free.map(b=>`<option value="${b.id}">${escHTML(b.label)}</option>`).join("");
+}
+function fillBedSelectForEditKeepCurrent(currentBedId){
+  const area = ($("#pArea").value||"").trim();
+  const beds = getBeds().filter(b=> !area || b.area===area );
+  const allowed = beds.filter(b=>{
+    if(b.id === currentBedId) return true;
+    return !getAdmissionByBedId(b.id);
+  });
+  const sel = $("#pBed");
+  sel.innerHTML = `<option value="">—</option>` + allowed.map(b=>`<option value="${b.id}">${escHTML(b.label)}</option>`).join("");
+}
+
+function getAdmDaysForSelectedPatient(){
+  if(!selectedPatientId) return "";
+  const adm = getAdmissionByPatientId(selectedPatientId);
+  if(!adm?.admDateTime) return "";
+  const dt = new Date(String(adm.admDateTime).replace(" ", "T"));
+  if(isNaN(dt.getTime())) return "";
+  const now = new Date();
+  const diffMs = now - dt;
+  const days = Math.max(0, Math.floor(diffMs / (1000*60*60*24)));
+  return String(days);
+}
+
+function numClean(v){
+  const s = String(v ?? "").trim().replace(",",".");
+  const n = parseFloat(s);
+  return isFinite(n) ? n : null;
+}
+
+function calcPAFI(pO2, fio2Percent){
+  const po2 = numClean(pO2);
+  const fio2 = numClean(fio2Percent);
+  if(po2 === null || fio2 === null || fio2 <= 0) return "";
+  const pafi = po2 / (fio2/100);
+  if(!isFinite(pafi)) return "";
+  return pafi.toFixed(0);
+}
+
+function readChecks(groupName){
+  return Array.from(document.querySelectorAll(`input[data-g="${groupName}"]`))
+    .filter(x=>x.checked)
+    .map(x=>x.value);
+}
+function normalizeBalanceDetail(txt){
+  let s = String(txt || "").trim().toLowerCase();
+
+  // colapsa espacios múltiples
+  s = s.replace(/\s+/g, " ");
+
+  if(!s) return "";
+
+  // primera letra mayúscula
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+function showEl(el, on){
+  if(!el) return;
+  el.style.display = on ? "" : "none";
+}
+
+function fmtDateTimeShort(iso){
+  if(!iso) return "—";
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return "—";
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString().slice(0,5)}`;
+}
+
+function getSVPreviewData(pid){
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  const arr = Array.isArray(cur.signosVitales) ? cur.signosVitales : [];
+  const last = arr.length ? arr[arr.length - 1] : null;
+  return { arr, last };
+}
+
+function getBALPreviewData(pid){
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  const arr = Array.isArray(cur.balances) ? cur.balances : [];
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let totIng = 0;
+  let totEgr = 0;
+
+  arr.forEach(r=>{
+    const d = new Date(r.dateTime);
+    if(d >= startOfDay){
+      totIng += Number(r.ingresos || 0);
+      totEgr += Number(r.egresos || 0);
+    }
+  });
+
+  const balance = totIng - totEgr;
+  const last = arr.length ? arr[arr.length - 1] : null;
+
+  return { arr, last, totIng, totEgr, balance };
+}
+
+function getSVPreviewHTML(pid){
+  const { arr, last } = getSVPreviewData(pid);
+
+  if(!last){
+    return `
+      <div class="miniBox">
+        <h4>Signos vitales</h4>
+        <div class="muted">Sin registros cargados.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="miniBox">
+      <h4>Signos vitales</h4>
+      <div style="font-size:12px;">
+        <div><b>Último:</b> ${escHTML(fmtDateTimeShort(last.dateTime))} • ${escHTML(last.user || "—")}</div>
+        <div style="margin-top:6px;">
+          TA: ${escHTML(last.ta_sys || "—")}/${escHTML(last.ta_dia || "—")} mmHg
+        </div>
+        <div>
+          FC: ${escHTML(last.fc || "—")} lpm • FR: ${escHTML(last.fr || "—")} rpm
+        </div>
+        <div>
+          Temp: ${escHTML(last.temp || "—")} °C • SatO₂: ${escHTML(last.sat || "—")} %
+        </div>
+        <div class="muted" style="margin-top:6px;">Total de registros: ${arr.length}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getBALPreviewHTML(pid){
+  const { arr, last, totIng, totEgr, balance } = getBALPreviewData(pid);
+
+  if(!arr.length){
+    return `
+      <div class="miniBox">
+        <h4>Balances</h4>
+        <div class="muted">Sin registros cargados.</div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="miniBox">
+      <h4>Balances</h4>
+      <div style="font-size:12px;">
+        <div><b>Totales desde 00:00</b></div>
+        <div style="margin-top:4px;">Ingresos: ${totIng} ml</div>
+        <div>Egresos: ${totEgr} ml</div>
+        <div><b>Balance:</b> ${balance} ml</div>
+
+        ${
+          last ? `
+          <div style="margin-top:8px;"><b>Último:</b> ${escHTML(fmtDateTimeShort(last.dateTime))}</div>
+          <div>
+            Ing: ${Number(last.ingresos||0)} ml (${escHTML(last.ingresoDetalle || "-")})
+          </div>
+          <div>
+            Egr: ${Number(last.egresos||0)} ml (${escHTML(last.egresoDetalle || "-")})
+          </div>
+          ` : ``
+        }
+
+        <div class="muted" style="margin-top:6px;">Total de registros: ${arr.length}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getSVAttachmentText(pid){
+  const { arr, last } = getSVPreviewData(pid);
+
+  if(!last) return "Sin signos vitales cargados.";
+
+  return [
+    `Último control: ${fmtDateTimeShort(last.dateTime)} • ${last.user || "—"}`,
+    `TA: ${last.ta_sys || "—"}/${last.ta_dia || "—"} mmHg`,
+    `FC: ${last.fc || "—"} lpm`,
+    `FR: ${last.fr || "—"} rpm`,
+    `Temp: ${last.temp || "—"} °C`,
+    `SatO₂: ${last.sat || "—"} %`,
+    `Cantidad total de controles: ${arr.length}`
+  ].join("\n");
+}
+
+function getBALAttachmentText(pid){
+  const { arr, last, totIng, totEgr, balance } = getBALPreviewData(pid);
+
+  if(!arr.length) return "Sin balances cargados.";
+
+  const lines = [
+    `Totales desde 00:00`,
+    `Ingresos: ${totIng} ml`,
+    `Egresos: ${totEgr} ml`,
+    `Balance: ${balance} ml`
+  ];
+
+  if(last){
+    lines.push("");
+    lines.push(`Último registro: ${fmtDateTimeShort(last.dateTime)} • ${last.user || "—"}`);
+    lines.push(`Ingresos: ${Number(last.ingresos||0)} ml (${last.ingresoDetalle || "-"})`);
+    lines.push(`Egresos: ${Number(last.egresos||0)} ml (${last.egresoDetalle || "-"})`);
+  }
+
+  return lines.join("\n");
+}
+/* =========================================================
+   Estado global
+========================================================= */
+let session = loadJSON(LS.session, null);
+let selectedPatientId = null;
+let adminTab = "intern";
+let medTab = "ingreso";
+
+let editingAdmId = null;
+let editingPatientId = null;
+let moveFromBedId = null;
+
+/* Evolución */
+let openedEvoIndex = null;     // index en evolucionesFull
+let evoEditingIndex = null;    // index en evolucionesFull
+let evoEditingMode = "plantilla"; // "plantilla"|"libre"
+
+/* =========================================================
+   ADMIN
+========================================================= */
+function setAdminTab(t){
+  adminTab = t;
+  document.querySelectorAll("[data-admin-tab]").forEach(x=>{
+    x.classList.toggle("active", x.dataset.adminTab === t);
+  });
+  $("#adminIntern").style.display = (t==="intern") ? "" : "none";
+  $("#adminUsers").style.display  = (t==="users")  ? "" : "none";
+  $("#adminConf").style.display   = (t==="conf")   ? "" : "none";
+  $("#adminArch").style.display   = (t==="arch")   ? "" : "none";
+}
+
+function clearInternForm(){
+  editingAdmId = null;
+  editingPatientId = null;
+  moveFromBedId = null;
+
+  $("#pLast").value = "";
+  $("#pFirst").value = "";
+  $("#pDni").value = "";
+  $("#pDob").value = "";
+  $("#pSex").value = "";
+  $("#pOS").value = "";
+  $("#pAff").value = "";
+  $("#pFamPhone").value = "";
+
+  $("#pStreet").value = "";
+  $("#pStreetNo").value = "";
+  $("#pNeighborhood").value = "";
+  $("#pCity").value = "";
+  $("#pProvince").value = "";
+
+  $("#pDx").value = "";
+  $("#pAdmDate").value = "";
+  $("#pArea").value = "";
+  $("#pAge").value = "—";
+
+  fillBedSelectOnlyFree();
+  $("#btnAdmit").textContent = "Ingresar";
+  $("#admHint").textContent = "Mover: click origen → click destino libre";
+}
+
+function loadAdmissionToForm(admId){
+  const reg = getRegistry();
+  const adm = reg.find(x=>x.id===admId);
+  if(!adm || adm.active===false) return;
+
+  const p = findPatient(adm.patientId);
+  const bed = getBeds().find(b=>b.id===adm.bedId);
+
+  editingAdmId = adm.id;
+  editingPatientId = adm.patientId;
+
+  $("#pLast").value = p?.lastName || "";
+  $("#pFirst").value = p?.firstNames || "";
+  $("#pDni").value = p?.dni || "";
+  $("#pDob").value = p?.dob || "";
+  $("#pAge").value = (p?.dob ? String(calcAge(p.dob)) : "—");
+
+  $("#pSex").value = p?.sex || "";
+  $("#pOS").value = p?.os || "";
+  $("#pAff").value = p?.aff || "";
+  $("#pFamPhone").value = p?.famPhone || "";
+
+  $("#pStreet").value = p?.street || "";
+  $("#pStreetNo").value = p?.streetNo || "";
+  $("#pNeighborhood").value = p?.neighborhood || "";
+  $("#pCity").value = p?.city || "";
+  $("#pProvince").value = p?.province || "";
+
+  $("#pDx").value = adm.dx || "";
+  $("#pAdmDate").value = dmyhmFromISODateTime(adm.admDateTime || "");
+  $("#pArea").value = bed?.area || "";
+
+  fillBedSelectForEditKeepCurrent(adm.bedId);
+  $("#pBed").value = adm.bedId || "";
+
+  $("#btnAdmit").textContent = "Guardar cambios";
+  $("#admHint").textContent = "Editando: modificá y tocá Guardar cambios.";
+}
+
+function admitFromUI(){
+  const lastName = $("#pLast").value.trim();
+  const firstNames = $("#pFirst").value.trim();
+  const dni = $("#pDni").value.trim();
+  const dob = $("#pDob").value || "";
+  const sex = $("#pSex").value || "";
+  const os = $("#pOS").value.trim();
+  const aff = $("#pAff").value.trim();
+
+  const street = $("#pStreet").value.trim();
+  const streetNo = $("#pStreetNo").value.trim();
+  const neighborhood = $("#pNeighborhood").value.trim();
+  const city = $("#pCity").value.trim();
+  const province = $("#pProvince").value.trim();
+
+  const famPhone = $("#pFamPhone").value.trim();
+  const bedId = ($("#pBed").value||"").trim();
+  const dx = $("#pDx").value.trim();
+
+  if(!lastName || !dni || !bedId){
+    alert("Faltan datos mínimos: Apellido, DNI y Cama.");
+    return;
+  }
+
+  const patients = getPatients();
+  const reg = getRegistry();
+
+  if(editingAdmId && editingPatientId){
+    const p = patients.find(x=>x.id===editingPatientId);
+    if(!p){ alert("No se encontró el paciente."); return; }
+
+    p.lastName = lastName;
+    p.firstNames = firstNames;
+    p.name = (lastName && firstNames) ? `${lastName}, ${firstNames}` : (lastName || firstNames || "");
+    p.dni = dni; p.dob = dob; p.sex = sex; p.os = os; p.aff = aff; p.famPhone = famPhone;
+    p.street = street; p.streetNo = streetNo; p.neighborhood = neighborhood; p.city = city; p.province = province;
+
+    const adm = reg.find(x=>x.id===editingAdmId);
+    if(!adm){ alert("No se encontró la internación."); return; }
+
+    if(bedId && bedId !== adm.bedId){
+      const occ = getAdmissionByBedId(bedId);
+      if(occ){ alert("Esa cama ya está ocupada. Elegí otra."); return; }
+      adm.bedId = bedId;
+    }
+    adm.dx = dx;
+
+    setPatients(patients);
+    setRegistry(reg);
+
+    toast("Cambios guardados");
+    renderAdmin();
+    clearInternForm();
+    return;
+  }
+
+  // ingreso nuevo
+  if(getAdmissionByBedId(bedId)){
+    alert("Esa cama ya está ocupada. Elegí otra.");
+    return;
+  }
+
+  const pid = uid("p");
+  patients.push({
+    id: pid,
+    lastName, firstNames,
+    name: (lastName && firstNames) ? `${lastName}, ${firstNames}` : (lastName || firstNames || ""),
+    dni, dob, sex, os, aff, famPhone,
+    street, streetNo, neighborhood, city, province
+  });
+
+  const admId = uid("adm");
+  reg.push({
+    id: admId,
+    patientId: pid,
+    bedId,
+    dx,
+    admDateTime: isoFromNow(),
+    active: true,
+    createdBy: session?.username || ""
+  });
+
+  setPatients(patients);
+  setRegistry(reg);
+
+  toast("Ingreso guardado");
+  renderAdmin();
+  clearInternForm();
+}
+
+function renderCensoTable(){
+  const tb = $("#censoTbody"); if(!tb) return;
+  tb.innerHTML = "";
+
+  const beds = getBeds();
+  const reg = getRegistry();
+  const patients = getPatients();
+
+  const admByBed = new Map();
+  reg.forEach(a=>{
+    if(a && a.active!==false && a.bedId) admByBed.set(a.bedId, a);
+  });
+
+  beds.forEach(b=>{
+    const adm = admByBed.get(b.id);
+    const p = adm ? patients.find(x=>x.id===adm.patientId) : null;
+
+    const tr = document.createElement("tr");
+    tr.dataset.bedId = b.id;
+
+    const dom = p ? domStringFromPatient(p) : "—";
+    tr.innerHTML = `
+      <td>${escHTML(b.area||"")}</td>
+      <td>${escHTML(b.label||b.bed||"")}</td>
+      <td>${escHTML(p ? buildPatientDisplayName(p) : "—")}</td>
+      <td>${escHTML(p ? p.dni : "—")}</td>
+      <td>${escHTML(p && p.dob ? dmyFromDateISO(p.dob) : "—")}</td>
+      <td>${escHTML(p && p.dob ? String(calcAge(p.dob)) : "—")}</td>
+      <td>${escHTML(p ? (p.sex||"—") : "—")}</td>
+      <td>${escHTML(p ? (p.os||"—") : "—")}</td>
+      <td>${escHTML(p ? (p.aff||"—") : "—")}</td>
+      <td>${escHTML(dom || "—")}</td>
+      <td>${escHTML(adm ? (adm.dx||"—") : "—")}</td>
+      <td>${escHTML(adm ? dmyhmFromISODateTime(adm.admDateTime||"") : "—")}</td>
+    `;
+
+    tr.addEventListener("dblclick", ()=>{
+      if(!adm || !p) return;
+      loadAdmissionToForm(adm.id);
+      setAdminTab("intern");
+      window.scrollTo({top:0, behavior:"smooth"});
+    });
+
+   tr.addEventListener("click", ()=>{
+  const all = getRegistry();
+
+  // si todavía no elegiste origen
+  if(!moveFromBedId){
+    if(adm){
+      moveFromBedId = b.id;
+      $("#admHint").textContent = "Origen seleccionado. Ahora click en otra cama para mover o intercambiar.";
+    }
+    return;
+  }
+
+  // si hizo click sobre la misma cama, cancelar selección
+  if(moveFromBedId === b.id){
+    moveFromBedId = null;
+    $("#admHint").textContent = "Movimiento cancelado.";
+    return;
+  }
+
+  const fromAdm = getAdmissionByBedId(moveFromBedId);
+  if(!fromAdm){
+    moveFromBedId = null;
+    $("#admHint").textContent = "No se encontró el origen.";
+    renderAdmin();
+    return;
+  }
+
+  // destino libre: mover
+  if(!adm){
+    fromAdm.bedId = b.id;
+
+    const idxFrom = all.findIndex(x=>x.id===fromAdm.id);
+    if(idxFrom >= 0) all[idxFrom] = fromAdm;
+
+    setRegistry(all);
+    moveFromBedId = null;
+    $("#admHint").textContent = "Paciente movido correctamente.";
+    renderAdmin();
+    return;
+  }
+
+  // destino ocupado: intercambiar
+  const toAdm = adm;
+
+  const fromBedOriginal = fromAdm.bedId;
+  const toBedOriginal = toAdm.bedId;
+
+  fromAdm.bedId = toBedOriginal;
+  toAdm.bedId = fromBedOriginal;
+
+  const idxFrom = all.findIndex(x=>x.id===fromAdm.id);
+  const idxTo   = all.findIndex(x=>x.id===toAdm.id);
+
+  if(idxFrom >= 0) all[idxFrom] = fromAdm;
+  if(idxTo >= 0) all[idxTo] = toAdm;
+
+  setRegistry(all);
+  moveFromBedId = null;
+  $("#admHint").textContent = "Pacientes intercambiados correctamente.";
+  renderAdmin();
+});
+
+    tb.appendChild(tr);
+  });
+}
+
+function renderUsersTable(){
+  const tb = $("#usersTbody"); if(!tb) return;
+  tb.innerHTML = "";
+  const users = getUsers();
+  users.forEach((u, idx)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escHTML(u.username||"")}</td>
+      <td>${escHTML(u.name||"")}</td>
+      <td>${escHTML(u.role||"")}</td>
+      <td><button class="btn small danger" data-del="${idx}" type="button">Eliminar</button></td>
+    `;
+    tr.querySelector("[data-del]")?.addEventListener("click", ()=>{
+      if(!confirm("¿Eliminar usuario?")) return;
+      const arr = getUsers();
+      arr.splice(idx,1);
+      setUsers(arr);
+      renderUsersTable();
+    });
+    tb.appendChild(tr);
+  });
+}
+
+function adminAddUser(){
+  const username = $("#uUser").value.trim();
+  const password = $("#uPass").value.trim();
+  const name = $("#uName").value.trim();
+  const role = $("#uRole").value;
+  if(!username || !password){ alert("Usuario y contraseña obligatorios."); return; }
+
+  const users = getUsers();
+  if(users.some(x=>x.username===username)){ alert("Ya existe ese usuario."); return; }
+  const instName = (getInst()?.line1 || "").trim() || "Institución";
+  users.push({ username, password, name:name||username, role, inst: instName, photo:"" });
+  setUsers(users);
+  $("#uUser").value=""; $("#uPass").value=""; $("#uName").value="";
+  renderUsersTable();
+  toast("Usuario creado");
+}
+
+function renderAdmin(){
+  // inst
+  const inst = getInst();
+  $("#inst1").value = inst.line1 || "";
+  $("#inst2").value = inst.line2 || "";
+  $("#inst3").value = inst.line3 || "";
+
+  fillAreaSelectors();
+
+  if(editingAdmId){
+    const reg = getRegistry().find(r=>r.id===editingAdmId);
+    fillBedSelectForEditKeepCurrent(reg?.bedId);
+  }else{
+    fillBedSelectOnlyFree();
+  }
+  renderCensoTable();
+  renderUsersTable();
+}
+
+/* =========================================================
+   MÉDICO: headers + censo + tabs
+========================================================= */
+function renderInstitutionHeader(){
+  const inst = getInst();
+  const el = $("#instHdrBar");
+  if(!el) return;
+  el.innerHTML = `
+    <div class="l1">${escHTML(inst.line1||"Institución (configurar)")}</div>
+    <div class="l2">${escHTML(inst.line2||"")}</div>
+    <div class="l3">${escHTML(inst.line3||"")}</div>
+  `;
+}
+function renderPatientHeader(){
+  const p = selectedPatientId ? findPatient(selectedPatientId) : null;
+  const adm = p ? getAdmissionByPatientId(p.id) : null;
+  const bed = adm ? getBeds().find(b=>b.id===adm.bedId) : null;
+
+  const age = p ? calcAge(p.dob) : "";
+  const dom = p ? domStringFromPatient(p) : "";
+  const hdr = $("#pacHdrBar");
+  if(hdr){
+    const line1 = p ? buildPatientDisplayName(p) : "—";
+    const line2 = `DNI: ${p?.dni||"—"} • Edad: ${age!==""?String(age):"—"} • Sexo: ${p?.sex||"—"} • OS: ${p?.os||"—"} • Afiliado: ${p?.aff||"—"}`;
+    const line3 = `Domicilio: ${dom||"—"} • Área: ${bed?.area||"—"} • Cama: ${bed?.label||"—"} • Ingreso: ${adm ? dmyhmFromISODateTime(adm.admDateTime||"") : "—"} • Dx: ${adm?.dx||"—"}`;
+    hdr.innerHTML = `
+      <div class="l1">${escHTML(line1)}</div>
+      <div class="l2">${escHTML(line2)}</div>
+      <div class="l3">${escHTML(line3)}</div>
+      <div class="l3" style="margin-top:6px;">${escHTML(nowStr())} • ${escHTML(session?.name||session?.username||"")} (${escHTML(session?.role||"")})</div>
+    `;
+  }
+  renderInstitutionHeader();
+}
+
+function renderMedCenso(){
+  const wrap = $("#medCenso"); if(!wrap) return;
+  const beds = getBeds();
+  const filt = ($("#medAreaFilter")?.value || "Todo").trim().toUpperCase();
+  const reg = getRegistry();
+  const occByBed = new Map();
+  reg.forEach(a=>{
+    if(a && a.active!==false && a.bedId) occByBed.set(a.bedId, a);
+  });
+
+  const svc = (b)=> String(b.area||"").trim().toUpperCase();
+  const bedNum = (b)=>{
+    const s = String(b.bed||"");
+    const n = parseInt(s.replace(/\D/g,""),10);
+    if(!isNaN(n)) return n;
+    const m = String(b.label||"").match(/cama\s*(\d+)/i);
+    return m ? parseInt(m[1],10) : 9999;
+  };
+
+  let list = beds.filter(b=> filt==="TODO" ? true : svc(b)===filt);
+  list.sort((a,b)=>{
+    const sa=svc(a), sb=svc(b);
+    if(sa!==sb) return sa.localeCompare(sb);
+    return bedNum(a)-bedNum(b);
+  });
+
+  wrap.innerHTML = "";
+  list.forEach(b=>{
+    const a = occByBed.get(b.id);
+    const p = a ? findPatient(a.patientId) : null;
+
+    const div = document.createElement("div");
+    div.className = "censoItem " + (p ? "" : "empty");
+    div.dataset.bedId = b.id;
+
+    const left = document.createElement("div");
+    left.textContent = `${b.label || (b.area+" "+b.bed)}`;
+
+    const right = document.createElement("div");
+    right.textContent = p ? (buildPatientDisplayName(p) || "—") : "— vacío —";
+
+    div.appendChild(left);
+    div.appendChild(right);
+
+    if(p){
+      div.addEventListener("click", ()=>{
+        selectedPatientId = p.id;
+        renderMed();
+      });
+    }
+    if(p && selectedPatientId === p.id) div.classList.add("active");
+    wrap.appendChild(div);
+  });
+}
+
+function renderMedPanel(){
+  const titleMap = {
+    ingreso:"Ingreso",
+    evolucion:"Evolución",
+    prescripciones:"Prescripciones",
+    sv:"Signos vitales",
+    bal:"Balances",
+    laboratorio:"Laboratorio", micro:"Microbiología",
+    imagenes:"Estudios/Imágenes", invasiones:"Invasiones",
+    epicrisis:"Epicrisis"
+  };
+  $("#medPanelTitle").textContent = titleMap[medTab] || "Ingreso";
+
+  const show = (id, on)=>{ const el=$(id); if(el) el.style.display = on ? "" : "none"; };
+  show("#medIngreso", medTab==="ingreso");
+  show("#medEvol",   medTab==="evolucion");
+  show("#medPres",   medTab==="prescripciones");
+  show("#medSV",     medTab==="sv");
+  show("#medBAL",    medTab==="bal");
+  show("#medLab",    medTab==="laboratorio");
+  show("#medMicro",  medTab==="micro");
+  show("#medImg",    medTab==="imagenes");
+  show("#medInv",    medTab==="invasiones");
+  show("#medEpic",   medTab==="epicrisis");
+}
+
+/* =========================================================
+   Ingreso (texto bonito + lista de ingresos previos SOLO en ingreso)
+========================================================= */
+const EX_FIS_DEFAULT =
+`Aparato cardiovascular: Primer y segundo ruidos normofonéticos.
+Aparato respiratorio: Murmullo vesicular positivo bilateral, sin ruidos sobreagregados.
+Abdomen: Blando, depresible, no doloroso, ruidos hidroaéreos positivos.
+Genitourinario: Puño-percusión negativa, puntos reno-ureterales negativos.
+Neurológico: Vigil, orientación en tiempo y espacio, sin foco motor ni signos meníngeos.`;
+
+function buildPrettyIngreso(d){
+  const lines = [];
+  lines.push("INGRESO");
+  lines.push(`Motivo / Diagnóstico: ${d.diag || "—"}`);
+  lines.push("");
+
+  const talla = d.heightCm ? `${d.heightCm} cm` : "—";
+  const peso = d.weightKg ? `${d.weightKg} kg` : "—";
+  const imc = d.bmi ? `${d.bmi} (${bmiClass(d.bmi)})` : "—";
+  lines.push(`Peso: ${peso} • Talla: ${talla} • IMC: ${imc}`);
+  lines.push("");
+
+  lines.push("ANTECEDENTES");
+  lines.push(`- Patológicos: ${(Array.isArray(d.apList) && d.apList.length) ? d.apList.join(", ") : (d.apTxt || "—")}`);
+  lines.push(`- Quirúrgicos: ${(Array.isArray(d.aqList) && d.aqList.length) ? d.aqList.join(", ") : (d.aqTxt || "—")}`);
+  lines.push(`- Tóxicos: ${(Array.isArray(d.atList) && d.atList.length) ? d.atList.join(", ") : (d.atTxt || "—")}`);
+  lines.push(`- Alérgicos: ${(Array.isArray(d.alList) && d.alList.length) ? d.alList.join(", ") : (d.alTxt || "—")}`);
+  lines.push("");
+
+  lines.push("MEDICACIÓN HABITUAL");
+  lines.push(d.medHab || "—");
+  lines.push("");
+
+  lines.push("ENFERMEDAD ACTUAL");
+  lines.push(d.ea || "—");
+  lines.push("");
+
+  lines.push("LABORATORIO RELEVANTE");
+  lines.push(d.lab || "—");
+  lines.push("");
+
+  lines.push("EXÁMENES COMPLEMENTARIOS");
+  lines.push(d.comp || "—");
+  lines.push("");
+
+  lines.push("EXAMEN FÍSICO");
+  lines.push(d.ef || "—");
+  lines.push("");
+
+  lines.push("TRATAMIENTO / CONDUCTA");
+  lines.push(d.plan || "—");
+
+  return lines.join("\n");
+}
+
+/* =========================================================
+   Ingreso (PLANTILLA COMPLETA con tildes + IMC + texto bonito)
+========================================================= */
+
+// Listas (editables) de tildes
+const IN_AP_LIST = [
+  "Hipertensión arterial",
+  "Diabetes",
+  "Dislipemia",
+  "Tabaquismo",
+  "EPOC / Asma",
+  "Insuficiencia cardíaca",
+  "Cardiopatía isquémica",
+  "Fibrilación auricular",
+  "ACV previo",
+  "Enfermedad renal crónica",
+  "Hepatopatía",
+  "Hipotiroidismo",
+  "Cáncer / Neoplasia",
+  "Demencia / Alzheimer"
+];
+
+const IN_AQ_LIST = [
+  "Apendicectomía",
+  "Colecistectomía",
+  "Cesárea",
+  "Histerectomía",
+  "Prótesis de cadera",
+  "Prótesis de rodilla",
+  "Cirugía de columna",
+  "CRM (Bypass coronario)",
+  "Angioplastia previa",
+  "Cirugía vascular"
+];
+
+const IN_AT_LIST = [
+  "Tabaquismo",
+  "Alcoholismo",
+  "Drogas"
+];
+
+const IN_AL_LIST = [
+  "Penicilina",
+  "AINEs",
+  "Contraste yodado",
+  "Látex",
+  "Otros"
+];
+
+// Helpers chips/checks
+function renderChipGroup(containerId, items, selectedArr){
+  const box = document.getElementById(containerId);
+  if(!box) return;
+  const sel = Array.isArray(selectedArr) ? selectedArr : [];
+  box.innerHTML = items.map((label, i)=> {
+    const id = `${containerId}_${i}`;
+    const checked = sel.includes(label) ? "checked" : "";
+    return `
+      <label class="chip" for="${id}">
+        <input id="${id}" type="checkbox" data-chip="${escHTML(label)}" ${checked}
+               style="width:auto; margin:0;" />
+        <span>${escHTML(label)}</span>
+      </label>
+    `;
+  }).join("");
+}
+
+function readChipGroup(containerId){
+  const box = document.getElementById(containerId);
+  if(!box) return [];
+  return Array.from(box.querySelectorAll('input[type="checkbox"][data-chip]'))
+    .filter(ch => ch.checked)
+    .map(ch => ch.getAttribute("data-chip") || "")
+    .filter(Boolean);
+}
+
+function calcBMI(weightKg, heightCm){
+  const w = parseFloat(String(weightKg||"").replace(",","."));
+  const hcm = parseFloat(String(heightCm||"").replace(",","."));
+  if(!isFinite(w) || !isFinite(hcm) || w<=0 || hcm<=0) return "";
+  const hm = hcm / 100;
+  const bmi = w / (hm*hm);
+  if(!isFinite(bmi)) return "";
+  return bmi.toFixed(1);
+}
+
+function bmiClass(bmiStr){
+  const v = parseFloat(bmiStr);
+  if(!isFinite(v)) return "";
+  if(v < 18.5) return "Bajo peso";
+  if(v < 25) return "Normal";
+  if(v < 30) return "Sobrepeso";
+  if(v < 35) return "Obesidad I";
+  if(v < 40) return "Obesidad II";
+  return "Obesidad III";
+}
+
+
+
+// Reemplazá tu renderIngresoUI por este:
+function renderIngresoUI(){
+  const root = $("#medIngreso");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted" style="font-size:12px;">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const me = getCurrentUser();
+  const isEnfermero = me?.role === "enfermero";
+
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  const rec = cur.ingresoFull || null;
+
+  const isAuthor = rec ? (String(rec.author?.id||"") === String(me?.id||"")) : true;
+
+// si ya hay ingreso actual, nunca se permite "nuevo ingreso"
+// solo se podrá generar otro cuando admin haga una nueva internación
+let mode = rec ? "view" : (isEnfermero ? "view" : "edit");
+
+  // UI shell
+  root.innerHTML = `
+    <div class="card">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        ${(!isEnfermero && !rec) ? `
+  <button class="btn primary" id="btnNuevoIngreso" type="button">Nuevo Ingreso</button>
+` : ``}
+        <button class="btn" type="button" id="btnEditarIngreso" style="${(rec && isAuthor) ? "" : "display:none;"}">Editar</button>
+
+        <button class="btn primary" type="button" id="btnGuardarIngreso" style="${rec ? "display:none;" : ""}">Guardar ingreso</button>
+        <button class="btn primary" type="button" id="btnGuardarCambiosIngreso" style="${rec ? "display:none;" : "display:none;"}">Guardar cambios</button>
+        <button class="btn" type="button" id="btnCancelarIngreso" style="display:none;">Cancelar</button>
+        <button class="btn" type="button" id="btnPrintIngresoOpen" style="${rec ? "" : "display:none;"}">Imprimir</button>
+      </div>
+
+      <div id="ingresoStatus" class="muted" style="font-size:12px; opacity:.85; margin-bottom:10px;"></div>
+
+      <div id="ingresoFormWrap" style="display:none;"></div>
+
+      <div id="ingresoPrettyWrap" style="display:none;">
+        <div id="ingresoMeta" class="muted" style="font-size:12px; opacity:.85; margin-bottom:6px;"></div>
+        <pre id="ingresoPretty" style="white-space:pre-wrap; margin:0;"></pre>
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <div style="font-weight:900;">Ingresos previos</div>
+        <div id="ingPrevList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  `;
+
+  // Enfermería: solo visualizar Ingreso
+  if (isEnfermero) {
+    const ids = [
+      "btnNuevoIngreso",
+      "btnEditarIngreso",
+      "btnGuardarIngreso",
+      "btnGuardarCambiosIngreso",
+      "btnCancelarIngreso"
+    ];
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = "none";
+    });
+  }
+
+
+
+  const elStatus   = $("#ingresoStatus");
+  const wrapForm   = $("#ingresoFormWrap");
+  const wrapPretty = $("#ingresoPrettyWrap");
+  const elMeta     = $("#ingresoMeta");
+  const elPretty   = $("#ingresoPretty");
+
+  // Renderiza plantilla (con tus chips + IMC)
+  const renderForm = (data = {})=>{
+    wrapForm.innerHTML = `
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">
+        Ingreso (plantilla completa + tildes + IMC)
+      </div>
+
+      <!-- ✅ Diagnóstico ocupa todo el ancho -->
+      <div class="field">
+        <label>Diagnóstico / Motivo de ingreso</label>
+        <input id="in_diag" />
+      </div>
+
+      <div class="card" style="margin-top:10px;">
+        <div style="font-weight:900; margin-bottom:8px;">Antecedentes (tildes)</div>
+
+        <div class="field">
+          <label>Patológicos</label>
+          <div class="chipRow" id="in_ap_chips"></div>
+          <input id="in_ap_txt" placeholder="Otros / detalles (opcional)" style="margin-top:8px;" />
+        </div>
+
+        <div class="field" style="margin-top:10px;">
+          <label>Quirúrgicos</label>
+          <div class="chipRow" id="in_aq_chips"></div>
+          <input id="in_aq_txt" placeholder="Otros / detalles (opcional)" style="margin-top:8px;" />
+        </div>
+
+        <div class="field" style="margin-top:10px;">
+          <label>Tóxicos</label>
+          <div class="chipRow" id="in_at_chips"></div>
+          <input id="in_at_txt" placeholder="Detalles (paquetes/año, etc.)" style="margin-top:8px;" />
+        </div>
+
+        <div class="field" style="margin-top:10px;">
+          <label>Alérgicos</label>
+          <div class="chipRow" id="in_al_chips"></div>
+          <input id="in_al_txt" placeholder="Detalles (reacción, etc.)" style="margin-top:8px;" />
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label>Medicación habitual</label>
+        <textarea id="in_medHab" class="ta1"></textarea>
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+  <label>Enfermedad actual</label>
+  <textarea id="in_ea" class="ta1"></textarea>
+</div>
+
+<div class="field" style="margin-top:10px;">
+  <label>Laboratorio relevante</label>
+  <textarea id="in_lab" class="ta1"></textarea>
+</div>
+
+<div class="field" style="margin-top:10px;">
+  <label>Exámenes complementarios</label>
+  <textarea id="in_comp" class="ta1"></textarea>
+</div>
+
+<div class="field" style="margin-top:10px;">
+  <label>Examen físico</label>
+  <textarea id="in_ef" class="ta1"></textarea>
+</div>
+
+      <!-- ✅ ÍNDICES ANTROPOMÉTRICOS AHORA VAN ACÁ -->
+      <div class="row3" style="margin-top:10px;">
+        <div class="field">
+          <label>Peso (kg)</label>
+          <input id="in_weightKg" inputmode="decimal" placeholder="Ej: 78" />
+        </div>
+        <div class="field">
+          <label>Talla (cm)</label>
+          <input id="in_heightCm" inputmode="decimal" placeholder="Ej: 170" />
+        </div>
+        <div class="field">
+          <label>IMC</label>
+          <input id="in_bmi" disabled value="—" />
+          <div class="muted" id="in_bmiClass" style="font-size:12px; margin-top:4px; opacity:.85;"></div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:10px;">
+        <label>Plan / Tratamiento</label>
+        <textarea id="in_plan" class="ta1"></textarea>
+      </div>
+    `;
+
+
+
+    // chips
+    renderChipGroup("in_ap_chips", IN_AP_LIST, data.apList);
+    renderChipGroup("in_aq_chips", IN_AQ_LIST, data.aqList);
+    renderChipGroup("in_at_chips", IN_AT_LIST, data.atList);
+    renderChipGroup("in_al_chips", IN_AL_LIST, data.alList);
+
+    // defaults
+    $("#in_ef").value = data.ef || EX_FIS_DEFAULT;
+
+
+
+    // cargar data
+    $("#in_diag").value     = data.diag || "";
+    $("#in_medHab").value   = data.medHab || "";
+    $("#in_weightKg").value = data.weightKg || "";
+    $("#in_heightCm").value = data.heightCm || "";
+    $("#in_ap_txt").value   = data.apTxt || "";
+    $("#in_aq_txt").value   = data.aqTxt || "";
+    $("#in_at_txt").value   = data.atTxt || "";
+    $("#in_al_txt").value   = data.alTxt || "";
+    $("#in_ea").value       = data.ea || "";
+    $("#in_lab").value      = data.lab || "";
+    $("#in_comp").value     = data.comp || "";
+    $("#in_plan").value     = data.plan || "";
+
+    // === auto-grow 1 renglón en Ingreso ===
+    function autoGrowTA(ta){
+      if(!ta) return;
+      const grow = ()=>{
+        ta.style.height = "40px";          // mínimo (1 renglón)
+        ta.style.height = ta.scrollHeight + "px";
+      };
+      ta.addEventListener("input", grow);
+      grow(); // importante: ajusta altura al texto inicial (p.ej. examen físico predeterminado)
+    }
+
+    autoGrowTA($("#in_medHab"));
+autoGrowTA($("#in_ea"));
+autoGrowTA($("#in_lab"));
+autoGrowTA($("#in_comp"));
+autoGrowTA($("#in_ef"));
+autoGrowTA($("#in_plan"));
+
+
+    // IMC live
+    const updateBMI = ()=>{
+      const bmi = calcBMI($("#in_weightKg").value, $("#in_heightCm").value);
+      $("#in_bmi").value = bmi || "—";
+      $("#in_bmiClass").textContent = bmi ? bmiClass(bmi) : "";
+    };
+    $("#in_weightKg").addEventListener("input", updateBMI);
+    $("#in_heightCm").addEventListener("input", updateBMI);
+    updateBMI();
+  };
+
+  const renderPretty = ()=>{
+    const fresh = (getClinical()[pid] || {}).ingresoFull || rec; // por si cambió
+    if(!fresh){
+      elMeta.textContent = "";
+      elPretty.textContent = "";
+      return;
+    }
+    const cAt = (fresh.createdAt||"").slice(0,16).replace("T"," ");
+    const uAt = (fresh.updatedAt||"").slice(0,16).replace("T"," ");
+    const author = fresh.author?.name || "—";
+    elMeta.textContent = `Creado: ${cAt} • Actualizado: ${uAt} • Autor: ${author}`;
+    elPretty.textContent = fresh.prettyText || "";
+  };
+
+  const setMode = (m)=>{
+    mode = m;
+    const freshRec = (getClinical()[pid] || {}).ingresoFull || rec;
+
+    // botones
+    const btnNuevo   = $("#btnNuevoIngreso");
+    const btnEditar  = $("#btnEditarIngreso");
+    const btnSaveNew = $("#btnGuardarIngreso");
+    const btnSaveEd  = $("#btnGuardarCambiosIngreso");
+    const btnCancel  = $("#btnCancelarIngreso");
+    const btnPrint   = $("#btnPrintIngresoOpen");
+
+    if(m === "view"){
+      wrapForm.style.display = "none";
+      wrapPretty.style.display = freshRec ? "" : "none";
+
+      showEl(btnNuevo,  !freshRec && !isEnfermero);
+      showEl(btnEditar, freshRec && isAuthor && !isEnfermero);
+      showEl(btnSaveNew, !freshRec && !isEnfermero);
+      showEl(btnSaveEd,  false);
+      showEl(btnCancel,  false);
+      showEl(btnPrint,   !!freshRec);
+
+
+      elStatus.textContent = freshRec ? "Mostrando texto del ingreso." : "Sin ingreso.";
+      renderPretty();
+    }else{ // edit
+      wrapPretty.style.display = "none";
+      wrapForm.style.display = "";
+
+      btnNuevo.style.display  = "none";
+      btnEditar.style.display = "none";
+      btnPrint.style.display  = "none";
+      btnCancel.style.display = freshRec ? "" : "none";
+
+      // si hay ingreso => editando
+      if(freshRec){
+        btnSaveNew.style.display = "none";
+        btnSaveEd.style.display  = "";
+        elStatus.textContent = "Editando ingreso (solo autor).";
+        renderForm(freshRec.data || {});
+      }else{
+        btnSaveNew.style.display = "";
+        btnSaveEd.style.display  = "none";
+        elStatus.textContent = "Nuevo ingreso.";
+        renderForm({});
+      }
+    }
+  };
+
+  const saveIngreso = (isEdit)=>{
+    const cl = getClinical();
+    const cur = cl[pid] || { evolucionesFull:[], epicrisisFull:null };
+    const prev = cur.ingresoFull || null;
+
+    if(isEdit){
+      if(!prev) return alert("No hay ingreso para editar.");
+      if(String(prev.author?.id||"") !== String(me?.id||"")) return alert("Solo el autor puede editar.");
+    }
+
+    const apList = readChipGroup("in_ap_chips");
+    const aqList = readChipGroup("in_aq_chips");
+    const atList = readChipGroup("in_at_chips");
+    const alList = readChipGroup("in_al_chips");
+
+    const weightKg = ($("#in_weightKg").value||"").trim();
+    const heightCm = ($("#in_heightCm").value||"").trim();
+    const bmi = calcBMI(weightKg, heightCm);
+
+    const data = {
+      diag: $("#in_diag").value.trim(),
+      medHab: ($("#in_medHab").value||"").trim(),
+      weightKg, heightCm, bmi,
+
+      apList, aqList, atList, alList,
+      apTxt: ($("#in_ap_txt").value||"").trim(),
+      aqTxt: ($("#in_aq_txt").value||"").trim(),
+      atTxt: ($("#in_at_txt").value||"").trim(),
+      alTxt: ($("#in_al_txt").value||"").trim(),
+
+      ea: ($("#in_ea").value||"").trim(),
+      lab: ($("#in_lab").value||"").trim(),
+      comp: ($("#in_comp").value||"").trim(),
+      ef: ($("#in_ef").value||"").trim(),
+      plan: ($("#in_plan").value||"").trim()
+    };
+
+    const nowIso = isoNowLocalFull();
+
+    const newRec = prev ? {
+      ...prev,
+      data,
+      updatedAt: nowIso,
+      prettyText: buildPrettyIngreso(data)
+    } : {
+      data,
+      author: { id: me.id, name: me.name },
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      prettyText: buildPrettyIngreso(data)
+    };
+
+    cur.ingresoFull = newRec;
+
+    // compat breve
+    cur.ingreso = {
+      dx: data.diag,
+      ap: (apList.length ? apList.join(", ") : data.apTxt),
+      ea: data.ea,
+      ef: data.ef,
+      plan: data.plan,
+      author: me.username
+    };
+
+    // solo guardar en ingresos previos si se está creando un ingreso nuevo
+if(!isEdit && prev){
+  cur.ingresosPrev = Array.isArray(cur.ingresosPrev) ? cur.ingresosPrev : [];
+  cur.ingresosPrev.push(prev);
+}
+
+    cl[pid] = cur;
+    setClinical(cl);
+
+    const pname = buildPatientDisplayName(findPatient(pid));
+    if(prev){
+      logAction(`editó ingreso de ${pname}`, pid);
+    }else{
+      logAction(`añadió ingreso de ${pname}`, pid);
+    }
+
+
+    toast("Ingreso guardado");
+    renderIngresoPrevList(pid);
+    setMode("view"); // ✅ ocultar plantilla, mostrar texto
+  };
+
+
+    const bindClick = (id, fn)=>{
+      const el = document.getElementById(id);
+      if(el) el.onclick = fn;
+    };
+
+// ===== listeners (robustos; no rompen si el botón no existe) =====
+
+// Guardar (solo si existen)
+bindClick("btnGuardarIngreso", ()=> saveIngreso(false));
+bindClick("btnGuardarCambiosIngreso", ()=> saveIngreso(true));
+
+// Editar (solo si existe)
+bindClick("btnEditarIngreso", ()=>{
+  const fresh = (getClinical()[pid] || {}).ingresoFull;
+  if(!fresh) return;
+  if(String(fresh.author?.id||"") !== String(me?.id||"")) return alert("Solo el autor puede editar.");
+  setMode("edit");
+});
+
+// Cancelar (solo si existe)
+bindClick("btnCancelarIngreso", ()=> setMode("view"));
+
+bindClick("btnNuevoIngreso", ()=>{
+  const fresh = (getClinical()[pid] || {}).ingresoFull;
+  if(fresh) return alert("Este paciente ya tiene un ingreso cargado. Solo podrá generarse uno nuevo si Administración realiza una nueva internación.");
+  setMode("edit");
+});
+
+// Imprimir (puede existir aunque sea enfermero)
+bindClick("btnPrintIngresoOpen", ()=>{
+  const prevTab = medTab;
+  medTab = "ingreso";
+  const html = getPrintDocForMed();
+  medTab = prevTab;
+  if(html) printByWindow(html);
+});
+
+
+  // render prev list
+  renderIngresoPrevList(pid);
+  // ===== INICIALIZACIÓN CORRECTA SEGÚN ROL =====
+
+  if(isEnfermero){
+    // Enfermería solo visualiza
+    if(rec){
+      // Si existe ingreso, mostrar SIEMPRE texto bonito
+      wrapForm.style.display = "none";
+      wrapPretty.style.display = "";
+      elStatus.textContent = "Mostrando ingreso (solo lectura).";
+      renderPretty();
+    }else{
+      // Si no existe ingreso
+      wrapForm.style.display = "none";
+      wrapPretty.style.display = "none";
+      elStatus.textContent = "Sin ingreso cargado.";
+    }
+
+    // Seguridad extra: ocultar todos los botones de edición
+    [
+      "btnNuevoIngreso",
+      "btnEditarIngreso",
+      "btnGuardarIngreso",
+      "btnGuardarCambiosIngreso",
+      "btnCancelarIngreso"
+    ].forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.style.display = "none";
+    });
+
+  }else{
+    // Médico
+    if(rec){
+      setMode("view");
+    }else{
+      setMode("edit");
+    }
+  }
+
+
+}
+
+
+function renderIngresoPrevList(pid){
+  const box = $("#ingPrevList");
+  if(!box) return;
+
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  const arr = Array.isArray(cur.ingresosPrev) ? cur.ingresosPrev : [];
+
+  if(!arr.length){
+    box.innerHTML = `<div class="muted" style="font-size:12px;">Sin ingresos previos.</div>`;
+    return;
+  }
+
+  box.innerHTML = "";
+
+  arr.slice().reverse().forEach((r, idx)=>{
+    const item = document.createElement("div");
+    item.style.border = "1px solid rgba(255,255,255,.10)";
+    item.style.borderRadius = "12px";
+    item.style.marginBottom = "8px";
+    item.style.overflow = "hidden";
+    item.style.background = "rgba(255,255,255,.03)";
+
+    const head = document.createElement("div");
+    head.style.padding = "8px 10px";
+    head.style.cursor = "pointer";
+    head.style.display = "flex";
+    head.style.justifyContent = "space-between";
+    head.style.alignItems = "center";
+    head.style.gap = "10px";
+    head.innerHTML = `
+      <div class="muted" style="font-size:12px;">
+        ${escHTML(dmyhmFromISODateTime((r.createdAt||"").slice(0,16)))} • ${escHTML(r.author||"—")}
+      </div>
+      <div class="muted" style="font-size:12px;">click para ver</div>
+    `;
+
+    const body = document.createElement("div");
+    body.style.display = "none";
+    body.style.padding = "0 10px 10px 10px";
+    body.innerHTML = `
+      <pre style="white-space:pre-wrap; font-size:12px; margin:0;">${escHTML(r.prettyText||"")}</pre>
+    `;
+
+    head.onclick = ()=>{
+      const isOpen = body.style.display === "block";
+
+      // cerrar todos
+      box.querySelectorAll(".ingPrevBody").forEach(el=> el.style.display = "none");
+      box.querySelectorAll(".ingPrevHint").forEach(el=> el.textContent = "click para ver");
+
+      if(!isOpen){
+        body.style.display = "block";
+        hint.textContent = "click para ocultar";
+      }
+    };
+
+    body.className = "ingPrevBody";
+
+    const hint = head.querySelector("div:last-child");
+    hint.className = "ingPrevHint";
+
+    item.appendChild(head);
+    item.appendChild(body);
+    box.appendChild(item);
+  });
+}
+
+/* =========================================================
+   Evolución (texto bonito + lista solo evoluciones, dblclick abre, editar si autor)
+========================================================= */
+
+function buildPrettyEvoTemplate(d){
+  const L = [];
+  L.push("EVOLUCIÓN");
+  L.push(`Tiempo de internación: ${d.diasInt ?? "—"} días`);
+  L.push("");
+  L.push(`Diagnósticos: ${d.dx || "—"}`);
+  L.push("");
+
+  L.push("ESTADO GENERAL");
+  L.push(`- ${d.egChecks?.length ? d.egChecks.join(", ") : "—"}`);
+  if(d.egObs) L.push(`Obs: ${d.egObs}`);
+
+  L.push("");
+  L.push("HEMODINÁMICA");
+  L.push(`- ${d.hemoChecks?.length ? d.hemoChecks.join(", ") : "—"}`);
+  L.push(`PVC: ${d.pvc ? d.pvc + " cmH2O" : "—"}`);
+  if(d.hemoObs) L.push(`Obs: ${d.hemoObs}`);
+
+  L.push("");
+  L.push("FUNCIÓN RESPIRATORIA");
+  L.push(`- ${d.respChecks?.length ? d.respChecks.join(", ") : "—"}`);
+  if(d.respObs) L.push(`Obs: ${d.respObs}`);
+
+  L.push("");
+  L.push(`ARM: ${d.armOn ? "Sí" : "No"}`);
+  if(d.armOn){
+    L.push(`Modo: ${d.armModo || "—"}`);
+    L.push(`Volumen: ${d.armVol || "—"} ml`);
+    L.push(`Presión: ${d.armPres || "—"} cmH2O`);
+    L.push(`FiO2: ${d.armFiO2 || "—"} %`);
+    L.push(`PEEP: ${d.armPEEP || "—"} cmH2O`);
+    L.push(`pO2: ${d.armPO2 || "—"} mmHg`);
+    L.push(`PAFI: ${d.armPAFI || "—"}`);
+  }
+  if(d.armObs) L.push(`Obs ARM: ${d.armObs}`);
+
+  L.push("");
+  L.push("NEUROLÓGICO");
+  L.push(`- ${d.neuroChecks?.length ? d.neuroChecks.join(", ") : "—"}`);
+  if(d.neuroObs) L.push(`Obs: ${d.neuroObs}`);
+
+  L.push("");
+  L.push("DIURESIS");
+  L.push(`- ${d.diurChecks?.length ? d.diurChecks.join(", ") : "—"}`);
+  if(d.diurObs) L.push(`Obs: ${d.diurObs}`);
+
+  L.push("");
+  L.push("CATARSIS");
+  L.push(`- ${d.catarsis || "—"}`);
+  if(d.catarsis === "Positiva"){
+    L.push(`  + ${d.catPosChecks?.length ? d.catPosChecks.join(", ") : "—"}`);
+  }
+  if(d.catarsis === "Negativa"){
+    L.push(`  + ${d.catNegChecks?.length ? d.catNegChecks.join(", ") : "—"}`);
+  }
+  if(d.catObs) L.push(`Obs: ${d.catObs}`);
+
+  L.push("");
+  L.push("EXAMEN FÍSICO");
+  L.push(d.ef || "—");
+
+  // adjuntos (por ahora texto; después lo vinculamos a módulos)
+  if(d.attachSV)  { L.push(""); L.push("Adjunto: Últimos signos vitales"); L.push(d.attachSV); }
+  if(d.attachBAL) { L.push(""); L.push("Adjunto: Últimos balances 24hs"); L.push(d.attachBAL); }
+  if(d.attachLAB) { L.push(""); L.push("Adjunto: Último laboratorio"); L.push(d.attachLAB); }
+  if(d.attachMIC) { L.push(""); L.push("Adjunto: Microbiología"); L.push(d.attachMIC); }
+  if(d.attachINV) { L.push(""); L.push("Adjunto: Invasiones activas"); L.push(d.attachINV); }
+  if(d.attachRX)  { L.push(""); L.push("Adjunto: Estudios / Imágenes"); L.push(d.attachRX); }
+  if(d.attachPR)  { L.push(""); L.push("Adjunto: Prescripciones activas"); L.push(d.attachPR); }
+
+  L.push("");
+  L.push("CONDUCTA");
+  L.push(d.cond || "—");
+
+  return L.join("\n");
+}
+
+
+
+
+/* =========================================================
+   EVOLUCIÓN (Workflow tipo Ingreso)
+   - Lista siempre visible
+   - Viewer solo texto al abrir
+   - Nueva evolución -> elegir Plantilla / Texto libre
+   - Guardar -> ocultar editor y volver a viewer
+   - Editar solo si autor
+========================================================= */
+
+// Estado UI Evolución (nuevo)
+let evoUIState = "view";            // "view" | "new" | "edit"
+let evoDraftKind = "plantilla";     // dejamos por compat, pero acá siempre usaremos plantilla o libre
+
+function evoGetList(pid){
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  cur.evolucionesFull = Array.isArray(cur.evolucionesFull) ? cur.evolucionesFull : [];
+  cl[pid] = cur;
+  return { cl, cur, arr: cur.evolucionesFull };
+}
+
+function evoRender(){
+  const root = $("#medEvol");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted" style="font-size:12px;">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const me = getCurrentUser();
+  const isEnfermero = me?.role === "enfermero";
+
+
+  const { arr } = evoGetList(pid);
+
+  if(openedEvoIndex === null && arr.length) openedEvoIndex = arr.length - 1;
+  if(arr.length === 0) openedEvoIndex = null;
+
+  root.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">
+        Evolución • Doble click en una fila para abrir
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+        <button class="btn" id="btnNuevaEvo" type="button">Nueva evolución</button>
+        <button class="btn" id="btnEditEvo" type="button" style="display:none;">Editar</button>
+        <button class="btn" id="btnCancelEvo" type="button" style="display:none;">Cancelar</button>
+        <button class="btn" id="btnPrintEvo" type="button">Imprimir</button>
+      </div>
+
+      <!-- Editor (solo new/edit) -->
+      <div id="evoEditorWrap" style="display:none;"></div>
+
+      <!-- Viewer (solo view) -->
+      <div id="evoViewer" class="card" style="margin-top:10px; display:none;">
+        <div class="muted" id="evoOpenMeta" style="font-size:12px; opacity:.85;"></div>
+        <pre id="evoOpenText" style="white-space:pre-wrap; font-size:12px; margin:8px 0 0;"></pre>
+      </div>
+
+      <!-- Lista siempre -->
+      <div class="card" style="margin-top:10px;">
+        <div style="font-weight:900;">Evoluciones previas</div>
+        <div id="evoList" style="margin-top:8px;"></div>
+      </div>
+    </div>
+  `;
+  
+  if(isEnfermero){
+    $("#btnNuevaEvo").style.display = "none";
+    $("#btnEditEvo").style.display = "none";
+  }
+
+
+  evoRenderList(pid);
+  evoSetState("view");
+
+  $("#btnNuevaEvo").onclick = ()=>{
+    evoUIState = "new";
+    evoRenderEditor(null);     // nuevo vacío
+    evoSetState("new");
+  };
+
+  $("#btnCancelEvo").onclick = ()=> evoSetState("view");
+
+  $("#btnPrintEvo").onclick = ()=>{
+    const html = evoBuildPrintDoc();
+    if(html) printByWindow(html);
+  };
+
+  $("#btnEditEvo").onclick = ()=>{
+    const { arr } = evoGetList(pid);
+    const r = (openedEvoIndex !== null) ? arr[openedEvoIndex] : null;
+    if(!r) return alert("No hay evolución abierta.");
+    const me = getCurrentUser();
+    if(String(r.author?.id||"") !== String(me?.id||"")) return alert("Solo el autor puede editar.");
+    evoUIState = "edit";
+    evoRenderEditor(r);
+    evoSetState("edit");
+
+    if(isEnfermero){
+      $("#btnNuevaEvo").onclick = null;
+      $("#btnEditEvo").onclick = null;
+    }
+
+  };
+}
+
+function evoSetState(state){
+  const pid = selectedPatientId;
+  const { arr } = evoGetList(pid);
+  const r = (openedEvoIndex !== null) ? arr[openedEvoIndex] : null;
+  const me = getCurrentUser();
+  const canEdit = !!r && String(r.author?.id||"") === String(me?.id||"");
+
+  const isEditing = (state === "new" || state === "edit");
+
+  $("#evoEditorWrap").style.display = isEditing ? "" : "none";
+  $("#btnCancelEvo").style.display = isEditing ? "" : "none";
+  $("#btnEditEvo").style.display = (!isEditing && canEdit) ? "" : "none";
+
+  // viewer
+  const viewer = $("#evoViewer");
+  if(!viewer) return;
+
+  if(!isEditing && r){
+    viewer.style.display = "";
+    const d = (r.createdAt||"").slice(0,16).replace("T"," ");
+    const a = r.author?.name || "—";
+    $("#evoOpenMeta").textContent = `${d} • ${a}`;
+    $("#evoOpenText").textContent = r.prettyText || "";
+  }else{
+    viewer.style.display = "none";
+  }
+}
+
+function evoRenderEditor(recOrNull){
+  const wrap = $("#evoEditorWrap");
+  const pid = selectedPatientId;
+  const dias = getAdmDaysForSelectedPatient();
+
+  // si recOrNull.kind === "libre" entonces cargamos modo libre, si no plantilla
+  const isLibre = (recOrNull?.kind === "libre");
+
+  wrap.innerHTML = `
+    <div class="evoSplit">
+      <!-- IZQUIERDA: editor -->
+      <div class="card">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+          <button class="btn small ${!isLibre ? "primary":""}" id="btnEvoModePlantilla" type="button">Plantilla</button>
+          <button class="btn small ${isLibre ? "primary":""}" id="btnEvoModeLibre" type="button">Texto libre</button>
+        </div>
+
+        <div id="evoPlantillaWrap" style="${isLibre ? "display:none;" : ""}">
+          <div class="row">
+            <div class="field">
+              <label>Tiempo de internación (días)</label>
+              <input id="evo_dias" value="${escHTML(dias||"")}" disabled />
+            </div>
+            <div class="field">
+              <label>Diagnósticos</label>
+              <input id="evo_dx" />
+            </div>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Estado general</label>
+            <div class="chkRow">
+              ${mkChk("eg","Conservado")} ${mkChk("eg","Caquexia")}
+              ${mkChk("eg","Miopatía de paciente crítico")} ${mkChk("eg","Discracia")}
+            </div>
+          </div>
+          <div class="field" style="margin-top:8px;">
+            <label>Observaciones (Estado general)</label>
+            <textarea id="evo_egObs" class="ta1"></textarea>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Hemodinámicamente</label>
+            <div class="chkRow">
+              ${mkChk("hemo","Estable")} ${mkChk("hemo","Inestable")}
+              ${mkChk("hemo","Requerimiento de Inotrópicos")}
+              ${mkChk("hemo","Requerimiento de vasodilatadores")}
+            </div>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <div class="field">
+              <label>Presión venosa central (cmH2O)</label>
+              <input id="evo_pvc" inputmode="numeric" maxlength="2" placeholder="Ej: 12" />
+            </div>
+            <div class="field">
+              <label>Observaciones (Hemodinámica)</label>
+              <input id="evo_hemoObs" />
+            </div>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Función respiratoria</label>
+            <div class="chkRow">
+              ${mkChk("resp","Conservada")} ${mkChk("resp","Dificultad respiratoria")}
+              ${mkChk("resp","Mala mecánica respiratoria")}
+            </div>
+          </div>
+          <div class="field" style="margin-top:8px;">
+            <label>Observaciones (Respiratorio)</label>
+            <textarea id="evo_respObs" class="ta1"></textarea>
+          </div>
+
+          <div class="field" style="margin-top:8px;">
+            <label>${mkChkRaw("arm_on","Asistencia Respiratoria Mecánica")}</label>
+          </div>
+
+          <div id="armBlock" style="display:none; margin-top:8px;">
+            <div class="row3">
+              <div class="field">
+                <label>Modo</label>
+                <select id="arm_modo">
+                  <option value="">—</option>
+                  <option>VCV</option>
+                  <option>PCV</option>
+                  <option>CPAP</option>
+                  <option>VNI</option>
+                </select>
+              </div>
+              <div class="field"><label>Volumen (ml)</label><input id="arm_vol" inputmode="numeric" maxlength="4" /></div>
+              <div class="field"><label>Presión (cmH2O)</label><input id="arm_pres" inputmode="numeric" maxlength="4" /></div>
+            </div>
+
+            <div class="row3" style="margin-top:8px;">
+              <div class="field"><label>FiO2 (%)</label><input id="arm_fio2" inputmode="decimal" maxlength="3" /></div>
+              <div class="field"><label>PEEP (cmH2O)</label><input id="arm_peep" inputmode="numeric" maxlength="2" /></div>
+              <div class="field"><label>pO2 (mmHg)</label><input id="arm_po2" inputmode="decimal" maxlength="3" /></div>
+            </div>
+
+            <div class="row" style="margin-top:8px;">
+              <div class="field">
+                <label>PAFI (auto)</label>
+                <input id="arm_pafi" disabled value="—" />
+              </div>
+              <div class="field">
+                <label>Observaciones (ARM)</label>
+                <input id="arm_obs" />
+              </div>
+            </div>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Neurológicamente</label>
+            <div class="chkRow">
+              ${mkChk("neuro","Vigil")} ${mkChk("neuro","Somnolencia")}
+              ${mkChk("neuro","Sopor")} ${mkChk("neuro","Sedoanalgesia")}
+            </div>
+          </div>
+          <div class="field" style="margin-top:8px;">
+            <label>Observaciones (Neurológico)</label>
+            <textarea id="evo_neuroObs" class="ta1"></textarea>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Diuresis</label>
+            <div class="chkRow">
+              ${mkChk("diur","Conservada")} ${mkChk("diur","Oligoanuria")}
+              ${mkChk("diur","Anuria")} ${mkChk("diur","Poliuria")}
+              ${mkChk("diur","Disuria")} ${mkChk("diur","Hematuria")}
+              ${mkChk("diur","Piuria")}
+            </div>
+          </div>
+          <div class="field" style="margin-top:8px;">
+            <label>Observaciones (Diuresis)</label>
+            <textarea id="evo_diurObs" class="ta1"></textarea>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="row">
+            <div class="field">
+              <label>Catarsis</label>
+              <select id="cat_sel">
+                <option value="">—</option>
+                <option>Positiva</option>
+                <option>Negativa</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Observaciones (Catarsis)</label>
+              <input id="cat_obs" />
+            </div>
+          </div>
+
+          <div id="cat_pos" style="display:none; margin-top:8px;">
+            <div class="field">
+              <label>Si es Positiva</label>
+              <div class="chkRow">
+                ${mkChk("catpos","Diarrea")} ${mkChk("catpos","Melena")}
+              </div>
+            </div>
+          </div>
+
+          <div id="cat_neg" style="display:none; margin-top:8px;">
+            <div class="field">
+              <label>Si es Negativa</label>
+              <div class="chkRow">
+                ${mkChk("catneg","Constipación")}
+              </div>
+            </div>
+          </div>
+
+          <div class="hrLine"></div>
+
+          <div class="field">
+            <label>Examen físico</label>
+            <textarea id="evo_ef"></textarea>
+          </div>
+
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn small" id="btnAttSV" type="button">Adjuntar últimos signos vitales</button>
+            <button class="btn small" id="btnAttBAL" type="button">Adjuntar últimos balances 24hs</button>
+            <button class="btn small" id="btnAttLAB" type="button">Adjuntar últimos resultados de laboratorio</button>
+            <button class="btn small" id="btnAttMIC" type="button">Adjuntar resultados de microbiología</button>
+            <button class="btn small" id="btnAttINV" type="button">Adjuntar invasiones activas</button>
+            <button class="btn small" id="btnAttPR" type="button">Adjuntar prescripciones activas</button>
+          </div>
+
+          <div class="field" style="margin-top:10px;">
+            <label>Conducta</label>
+            <textarea id="evo_cond" class="ta1"></textarea>
+          </div>
+
+          <div style="margin-top:10px;">
+            <button class="btn primary" id="btnSaveEvo" type="button">Guardar</button>
+          </div>
+        </div>
+
+        <div id="evoLibreWrap" style="${isLibre ? "" : "display:none;"}">
+          <div class="field"><label>Texto libre</label><textarea id="evo_free"></textarea></div>
+          <div style="margin-top:10px;">
+            <button class="btn primary" id="btnSaveEvoFree" type="button">Guardar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- DERECHA: mini ventanas -->
+<div class="evoRightCol">
+  ${getSVPreviewHTML(pid)}
+  ${getBALPreviewHTML(pid)}
+  ${mini("Laboratorio","Últimos resultados (preview).")}
+  ${mini("Microbiología","Cultivos/ATB (preview).")}
+  ${mini("Estudios / Imágenes","Rx/TC/US (preview).")}
+  ${mini("Invasiones","Vías / ARM / SNG / etc. (preview).")}
+</div>
+    </div>
+  `;
+
+  // defaults EF
+  const ef = $("#evo_ef");
+  if(ef) ef.value = (recOrNull?.data?.ef || (typeof EX_FIS_DEFAULT!=="undefined" ? EX_FIS_DEFAULT : "Normal."));
+
+
+  // cargar valores si edit
+  if(recOrNull && !isLibre){
+    const d = recOrNull.data || {};
+    $("#evo_dx").value = d.dx || "";
+    $("#evo_egObs").value = d.egObs || "";
+    $("#evo_hemoObs").value = d.hemoObs || "";
+    $("#evo_pvc").value = d.pvc || "";
+    $("#evo_respObs").value = d.respObs || "";
+    $("#evo_neuroObs").value = d.neuroObs || "";
+    $("#evo_diurObs").value = d.diurObs || "";
+    $("#cat_sel").value = d.catarsis || "";
+    $("#cat_obs").value = d.catObs || "";
+    $("#evo_cond").value = d.cond || "";
+
+    // checks
+    markChecks("eg", d.egChecks);
+    markChecks("hemo", d.hemoChecks);
+    markChecks("resp", d.respChecks);
+    markChecks("neuro", d.neuroChecks);
+    markChecks("diur", d.diurChecks);
+    markChecks("catpos", d.catPosChecks);
+    markChecks("catneg", d.catNegChecks);
+
+    // ARM
+    $("#arm_on").checked = !!d.armOn;
+    toggleARM();
+    $("#arm_modo").value = d.armModo || "";
+    $("#arm_vol").value = d.armVol || "";
+    $("#arm_pres").value = d.armPres || "";
+    $("#arm_fio2").value = d.armFiO2 || "";
+    $("#arm_peep").value = d.armPEEP || "";
+    $("#arm_po2").value = d.armPO2 || "";
+    $("#arm_pafi").value = d.armPAFI || (calcPAFI(d.armPO2, d.armFiO2) || "—");
+    $("#arm_obs").value = d.armObs || "";
+
+    // adjuntos
+    window.__evoAttach = {
+      sv: d.attachSV || "",
+      bal: d.attachBAL || "",
+      lab: d.attachLAB || "",
+      mic: d.attachMIC || "",
+      inv: d.attachINV || "",
+      rx: d.attachRX || "",
+      pr: d.attachPR || ""
+    };
+  } else {
+    window.__evoAttach = { sv:"", bal:"", lab:"", mic:"", inv:"", rx:"", pr:"" };
+    toggleARM();
+  }
+
+  // libre
+  if(recOrNull && isLibre){
+    $("#evo_free").value = recOrNull.data?.text || "";
+  }
+
+  // eventos: modo plantilla/libre
+  $("#btnEvoModePlantilla").onclick = ()=>{
+    // si venías en libre, cambio editor (solo en new/edit)
+    evoRenderEditor({ kind:"plantilla", data: (recOrNull?.kind==="plantilla" ? recOrNull.data : {}) });
+  };
+  $("#btnEvoModeLibre").onclick = ()=>{
+    evoRenderEditor({ kind:"libre", data: (recOrNull?.kind==="libre" ? recOrNull.data : { text:"" }) });
+  };
+
+  // ARM toggle + PAFI live
+  $("#arm_on")?.addEventListener("change", toggleARM);
+  $("#arm_fio2")?.addEventListener("input", updatePAFI);
+  $("#arm_po2")?.addEventListener("input", updatePAFI);
+
+  function updatePAFI(){
+    const v = calcPAFI($("#arm_po2").value, $("#arm_fio2").value);
+    $("#arm_pafi").value = v || "—";
+  }
+  function toggleARM(){
+    const on = $("#arm_on")?.checked;
+    $("#armBlock").style.display = on ? "" : "none";
+    updatePAFI();
+  }
+
+  // catarsis toggle
+  $("#cat_sel")?.addEventListener("change", ()=>{
+    const v = $("#cat_sel").value;
+    $("#cat_pos").style.display = (v==="Positiva") ? "" : "none";
+    $("#cat_neg").style.display = (v==="Negativa") ? "" : "none";
+  });
+  // activar según carga
+  const cv = $("#cat_sel")?.value;
+  $("#cat_pos").style.display = (cv==="Positiva") ? "" : "none";
+  $("#cat_neg").style.display = (cv==="Negativa") ? "" : "none";
+
+  // Adjuntar botones
+$("#btnAttSV").onclick = ()=>{
+  window.__evoAttach.sv = getSVAttachmentText(pid);
+  toast("Adjuntados signos vitales");
+};
+
+$("#btnAttBAL").onclick = ()=>{
+  window.__evoAttach.bal = getBALAttachmentText(pid);
+  toast("Adjuntados balances");
+};
+
+$("#btnAttLAB").onclick = ()=>{
+  window.__evoAttach.lab = window.__evoAttach.lab || "— Sin módulo conectado aún —";
+  toast("Adjuntado LAB");
+};
+
+$("#btnAttMIC").onclick = ()=>{
+  window.__evoAttach.mic = window.__evoAttach.mic || "— Sin módulo conectado aún —";
+  toast("Adjuntado MICRO");
+};
+
+$("#btnAttINV").onclick = ()=>{
+  window.__evoAttach.inv = window.__evoAttach.inv || "— Sin módulo conectado aún —";
+  toast("Adjuntado INV");
+};
+
+$("#btnAttPR").onclick = ()=>{
+  window.__evoAttach.pr = window.__evoAttach.pr || "— Sin módulo conectado aún —";
+  toast("Adjuntado PRESC");
+};
+
+  // save plantilla
+  $("#btnSaveEvo")?.addEventListener("click", ()=> evoSaveTemplate(recOrNull));
+  // save libre
+  $("#btnSaveEvoFree")?.addEventListener("click", ()=> evoSaveFree(recOrNull));
+
+  function evoSaveTemplate(oldRec){
+    const pid = selectedPatientId;
+    const me = getCurrentUser();
+    const { cl, cur, arr } = evoGetList(pid);
+
+    const isEditing = (evoUIState === "edit");
+    if(isEditing){
+      if(openedEvoIndex === null || !arr[openedEvoIndex]) return alert("No hay evolución abierta para editar.");
+      const r = arr[openedEvoIndex];
+      if(String(r.author?.id||"") !== String(me?.id||"")) return alert("Solo el autor puede editar.");
+    }
+
+    const d = {
+      diasInt: $("#evo_dias").value,
+      dx: $("#evo_dx").value.trim(),
+
+      egChecks: readChecks("eg"),
+      egObs: ($("#evo_egObs").value||"").trim(),
+
+      hemoChecks: readChecks("hemo"),
+      pvc: ($("#evo_pvc").value||"").trim(),
+      hemoObs: ($("#evo_hemoObs").value||"").trim(),
+
+      respChecks: readChecks("resp"),
+      respObs: ($("#evo_respObs").value||"").trim(),
+
+      armOn: !!$("#arm_on").checked,
+      armModo: ($("#arm_modo").value||"").trim(),
+      armVol: ($("#arm_vol").value||"").trim(),
+      armPres: ($("#arm_pres").value||"").trim(),
+      armFiO2: ($("#arm_fio2").value||"").trim(),
+      armPEEP: ($("#arm_peep").value||"").trim(),
+      armPO2: ($("#arm_po2").value||"").trim(),
+      armPAFI: (calcPAFI($("#arm_po2").value, $("#arm_fio2").value) || ""),
+      armObs: ($("#arm_obs").value||"").trim(),
+
+      neuroChecks: readChecks("neuro"),
+      neuroObs: ($("#evo_neuroObs").value||"").trim(),
+
+      diurChecks: readChecks("diur"),
+      diurObs: ($("#evo_diurObs").value||"").trim(),
+
+      catarsis: ($("#cat_sel").value||"").trim(),
+      catPosChecks: readChecks("catpos"),
+      catNegChecks: readChecks("catneg"),
+      catObs: ($("#cat_obs").value||"").trim(),
+
+      ef: ($("#evo_ef").value||"").trim(),
+
+      attachSV: window.__evoAttach?.sv || "",
+      attachBAL: window.__evoAttach?.bal || "",
+      attachLAB: window.__evoAttach?.lab || "",
+      attachMIC: window.__evoAttach?.mic || "",
+      attachINV: window.__evoAttach?.inv || "",
+      attachRX: window.__evoAttach?.rx || "",
+      attachPR: window.__evoAttach?.pr || "",
+
+      cond: ($("#evo_cond").value||"").trim()
+    };
+
+    const prettyText = buildPrettyEvoTemplate(d);
+    const nowIso = isoNowLocalFull();
+
+    if(isEditing){
+      const old = arr[openedEvoIndex];
+      arr[openedEvoIndex] = { ...old, kind:"plantilla", data:d, prettyText, updatedAt: nowIso };
+    }else{
+      arr.push({
+        kind:"plantilla",
+        data:d,
+        prettyText,
+        author:{ id: me.id, name: me.name },
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+      openedEvoIndex = arr.length - 1;
+    }
+
+    cur.evolucionesFull = arr;
+    cl[pid]=cur; setClinical(cl);
+
+    const pname = buildPatientDisplayName(findPatient(pid));
+    logAction(isEditing ? `editó una evolución de ${pname}` : `añadió una evolución de ${pname}`, pid);
+
+    toast("Evolución guardada");
+    evoUIState = "view";
+    evoRenderList(pid);
+    evoSetState("view");
+  }
+
+  function evoSaveFree(oldRec){
+    const pid = selectedPatientId;
+    const me = getCurrentUser();
+    const { cl, cur, arr } = evoGetList(pid);
+
+    const isEditing = (evoUIState === "edit");
+    if(isEditing){
+      if(openedEvoIndex === null || !arr[openedEvoIndex]) return alert("No hay evolución abierta para editar.");
+      const r = arr[openedEvoIndex];
+      if(String(r.author?.id||"") !== String(me?.id||"")) return alert("Solo el autor puede editar.");
+    }
+
+    const text = ($("#evo_free").value||"").trim();
+    if(!text) return alert("La evolución está vacía.");
+
+    const prettyText = `EVOLUCIÓN (TEXTO LIBRE)\n\n${text}`;
+    const nowIso = isoNowLocalFull();
+
+    if(isEditing){
+      const old = arr[openedEvoIndex];
+      arr[openedEvoIndex] = { ...old, kind:"libre", data:{ text }, prettyText, updatedAt: nowIso };
+    }else{
+      arr.push({
+        kind:"libre",
+        data:{ text },
+        prettyText,
+        author:{ id: me.id, name: me.name },
+        createdAt: nowIso,
+        updatedAt: nowIso
+      });
+      openedEvoIndex = arr.length - 1;
+    }
+
+    cur.evolucionesFull = arr;
+    cl[pid]=cur; setClinical(cl);
+
+    const pname = buildPatientDisplayName(findPatient(pid));
+    logAction(isEditing ? `editó una evolución de ${pname}` : `añadió una evolución de ${pname}`, pid);
+
+    toast("Evolución guardada");
+    evoUIState = "view";
+    evoRenderList(pid);
+    evoSetState("view");
+  }
+
+  function mkChk(group, label){
+    const id = `chk_${group}_${label.replace(/\W+/g,"_")}`;
+    return `<label class="chk" for="${id}">
+      <input id="${id}" type="checkbox" data-g="${group}" value="${escHTML(label)}" />
+      <span>${escHTML(label)}</span>
+    </label>`;
+  }
+  function mkChkRaw(id, label){
+    return `<label class="chk" for="${id}">
+      <input id="${id}" type="checkbox" />
+      <span>${escHTML(label)}</span>
+    </label>`;
+  }
+  function mini(title, body){
+    return `<div class="miniBox">
+      <h4>${escHTML(title)}</h4>
+      <div class="muted">${escHTML(body)}</div>
+    </div>`;
+  }
+  function markChecks(group, arr){
+    const set = new Set(Array.isArray(arr)?arr:[]);
+    document.querySelectorAll(`input[data-g="${group}"]`).forEach(x=>{
+      x.checked = set.has(x.value);
+    });
+  }
+  function autoGrowTA(ta){
+    if(!ta) return;
+    const grow = ()=>{
+      ta.style.height = "40px";          // vuelve al mínimo
+      ta.style.height = ta.scrollHeight + "px"; // crece según contenido
+    };
+    ta.addEventListener("input", grow);
+    grow(); // por si ya viene cargado (editar)
+  }
+
+  ["#evo_egObs","#evo_respObs","#evo_neuroObs","#evo_diurObs","#evo_cond"]
+    .forEach(sel => autoGrowTA(document.querySelector(sel)));
+
+}
+
+function evoRenderList(pid){
+  const box = $("#evoList"); if(!box) return;
+  const { arr } = evoGetList(pid);
+
+  if(!arr.length){
+    box.innerHTML = `<div class="muted" style="font-size:12px;">Todavía no hay evoluciones.</div>`;
+    return;
+  }
+
+  box.innerHTML = "";
+  arr.slice().reverse().forEach((r, revIdx)=>{
+    const idx = arr.length - 1 - revIdx;
+    const isOpen = (openedEvoIndex === idx);
+
+    const row = document.createElement("div");
+    row.style.cssText = `
+      display:flex; justify-content:space-between; align-items:center; gap:10px;
+      padding:6px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.10);
+      font-size:12px; cursor:pointer;
+      background:${isOpen ? "rgba(20,110,255,.14)" : "rgba(255,255,255,.04)"};
+      margin-bottom:6px;
+    `;
+
+    const d = (r.createdAt||"").slice(0,16).replace("T"," ");
+    const a = r.author?.name || "—";
+    const tag = (r.kind === "libre") ? "libre" : "plantilla";
+
+    row.innerHTML = `
+      <div style="min-width:0; display:flex; gap:10px; align-items:center;">
+        <div style="white-space:nowrap;">${escHTML(d)}</div>
+        <div style="white-space:nowrap; font-weight:900; overflow:hidden; text-overflow:ellipsis;">${escHTML(a)}</div>
+        <div class="muted" style="white-space:nowrap;">(${escHTML(tag)})</div>
+      </div>
+      <div class="muted" style="white-space:nowrap;">${isOpen ? "abierta" : "doble click"}</div>
+    `;
+
+    row.ondblclick = ()=>{
+      openedEvoIndex = idx;
+      evoUIState = "view";
+      evoSetState("view");
+      evoRenderList(pid);
+    };
+
+    box.appendChild(row);
+  });
+}
+
+function evoBuildPrintDoc(){
+  const pid = selectedPatientId;
+  if(!pid) return null;
+  const { arr } = evoGetList(pid);
+  if(!arr.length) return buildPrintShell("Evolución", `<div class="box"><div class="line">Sin evoluciones.</div></div>`);
+
+  const r = (openedEvoIndex !== null && arr[openedEvoIndex]) ? arr[openedEvoIndex] : arr[arr.length-1];
+  const html = `<div class="box"><div class="line">${escHTML(r.prettyText || "—")}</div></div>`;
+  return buildPrintShell("Evolución", html);
+}
+
+
+/* =========================================================
+   SIGNOS VITALES
+   - Medico: solo visualiza
+   - Enfermero: edita
+========================================================= */
+
+function getSVList(pid){
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  cur.signosVitales = Array.isArray(cur.signosVitales) ? cur.signosVitales : [];
+  cl[pid] = cur;
+  return { cl, cur, arr: cur.signosVitales };
+}
+
+function renderSV(){
+  
+  const root = $("#medSV");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const { arr } = getSVList(pid);
+  const user = getCurrentUser();
+  const canEdit = user?.role === "enfermero";
+
+  const btnPrintSV = document.getElementById("btnPrintSV");
+  if(btnPrintSV){
+    btnPrintSV.onclick = ()=>{
+      const prevTab = medTab;
+      medTab = "sv";
+      const html = getPrintDocForMed();
+      medTab = prevTab;
+      if(html) printByWindow(html);
+    };
+  }
+
+  renderSVList(arr);
+
+  if(canEdit){
+    const syncTAM = ()=>{
+      const tam = calcTAM($("#sv_ta_sys")?.value, $("#sv_ta_dia")?.value);
+      $("#sv_tam").value = tam || "—";
+    };
+
+    $("#sv_ta_sys")?.addEventListener("input", syncTAM);
+    $("#sv_ta_dia")?.addEventListener("input", syncTAM);
+    syncTAM();
+
+    $("#btnSaveSV").onclick = saveSV;
+  }
+}
+
+function renderSVLast(r){
+  const box = $("#svLast");
+  if(!box) return;
+
+  if(!r){
+    box.innerHTML = `<div class="muted">Sin registros.</div>`;
+    return;
+  }
+
+  box.innerHTML = buildSVView(r, true);
+}
+
+function renderSV(){
+  const root = $("#medSV");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const { arr } = getSVList(pid);
+  const user = getCurrentUser();
+  const canEdit = user?.role === "enfermero";
+
+  root.innerHTML = `
+    ${canEdit ? `
+    <div class="card">
+      <div style="font-weight:900; margin-bottom:8px;">Nueva Toma</div>
+
+      <div class="row3">
+        <div class="field">
+          <label>Sistólica (mmHg)</label>
+          <input id="sv_ta_sys" inputmode="numeric" maxlength="3" />
+        </div>
+        <div class="field">
+          <label>Diastólica (mmHg)</label>
+          <input id="sv_ta_dia" inputmode="numeric" maxlength="3" />
+        </div>
+        <div class="field">
+          <label>Tensión Arterial Media (auto)</label>
+          <input id="sv_tam" disabled value="—" />
+        </div>
+      </div>
+
+      <div class="row3" style="margin-top:10px;">
+        <div class="field">
+          <label>Frecuencia Cardíaca (lpm)</label>
+          <input id="sv_fc" inputmode="numeric" maxlength="3" />
+        </div>
+        <div class="field">
+          <label>Frecuencia Respiratoria (rpm)</label>
+          <input id="sv_fr" inputmode="numeric" maxlength="2" />
+        </div>
+        <div class="field">
+          <label>Temperatura (°C)</label>
+          <input id="sv_temp" inputmode="decimal" maxlength="4" />
+        </div>
+      </div>
+
+      <div class="row3" style="margin-top:10px;">
+        <div class="field">
+          <label>Saturación O₂ (%)</label>
+          <input id="sv_sat" inputmode="numeric" maxlength="3" />
+        </div>
+        <div class="field"></div>
+        <div class="field">
+          <label></label>
+          <button class="btn primary" id="btnSaveSV" type="button">Guardar</button>
+        </div>
+      </div>
+    </div>
+    ` : ``}
+
+    <div class="card" style="margin-top:10px;">
+      <div style="font-weight:900;">Registros de signos vitales</div>
+      <div id="svList" style="margin-top:8px;"></div>
+    </div>
+  `;
+
+  renderSVList(arr);
+
+  if(canEdit){
+    const syncTAM = ()=>{
+      const tam = calcTAM($("#sv_ta_sys")?.value, $("#sv_ta_dia")?.value);
+      $("#sv_tam").value = tam || "—";
+    };
+
+    $("#sv_ta_sys")?.addEventListener("input", syncTAM);
+    $("#sv_ta_dia")?.addEventListener("input", syncTAM);
+    syncTAM();
+
+    $("#btnSaveSV").onclick = saveSV;
+  }
+}
+
+function saveSV(){
+  const pid = selectedPatientId;
+  const user = getCurrentUser();
+  const { cl, cur, arr } = getSVList(pid);
+
+  const ta_sys = ($("#sv_ta_sys").value || "").trim();
+  const ta_dia = ($("#sv_ta_dia").value || "").trim();
+  const tam = calcTAM(ta_sys, ta_dia);
+
+  const r = {
+    ta_sys,
+    ta_dia,
+    tam: tam || "",
+    fc: ($("#sv_fc").value || "").trim(),
+    fr: ($("#sv_fr").value || "").trim(),
+    temp: ($("#sv_temp").value || "").trim(),
+    sat: ($("#sv_sat").value || "").trim(),
+    dateTime: isoNowLocalFull(),
+    user: user.name
+  };
+
+  arr.push(r);
+  cur.signosVitales = arr;
+  cl[pid] = cur;
+  setClinical(cl);
+
+  const pname = buildPatientDisplayName(findPatient(pid));
+  logAction(`cargó signos vitales de ${pname}`, pid);
+
+  const syncTAM = ()=>{
+    const tam = calcTAM($("#sv_ta_sys")?.value, $("#sv_ta_dia")?.value);
+    $("#sv_tam").value = tam || "—";
+  };
+
+  $("#sv_ta_sys")?.addEventListener("input", syncTAM);
+  $("#sv_ta_dia")?.addEventListener("input", syncTAM);
+  syncTAM();
+
+  toast("Signos vitales guardados.");
+  renderSV();
+}
+
+function buildSVView(r, big=false){
+
+  const abnormal = (val, min, max)=>{
+    if(val === null || val === "") return "";
+    const n = parseFloat(val);
+    if(isNaN(n)) return "";
+    if(n < min || n > max) return "color:#ff4d4d;font-weight:900;";
+    return "";
+  };
+
+  return `
+    <div style="margin-top:8px; font-size:${big? "15px":"12px"};">
+      TA: 
+      <span style="${abnormal(r.ta_sys,90,160)}">${r.ta_sys || "—"}</span> /
+      <span style="${abnormal(r.ta_dia,50,100)}">${r.ta_dia || "—"}</span> mmHg |
+
+      FC: <span style="${abnormal(r.fc,50,120)}">${r.fc || "—"}</span> lpm |
+
+      FR: <span style="${abnormal(r.fr,8,30)}">${r.fr || "—"}</span> rpm |
+
+      Temp: <span style="${abnormal(r.temp,35,38.5)}">${r.temp || "—"}</span> °C |
+
+      SatO₂: <span style="${abnormal(r.sat,92,100)}">${r.sat || "—"}</span> %
+    </div>
+  `;
+}
+
+
+function renderSVList(arr){
+  const box = $("#svList");
+  if(!box) return;
+
+  if(!arr.length){
+    box.innerHTML = `<div class="muted">Sin registros previos.</div>`;
+    return;
+  }
+
+  const sorted = arr.slice().sort((a,b)=>{
+    return String(b.dateTime || "").localeCompare(String(a.dateTime || ""));
+  });
+
+  box.innerHTML = `
+    <div class="svTableWrap">
+      <table class="svTable">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Hora</th>
+            <th>Usuario</th>
+            <th>TAS</th>
+            <th>TAD</th>
+            <th>TAM</th>
+            <th>FC</th>
+            <th>FR</th>
+            <th>Temp</th>
+            <th>SatO₂</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map(r=>{
+            const fecha = dmyFromDateISO(String(r.dateTime).slice(0,10));
+            const hora  = hm24FromISO(r.dateTime);
+            const tam = r.tam || calcTAM(r.ta_sys, r.ta_dia) || "";
+
+            return `
+              <tr>
+                <td>${escHTML(fecha)}</td>
+                <td>${escHTML(hora)}</td>
+                <td>${escHTML(r.user || "—")}</td>
+                <td>${svBadge("tas", r.ta_sys)}</td>
+                <td>${svBadge("tad", r.ta_dia)}</td>
+                <td>${svBadge("tam", tam)}</td>
+                <td>${svBadge("fc", r.fc)}</td>
+                <td>${svBadge("fr", r.fr)}</td>
+                <td>${svBadge("temp", r.temp)}</td>
+                <td>${svBadge("sat", r.sat)}</td>
+              </tr>
+            `;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+
+
+
+/* =========================================================
+   BALANCES
+========================================================= */
+
+function getBalanceData(pid){
+  const cl = getClinical();
+  const cur = cl[pid] || {};
+  cur.balances = Array.isArray(cur.balances) ? cur.balances : [];
+  cur.balanceDetalles = cur.balanceDetalles || { ingresos:[], egresos:[] };
+  cl[pid] = cur;
+  return { cl, cur };
+}
+
+function renderBAL(){
+  const root = $("#medBAL");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const user = getCurrentUser();
+  const isEnfermero = user?.role === "enfermero";
+  const { cur } = getBalanceData(pid);
+
+  root.innerHTML = `
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+    <button class="btn" id="btnPrintBal" type="button">Imprimir</button>
+  </div>
+
+  ${isEnfermero ? `
+  <div class="card">
+    <div style="font-weight:900;margin-bottom:8px;">Nuevo Balance</div>
+
+      <div class="row3">
+        <div class="field">
+          <label>Ingresos (ml)</label>
+          <input id="bal_ing_ml" inputmode="numeric" maxlength="5"/>
+        </div>
+        <div class="field">
+          <label>Detalle Ingreso</label>
+          <input id="bal_ing_det" list="bal_ing_list"/>
+          <datalist id="bal_ing_list">
+            ${cur.balanceDetalles.ingresos.map(x=>`<option value="${x}">`).join("")}
+          </datalist>
+        </div>
+        <div class="field"></div>
+      </div>
+
+      <div class="row3" style="margin-top:8px;">
+        <div class="field">
+          <label>Egresos (ml)</label>
+          <input id="bal_egr_ml" inputmode="numeric" maxlength="5"/>
+        </div>
+        <div class="field">
+          <label>Detalle Egreso</label>
+          <input id="bal_egr_det" list="bal_egr_list"/>
+          <datalist id="bal_egr_list">
+            ${cur.balanceDetalles.egresos.map(x=>`<option value="${x}">`).join("")}
+          </datalist>
+        </div>
+        <div class="field">
+          <label></label>
+          <button class="btn primary" id="btnSaveBal">Guardar</button>
+        </div>
+      </div>
+    </div>
+    ` : ""}
+
+    <div class="card" style="margin-top:10px;">
+      <div style="font-weight:900;">Registros</div>
+      <div id="balList" style="margin-top:8px;"></div>
+    </div>
+
+        <div class="card" style="margin-top:10px;">
+      <div style="font-weight:900;">Totales hasta 00:00</div>
+      <div id="balTotales" style="margin-top:8px;"></div>
+    </div>
+
+
+  `;
+
+    renderBalList(cur.balances);
+    renderBalTotals(cur.balances);
+    
+
+  if(isEnfermero){
+    const btn = document.getElementById("btnSaveBal");
+    if(btn) btn.onclick = saveBalance;
+  }
+  const btnPrintBal = document.getElementById("btnPrintBal");
+if(btnPrintBal){
+  btnPrintBal.onclick = ()=>{
+    const prevTab = medTab;
+    medTab = "bal";
+    const html = getPrintDocForMed();
+    medTab = prevTab;
+    if(html) printByWindow(html);
+  };
+}
+}
+
+function saveBalance(){
+  const pid = selectedPatientId;
+  const user = getCurrentUser();
+  const { cl, cur } = getBalanceData(pid);
+
+    const ingresos = parseInt($("#bal_ing_ml")?.value || 0);
+  const egresos  = parseInt($("#bal_egr_ml")?.value || 0);
+  const ingresoDetalle = normalizeBalanceDetail($("#bal_ing_det")?.value || "");
+  const egresoDetalle  = normalizeBalanceDetail($("#bal_egr_det")?.value || "");
+
+  const record = {
+    dateTime: isoNowLocalFull(),
+    user: user.name,
+    ingresos,
+    ingresoDetalle,
+    egresos,
+    egresoDetalle
+  };
+
+  cur.balances.push(record);
+
+  if(ingresoDetalle && !cur.balanceDetalles.ingresos.includes(ingresoDetalle))
+    cur.balanceDetalles.ingresos.push(ingresoDetalle);
+
+  if(egresoDetalle && !cur.balanceDetalles.egresos.includes(egresoDetalle))
+    cur.balanceDetalles.egresos.push(egresoDetalle);
+
+  cl[pid] = cur;
+  setClinical(cl);
+
+  const pname = buildPatientDisplayName(findPatient(pid));
+  logAction(`cargó balance de ${pname}`, pid);
+
+    if($("#bal_ing_ml")) $("#bal_ing_ml").value = "";
+  if($("#bal_egr_ml")) $("#bal_egr_ml").value = "";
+  if($("#bal_ing_det")) $("#bal_ing_det").value = "";
+  if($("#bal_egr_det")) $("#bal_egr_det").value = "";
+
+  renderBAL();
+}
+
+function renderBalList(arr){
+  const box = $("#balList");
+  if(!box) return;
+
+  if(!arr.length){
+    box.innerHTML = `<div class="muted">Sin registros.</div>`;
+    return;
+  }
+
+  box.innerHTML = "";
+
+  // ordenar por fecha ascendente para calcular acumulados por día
+  const sorted = arr.slice().sort((a,b)=>{
+    return String(a.dateTime || "").localeCompare(String(b.dateTime || ""));
+  });
+
+  // agrupar por día
+  const groups = {};
+  sorted.forEach(r=>{
+    const dayKey = String(r.dateTime || "").slice(0,10);
+    if(!groups[dayKey]) groups[dayKey] = [];
+    groups[dayKey].push(r);
+  });
+
+  const dayKeys = Object.keys(groups).sort().reverse();
+
+  dayKeys.forEach(dayKey=>{
+    const dayRows = groups[dayKey];
+
+    // separador grueso por día
+    const dayBlock = document.createElement("div");
+    dayBlock.style.cssText = `
+      border-top:3px solid rgba(255,255,255,.22);
+      padding-top:10px;
+      margin-top:12px;
+    `;
+
+    const dayTitle = document.createElement("div");
+    dayTitle.style.cssText = `
+      font-weight:900;
+      font-size:13px;
+      margin-bottom:8px;
+    `;
+    dayTitle.textContent = dmyFromDateISO(dayKey);
+
+    dayBlock.appendChild(dayTitle);
+
+    const tableWrap = document.createElement("div");
+    tableWrap.style.cssText = `
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:12px;
+      overflow:hidden;
+    `;
+
+    const table = document.createElement("table");
+    table.style.width = "100%";
+    table.style.borderCollapse = "collapse";
+
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="padding:8px; text-align:left;">Fecha / Hora</th>
+          <th style="padding:8px; text-align:left;">Usuario</th>
+          <th style="padding:8px; text-align:left;">Ingresos</th>
+          <th style="padding:8px; text-align:left;">Egresos</th>
+          <th style="padding:8px; text-align:left;">Balance parcial</th>
+          <th style="padding:8px; text-align:left;">Balance acumulado</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+
+    const tbody = table.querySelector("tbody");
+
+    let acumuladoDia = 0;
+    const detalleIngresosDia = {};
+    const detalleEgresosDia = {};
+
+    dayRows.forEach(r=>{
+      const fecha = dmyFromDateISO(String(r.dateTime || "").slice(0,10));
+      const hora = hm24FromISO(r.dateTime);
+
+      const ingresos = Number(r.ingresos || 0);
+      const egresos = Number(r.egresos || 0);
+      const parcial = ingresos - egresos;
+      acumuladoDia += parcial;
+
+      const ingresoDetalleNorm = normalizeBalanceDetail(r.ingresoDetalle || "");
+      const egresoDetalleNorm  = normalizeBalanceDetail(r.egresoDetalle || "");
+
+      if(ingresoDetalleNorm){
+        detalleIngresosDia[ingresoDetalleNorm] = (detalleIngresosDia[ingresoDetalleNorm] || 0) + ingresos;
+      }
+      if(egresoDetalleNorm){
+        detalleEgresosDia[egresoDetalleNorm] = (detalleEgresosDia[egresoDetalleNorm] || 0) + egresos;
+      }
+
+      const totalIngresoDetalle = ingresoDetalleNorm ? detalleIngresosDia[ingresoDetalleNorm] : 0;
+      const totalEgresoDetalle  = egresoDetalleNorm ? detalleEgresosDia[egresoDetalleNorm] : 0;
+
+      const ingresoTxt = ingresos
+        ? `${ingresos} ml${ingresoDetalleNorm ? ` (${escHTML(ingresoDetalleNorm)} · total día: ${totalIngresoDetalle} ml)` : ""}`
+        : "—";
+
+      const egresoTxt = egresos
+        ? `${egresos} ml${egresoDetalleNorm ? ` (${escHTML(egresoDetalleNorm)} · total día: ${totalEgresoDetalle} ml)` : ""}`
+        : "—";
+
+      const parcialColor = parcial > 0 ? "#68d391" : (parcial < 0 ? "#fc8181" : "#fff");
+      const acumuladoColor = acumuladoDia > 0 ? "#68d391" : (acumuladoDia < 0 ? "#fc8181" : "#fff");
+
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10);">
+          ${escHTML(fecha)} ${escHTML(hora)}
+        </td>
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10);">
+          ${escHTML(r.user || "—")}
+        </td>
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10);">
+          ${ingresoTxt}
+        </td>
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10);">
+          ${egresoTxt}
+        </td>
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10); color:${parcialColor}; font-weight:900;">
+          ${parcial > 0 ? "+" : ""}${parcial} ml
+        </td>
+        <td style="padding:8px; border-top:1px solid rgba(255,255,255,.10); color:${acumuladoColor}; font-weight:900;">
+          ${acumuladoDia > 0 ? "+" : ""}${acumuladoDia} ml
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    tableWrap.appendChild(table);
+    dayBlock.appendChild(tableWrap);
+    box.appendChild(dayBlock);
+  });
+}
+
+
+function renderBalTotals(arr){
+  const box = $("#balTotales");
+  if(!box) return;
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let totIng = 0;
+  let totEgr = 0;
+
+  const detIng = {};
+  const detEgr = {};
+
+  arr.forEach(r=>{
+    const d = new Date(r.dateTime);
+    if(d >= startOfDay){
+      const ing = Number(r.ingresos || 0);
+      const egr = Number(r.egresos || 0);
+
+      totIng += ing;
+      totEgr += egr;
+
+      const ingDet = normalizeBalanceDetail(r.ingresoDetalle || "");
+      const egrDet = normalizeBalanceDetail(r.egresoDetalle || "");
+
+      if(ingDet && ing > 0){
+        detIng[ingDet] = (detIng[ingDet] || 0) + ing;
+      }
+      if(egrDet && egr > 0){
+        detEgr[egrDet] = (detEgr[egrDet] || 0) + egr;
+      }
+    }
+  });
+
+  const balance = totIng - totEgr;
+
+  const ingLines = Object.keys(detIng).length
+    ? Object.entries(detIng)
+        .sort((a,b)=> a[0].localeCompare(b[0]))
+        .map(([k,v])=> `<div>${escHTML(k)}: <b>${v} ml</b></div>`)
+        .join("")
+    : `<div class="muted">Sin detalle de ingresos hoy.</div>`;
+
+  const egrLines = Object.keys(detEgr).length
+    ? Object.entries(detEgr)
+        .sort((a,b)=> a[0].localeCompare(b[0]))
+        .map(([k,v])=> `<div>${escHTML(k)}: <b>${v} ml</b></div>`)
+        .join("")
+    : `<div class="muted">Sin detalle de egresos hoy.</div>`;
+
+  const balColor = balance > 0 ? "#68d391" : (balance < 0 ? "#fc8181" : "#fff");
+
+  box.innerHTML = `
+    <div style="font-size:15px; margin-bottom:10px;">
+      Ingresos Totales: <b>${totIng} ml</b> |
+      Egresos Totales: <b>${totEgr} ml</b> |
+      Balance Total: <b style="color:${balColor};">${balance > 0 ? "+" : ""}${balance} ml</b>
+    </div>
+
+    <div class="row" style="margin-top:10px;">
+      <div class="card">
+        <div style="font-weight:900; margin-bottom:8px;">Detalle de ingresos del día</div>
+        ${ingLines}
+      </div>
+
+      <div class="card">
+        <div style="font-weight:900; margin-bottom:8px;">Detalle de egresos del día</div>
+        ${egrLines}
+      </div>
+    </div>
+  `;
+}
+
+
+/* =========================================================
+   Epicrisis (placeholder + “cierre” guarda en Archive)
+========================================================= */
+function renderEpicrisisUI(){
+  const root = $("#medEpic"); if(!root) return;
+  root.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">Epicrisis (placeholder). Botón “Cerrar” guarda Alta/Defunción en Admin.</div>
+      <div class="field"><label>Epicrisis</label><textarea id="epicText"></textarea></div>
+      <div class="row" style="margin-top:10px;">
+        <div class="field"><label>Tipo de egreso</label>
+          <select id="epicType">
+            <option value="alta">Alta</option>
+            <option value="defuncion">Defunción</option>
+          </select>
+        </div>
+        <div class="field"><label>Fecha</label><input id="epicDate" value="${dmyFromDateISO(new Date().toISOString().slice(0,10))}"></div>
+      </div>
+      <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn primary" id="btnSaveEpic" type="button">Guardar epicrisis</button>
+        <button class="btn danger" id="btnCloseEpic" type="button">Cerrar (guardar en Altas/Defunciones)</button>
+      </div>
+    </div>
+  `;
+
+  const pid = selectedPatientId;
+  if(pid){
+    const cl = getClinical();
+    const cur = cl[pid] || {};
+    if(cur.epicrisisFull?.text) $("#epicText").value = cur.epicrisisFull.text;
+  }
+
+  $("#btnSaveEpic").onclick = ()=>{
+    if(!selectedPatientId) return alert("Seleccioná un paciente.");
+    const pid = selectedPatientId;
+    const cl = getClinical();
+    const cur = cl[pid] || {};
+    cur.epicrisisFull = {
+      text: ($("#epicText").value||"").trim(),
+      author: { id: session.username, name: session.name },
+      updatedAt: isoNowLocalFull()
+    };
+    cl[pid]=cur; setClinical(cl);
+
+    const pname = buildPatientDisplayName(findPatient(pid));
+    logAction(`editó epicrisis de ${pname}`, pid);
+
+    toast("Epicrisis guardada");
+  };
+
+  $("#btnCloseEpic").onclick = ()=>{
+    if(!selectedPatientId) return alert("Seleccioná un paciente.");
+    const pid = selectedPatientId;
+    const p = findPatient(pid);
+    const adm = getAdmissionByPatientId(pid);
+    if(!p || !adm) return alert("No se encontró internación.");
+
+    // guardar en archivo
+    const arch = getArchive();
+    arch.push({
+      id: uid("arch"),
+      type: $("#epicType").value,
+      date: $("#epicDate").value,
+      patientId: pid,
+      dni: p.dni,
+      name: buildPatientDisplayName(p),
+      dx: adm.dx || "",
+      epicText: ($("#epicText").value||"").trim(),
+      closedAt: isoNowLocalFull(),
+      closedBy: session.username
+    });
+    setArchive(arch);
+
+    // cerrar internación
+    const reg = getRegistry();
+    const a = reg.find(x=>x.id===adm.id);
+    if(a){ a.active = false; setRegistry(reg); }
+
+    const pname = buildPatientDisplayName(findPatient(pid));
+    logAction(`cerró epicrisis (${ $("#epicType").value }) de ${pname}`, pid);
+
+    toast("Egreso guardado en Altas/Defunciones y cama liberada");
+    selectedPatientId = null;
+    renderAdmin();
+    renderMed();
+  };
+}
+
+/* =========================================================
+   Print / Preview
+========================================================= */
+function buildPatientHeaderHTML(){
+  const p = selectedPatientId ? findPatient(selectedPatientId) : null;
+  const adm = p ? getAdmissionByPatientId(p.id) : null;
+  const bed = adm ? getBeds().find(b=>b.id===adm.bedId) : null;
+  const inst = getInst();
+  const dom = p ? domStringFromPatient(p) : "";
+
+  return `
+  <div class="inst">
+    <div class="l1">${escHTML(inst.line1||"")}</div>
+    <div class="l2">${escHTML(inst.line2||"")}</div>
+    <div class="l3">${escHTML(inst.line3||"")}</div>
+    <div class="meta">Emitido: ${escHTML(nowStr())} • Usuario: ${escHTML(session?.name||session?.username||"")}</div>
+  </div>
+  <div class="pac">
+    <div class="a">${escHTML(p ? buildPatientDisplayName(p) : "—")}</div>
+    <div class="b">DNI: ${escHTML(p?.dni||"—")} • Edad: ${escHTML(p?.dob ? String(calcAge(p.dob)) : "—")} • Sexo: ${escHTML(p?.sex||"—")} • OS: ${escHTML(p?.os||"—")} • Afiliado: ${escHTML(p?.aff||"—")}</div>
+    <div class="c">Domicilio: ${escHTML(dom||"—")} • Área: ${escHTML(bed?.area||"—")} • Cama: ${escHTML(bed?.label||"—")} • Ingreso: ${escHTML(adm ? dmyhmFromISODateTime(adm.admDateTime||"") : "—")} • Dx: ${escHTML(adm?.dx||"—")}</div>
+  </div>
+  `.trim();
+}
+function buildPrintShell(bodyTitle, bodyHTML){
+  return `
+<!doctype html><html lang="es"><head><meta charset="utf-8" />
+<title>${escHTML(bodyTitle)}</title>
+<style>
+  :root{ --blue:#0b4ea2; --black:#0a0a0a; }
+  body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111; }
+  .page{ padding: 14mm 12mm; }
+  .inst{ background: var(--black); color:#fff; padding:10px 12px; border-radius:10px; }
+  .inst .l1{ font-weight:900; font-size:14px; }
+  .inst .l2{ font-size:12px; opacity:.95; margin-top:2px; }
+  .inst .l3{ font-size:11px; opacity:.9; margin-top:2px; }
+  .meta{ margin-top:8px; font-size:11px; opacity:.9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .pac{ margin-top:8px; background: linear-gradient(180deg, var(--blue), #083f84); color:#fff; padding:10px 12px; border-radius:10px; }
+  .pac .a{ font-weight:900; font-size:14px; } /* MISMO tamaño que institución */
+  .pac .b{ font-size:12px; opacity:.95; margin-top:2px; }
+  .pac .c{ font-size:11px; opacity:.92; margin-top:4px; line-height:1.25; }
+  .docTitle{ margin: 12px 0 8px 0; font-weight:900; font-size:14px; border-bottom:1px solid #ddd; padding-bottom:6px; }
+  .box{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; }
+  .line{ margin:6px 0; white-space:pre-wrap; }
+  @media print{ @page{ margin: 10mm; } .page{ padding:0; } }
+</style></head>
+<body><div class="page">
+  ${buildPatientHeaderHTML()}
+  <div class="docTitle">${escHTML(bodyTitle)}</div>
+  ${bodyHTML}
+</div></body></html>`.trim();
+}
+
+function buildPrintShellNoPatient(bodyTitle, bodyHTML){
+  const inst = getInst();
+  return `
+<!doctype html><html lang="es"><head><meta charset="utf-8" />
+<title>${escHTML(bodyTitle)}</title>
+<style>
+  :root{ --blue:#0b4ea2; --black:#0a0a0a; }
+  body{ margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color:#111; }
+  .page{ padding: 14mm 12mm; }
+  .inst{ background: var(--black); color:#fff; padding:10px 12px; border-radius:10px; }
+  .inst .l1{ font-weight:900; font-size:14px; }
+  .inst .l2{ font-size:12px; opacity:.95; margin-top:2px; }
+  .inst .l3{ font-size:11px; opacity:.9; margin-top:2px; }
+  .meta{ margin-top:8px; font-size:11px; opacity:.9; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+  .docTitle{ margin: 12px 0 8px 0; font-weight:900; font-size:14px; border-bottom:1px solid #ddd; padding-bottom:6px; }
+  .box{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; }
+  @media print{ @page{ margin: 10mm; } .page{ padding:0; } }
+</style></head>
+<body><div class="page">
+  <div class="inst">
+    <div class="l1">${escHTML(inst.line1||"")}</div>
+    <div class="l2">${escHTML(inst.line2||"")}</div>
+    <div class="l3">${escHTML(inst.line3||"")}</div>
+    <div class="meta">Emitido: ${escHTML(nowStr())} • Usuario: ${escHTML(session?.name||session?.username||"")}</div>
+  </div>
+
+  <div class="docTitle">${escHTML(bodyTitle)}</div>
+  ${bodyHTML}
+</div></body></html>`.trim();
+}
+
+function getBalancePrintHTML(pid){
+  const { cur } = getBalanceData(pid);
+  const arr = Array.isArray(cur?.balances) ? cur.balances : [];
+
+  if(!arr.length){
+    return `
+      <div class="box">
+        <div class="line">Sin registros de balances.</div>
+      </div>
+    `;
+  }
+
+  const sorted = arr.slice().sort((a,b)=>{
+    return String(a.dateTime || "").localeCompare(String(b.dateTime || ""));
+  });
+
+  const groups = {};
+  sorted.forEach(r=>{
+    const dayKey = String(r.dateTime || "").slice(0,10);
+    if(!groups[dayKey]) groups[dayKey] = [];
+    groups[dayKey].push(r);
+  });
+
+  const dayKeys = Object.keys(groups).sort().reverse();
+
+  let html = "";
+
+  dayKeys.forEach(dayKey=>{
+    const rows = groups[dayKey];
+    let acumuladoDia = 0;
+    const detalleIngresosDia = {};
+    const detalleEgresosDia = {};
+
+    const trs = rows.map(r=>{
+      const fecha = dmyFromDateISO(String(r.dateTime || "").slice(0,10));
+      const hora = hm24FromISO(r.dateTime);
+
+      const ingresos = Number(r.ingresos || 0);
+      const egresos = Number(r.egresos || 0);
+      const parcial = ingresos - egresos;
+      acumuladoDia += parcial;
+
+      const ingresoDetalleNorm = normalizeBalanceDetail(r.ingresoDetalle || "");
+      const egresoDetalleNorm  = normalizeBalanceDetail(r.egresoDetalle || "");
+
+      if(ingresoDetalleNorm){
+        detalleIngresosDia[ingresoDetalleNorm] = (detalleIngresosDia[ingresoDetalleNorm] || 0) + ingresos;
+      }
+      if(egresoDetalleNorm){
+        detalleEgresosDia[egresoDetalleNorm] = (detalleEgresosDia[egresoDetalleNorm] || 0) + egresos;
+      }
+
+      const totalIngresoDetalle = ingresoDetalleNorm ? detalleIngresosDia[ingresoDetalleNorm] : 0;
+      const totalEgresoDetalle  = egresoDetalleNorm ? detalleEgresosDia[egresoDetalleNorm] : 0;
+
+      const ingresoTxt = ingresos
+        ? `${ingresos} ml${ingresoDetalleNorm ? ` (${escHTML(ingresoDetalleNorm)} · total día: ${totalIngresoDetalle} ml)` : ""}`
+        : "—";
+
+      const egresoTxt = egresos
+        ? `${egresos} ml${egresoDetalleNorm ? ` (${escHTML(egresoDetalleNorm)} · total día: ${totalEgresoDetalle} ml)` : ""}`
+        : "—";
+
+      return `
+        <tr>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${escHTML(fecha)} ${escHTML(hora)}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${escHTML(r.user || "—")}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${ingresoTxt}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd;">${egresoTxt}</td>
+          <td style="padding:6px; border-bottom:1px solid #ddd; font-weight:900;">
+            ${parcial > 0 ? "+" : ""}${parcial} ml
+          </td>
+          <td style="padding:6px; border-bottom:1px solid #ddd; font-weight:900;">
+            ${acumuladoDia > 0 ? "+" : ""}${acumuladoDia} ml
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    // totales del día
+    let totIngDia = 0;
+    let totEgrDia = 0;
+    rows.forEach(r=>{
+      totIngDia += Number(r.ingresos || 0);
+      totEgrDia += Number(r.egresos || 0);
+    });
+    const balDia = totIngDia - totEgrDia;
+
+    html += `
+      <div style="margin-bottom:14px;">
+        <div style="font-weight:900; font-size:13px; margin-bottom:6px;">
+          ${escHTML(dmyFromDateISO(dayKey))}
+        </div>
+
+        <div style="margin-bottom:6px; font-size:12px;">
+          Ingresos Totales: <b>${totIngDia} ml</b> |
+          Egresos Totales: <b>${totEgrDia} ml</b> |
+          Balance Total: <b>${balDia > 0 ? "+" : ""}${balDia} ml</b>
+        </div>
+
+        <table style="width:100%; border-collapse:collapse; font-size:12px;">
+          <thead>
+            <tr>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Fecha / Hora</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Usuario</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Ingresos</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Egresos</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Balance parcial</th>
+              <th style="text-align:left; padding:6px; border-bottom:1px solid #999;">Balance acumulado</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${trs}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+
+
+function getPrintDocForMed(){
+  if(!selectedPatientId) return null;
+  const cl = getClinical();
+  const pid = selectedPatientId;
+  const data = cl[pid] || {};
+
+  if(medTab==="ingreso"){
+    const rec = data.ingresoFull;
+    const html = `<div class="box"><div class="line">${escHTML(rec?.prettyText || "—")}</div></div>`;
+    return buildPrintShell("Ingreso", html);
+  }
+
+  if(medTab==="evolucion"){
+    const evos = Array.isArray(data.evolucionesFull) ? data.evolucionesFull : [];
+    const sel = $("#evoPrintSelect");
+    let idx = -1;
+    if(sel && sel.value !== "") idx = parseInt(sel.value,10);
+    const chosen = (idx>=0 && idx<evos.length) ? evos[idx] : (evos.length ? evos[evos.length-1] : null);
+    const html = `<div class="box"><div class="line">${escHTML(chosen?.prettyText || "—")}</div></div>`;
+    return buildPrintShell("Evolución", html);
+  }
+
+  if(medTab==="bal"){
+    const html = getBalancePrintHTML(pid);
+    return buildPrintShell("Balances", html);
+  }
+
+  if(medTab==="epicrisis"){
+    const txt = data.epicrisisFull?.text || "";
+    const html = `<div class="box"><div class="line">${escHTML(txt||"—")}</div></div>`;
+    return buildPrintShell("Epicrisis", html);
+  }
+
+  return buildPrintShell("Registro", `<div class="box"><div class="line">Módulo sin impresión aún.</div></div>`);
+}
+
+
+function openPreview(html){
+  $("#previewFrame").srcdoc = html;
+  $("#previewModal").classList.add("show");
+}
+function printByWindow(html){
+  const w = window.open("", "_blank");
+  if(!w){ alert("El navegador bloqueó la ventana emergente."); return; }
+  w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(()=>{ w.focus(); w.print(); }, 300);
+}
+
+function getPrintDocForMedCenso(){
+  const beds = getBeds();
+  const reg = getRegistry();
+  const patients = getPatients();
+  const filt = ($("#medAreaFilter")?.value || "Todo").trim().toUpperCase();
+
+  const occByBed = new Map();
+  reg.forEach(a=>{
+    if(a && a.active!==false && a.bedId) occByBed.set(a.bedId, a);
+  });
+  const svc = (b)=> String(b.area||"").trim().toUpperCase();
+  let list = beds.filter(b=> filt==="TODO" ? true : svc(b)===filt);
+
+  const rows = list.map(b=>{
+    const adm = occByBed.get(b.id);
+    const p = adm ? patients.find(x=>x.id===adm.patientId) : null;
+    return `
+      <tr>
+        <td>${escHTML(b.area||"")}</td>
+        <td>${escHTML(b.label||b.bed||"")}</td>
+        <td>${escHTML(p ? buildPatientDisplayName(p) : "— vacío —")}</td>
+        <td>${escHTML(p?.dni || "—")}</td>
+        <td>${escHTML(p?.dob ? String(calcAge(p.dob)) : "—")}</td>
+        <td>${escHTML(adm?.dx || "—")}</td>
+        <td>${escHTML(adm?.admDateTime ? dmyhmFromISODateTime(adm.admDateTime) : "—")}</td>
+      </tr>
+    `;
+  }).join("");
+
+  const body = `
+    <div class="box">
+      <table style="width:100%; border-collapse:collapse; font-size:12px;">
+        <thead>
+          <tr>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Área</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Cama</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Paciente</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">DNI</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Edad</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Dx</th>
+            <th style="text-align:left; border-bottom:1px solid #ddd; padding:6px;">Ingreso</th>
+          </tr>
+        </thead>
+        <tbody>${rows || `<tr><td colspan="7" style="padding:10px;">Sin datos</td></tr>`}</tbody>
+      </table>
+    </div>`;
+  const titulo = (filt==="TODO") ? "Censo médico (todas las áreas)" : `Censo médico (${filt})`;
+  return buildPrintShell(titulo, body);
+}
+
+
+function renderPrescripciones(){
+  const root = $("#medPres");
+  if(!root) return;
+
+  const pid = selectedPatientId;
+  if(!pid){
+    root.innerHTML = `<div class="muted" style="font-size:12px;">Seleccioná un paciente.</div>`;
+    return;
+  }
+
+  const me = getCurrentUser();
+  const isEnfermero = me?.role === "enfermero";
+
+  // Por ahora: solo visualización para médico y enfermero.
+  // Cuando armes el módulo real, acá conectás cl[pid].prescripciones, etc.
+  root.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px; margin-bottom:8px;">
+        Prescripciones • ${isEnfermero ? "Solo visualizar (enfermería)" : "Visualizar / (edición a futuro)"}
+      </div>
+      <div class="box muted" style="font-size:12px;">
+        (Pendiente: módulo completo de prescripciones. Ya está el tab y el contenedor sin errores.)
+      </div>
+    </div>
+  `;
+}
+
+
+
+/* =========================================================
+   Med render + Admin Arch search
+========================================================= */
+function renderMed(){
+  const user = getCurrentUser();
+  const isEnfermero = user?.role === "enfermero";
+
+  const prevFilter = ($("#medAreaFilter")?.value || "Todo");
+  fillAreaSelectors();
+  if($("#medAreaFilter")) $("#medAreaFilter").value = prevFilter;
+
+  renderMedCenso();
+  renderPatientHeader();
+  renderMedPanel();
+
+  // IMPORTANTÍSIMO: Ingresos previos SOLO en ingreso
+  if(medTab === "ingreso"){
+    renderIngresoUI();
+  }
+  if(medTab === "evolucion"){
+    evoRender();
+  }
+  if(medTab === "prescripciones"){
+    renderPrescripciones();
+  }
+  if(medTab === "sv"){
+    renderSV();
+  }
+  if(medTab === "bal"){
+    renderBAL();
+  }
+  if(medTab === "epicrisis"){
+    renderEpicrisisUI();
+  }
+
+  $("#medSV").style.display = (medTab==="sv") ? "" : "none";
+
+  
+}
+
+function archSearch(){
+  const dni = ($("#archSearchDni").value||"").trim();
+  const name = ($("#archSearchName").value||"").trim().toLowerCase();
+  const arr = getArchive();
+  const out = arr.filter(x=>{
+    const okDni = dni ? String(x.dni||"").includes(dni) : true;
+    const okName = name ? String(x.name||"").toLowerCase().includes(name) : true;
+    return okDni && okName;
+  }).slice().reverse();
+
+  const box = $("#archResults");
+  if(!out.length){
+    box.innerHTML = `<div class="muted" style="font-size:12px;">Sin resultados.</div>`;
+    return;
+  }
+  box.innerHTML = out.map(x=>`
+    <div style="border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:10px; margin-top:8px;">
+      <div style="font-weight:900;">${escHTML(x.type||"")} • ${escHTML(x.date||"—")}</div>
+      <div class="muted" style="font-size:12px; margin-top:4px;">${escHTML(x.name||"—")} • DNI ${escHTML(x.dni||"—")} • Dx ${escHTML(x.dx||"—")}</div>
+      <pre style="white-space:pre-wrap; font-size:12px; margin:8px 0 0;">${escHTML(x.epicText||"")}</pre>
+    </div>
+  `).join("");
+}
+
+/* =========================================================
+   Sesión / Login
+========================================================= */
+function getCurrentUser(){
+  return session ? { id: session.username, name: session.name, role: session.role, username: session.username } : null;
+}
+function showLogin(){
+  $("#loginWrap").style.display = "";
+  $("#appAdmin").style.display = "none";
+  $("#appMed").style.display = "none";
+  $("#btnLogout").style.display = "none";
+  $("#btnAccount").style.display = "none";
+  $("#whoami").textContent = "sin sesión";
+}
+function showAppByRole(role){
+  $("#loginWrap").style.display = "none";
+  $("#appAdmin").style.display = (role === "admin" || role === "administrativo") ? "grid" : "none";
+  $("#appMed").style.display = (role === "medico") ? "grid" : "none";
+  $("#btnLogout").style.display = "inline-flex";
+  $("#btnAccount").style.display = "inline-flex";
+  if(role === "enfermero"){
+    $("#appMed").style.display = "grid";
+  }
+
+}
+function syncSessionUI(){
+  session = loadJSON(LS.session, null);
+  if(!session){ showLogin(); return; }
+  $("#whoami").textContent = `${session.name || session.username} • ${session.role}`;
+  showAppByRole(session.role);
+  migratePatientsNameParts();
+  if(session.role === "medico" || session.role === "enfermero") renderMed();
+  else renderAdmin();
+}
+function login(username, password){
+  const u = String(username || "").trim();
+  const p = String(password || "").trim();
+  const users = getUsers();
+  const found = users.find(x => x.username === u && x.password === p);
+  if(!found){ alert("Usuario o contraseña incorrectos."); return; }
+  session = { username: found.username, name: found.name || found.username, role: found.role || "medico" };
+  saveJSON(LS.session, session);
+  syncSessionUI();
+}
+function logout(){
+  localStorage.removeItem(LS.session);
+  session = null;
+  selectedPatientId = null;
+  syncSessionUI();
+}
+
+/* =========================================================
+   Demo seed
+========================================================= */
+function seedDemo(){
+  const instName = "Sanatorio (Demo)";
+  setUsers([
+    { username:"admin", password:"admin", role:"admin", seed:true,  name:"Admin seed", inst: instName, photo:"" },
+    { username:"medico", password:"medico", role:"medico", seed:false, name:"Médico", inst: instName, photo:"" },
+    { username:"adm", password:"adm", role:"administrativo", seed:false, name:"Administrativo", inst: instName, photo:"" },
+    { username:"enfermero", password:"enfermero", role:"enfermero", seed:false, name:"Enfermería", inst: instName, photo:"" },
+  ]);
+
+
+  const beds = [];
+  const mk = (area, label)=> beds.push({ id: uid("bed"), area, bed: label, label });
+
+  for(let i=1;i<=10;i++) mk("UCO", `UCO ${i}`);
+  for(let i=1;i<=10;i++) mk("UTI", `UTI ${i}`);
+  for(let i=1;i<=6;i++)  mk("UCE", `UCE ${i}`);
+
+  for(let h=100; h<=110; h++){ mk("Clínica Médica 1° Piso", `Hab ${h} - Cama A`); mk("Clínica Médica 1° Piso", `Hab ${h} - Cama B`); }
+  for(let h=200; h<=210; h++){ mk("Clínica Médica 2° Piso", `Hab ${h} - Cama A`); mk("Clínica Médica 2° Piso", `Hab ${h} - Cama B`); }
+  for(let h=300; h<=310; h++){ mk("Clínica Médica 3° Piso", `Hab ${h} - Cama A`); mk("Clínica Médica 3° Piso", `Hab ${h} - Cama B`); }
+  for(let h=400; h<=410; h++){ mk("Clínica Médica 4° Piso", `Hab ${h} - Cama A`); mk("Clínica Médica 4° Piso", `Hab ${h} - Cama B`); }
+  setBeds(beds);
+
+
+
+  setInst({ line1:"Sanatorio (Demo)", line2:"Córdoba • Dirección", line3:"Teléfono • Email • Notas" });
+setClinical({});
+setArchive([]);
+setActivity([]);
+setChats({});
+
+  toast("Demo cargada");
+  fillAreaSelectors();
+  renderAdmin();
+  renderMed();
+}
+
+/* =========================================================
+   Cuenta: perfil + cambio de contraseña
+========================================================= */
+let __pendingPhotoDataURL = null;
+
+function findUserByUsername(username){
+  return getUsers().find(u => u.username === username) || null;
+}
+
+function updateUser(username, patch){
+  const users = getUsers();
+  const idx = users.findIndex(u => u.username === username);
+  if(idx < 0) return false;
+  users[idx] = { ...users[idx], ...patch };
+  setUsers(users);
+  return true;
+}
+
+function openAccount(){
+  if(!session) return;
+  $("#accountModal").style.display = "grid";
+  $("#accMsg").textContent = "";
+
+  const u = findUserByUsername(session.username);
+  $("#accUser").textContent = session.name || session.username;
+  $("#accRole").textContent = session.role || "—";
+
+  // avatar
+  renderAccountAvatar(u?.photo || null);
+
+  // limpiar inputs
+  $("#accPhoto").value = "";
+  __pendingPhotoDataURL = null;
+  $("#accPassCur").value = "";
+  $("#accPassNew").value = "";
+  $("#accPassNew2").value = "";
+
+    accSetView("main");
+  __accSelectedMember = null;
+  __accChatWith = null;
+}
+
+function closeAccount(){
+  $("#accountModal").style.display = "none";
+  $("#accPhoto").value = "";
+  __pendingPhotoDataURL = null;
+}
+
+function renderAccountAvatar(photoDataURL){
+  const box = $("#accAvatar");
+  if(!box) return;
+  if(photoDataURL){
+    box.innerHTML = `<img src="${photoDataURL}" alt="avatar" style="width:100%;height:100%;object-fit:cover;">`;
+  }else{
+    box.innerHTML = `<span class="muted" style="font-size:12px;">sin foto</span>`;
+  }
+}
+
+function showAccMsg(msg){
+  const el = $("#accMsg");
+  if(el) el.textContent = msg || "";
+}
+
+function readFileAsDataURL(file){
+  return new Promise((resolve, reject)=>{
+    const fr = new FileReader();
+    fr.onload = ()=> resolve(fr.result);
+    fr.onerror = ()=> reject(fr.error);
+    fr.readAsDataURL(file);
+  });
+}
+
+
+/* =========================================================
+   Cuenta > Miembros + Perfil + Chat
+========================================================= */
+let __accView = "main"; // "main" | "members" | "member" | "chat"
+let __accSelectedMember = null; // username del miembro
+let __accChatWith = null;       // username del chat
+
+function accSetView(v){
+  __accView = v;
+
+  const vMain = document.getElementById("accViewMain");
+  const vMem  = document.getElementById("accViewMembers");
+  const vDet  = document.getElementById("accViewMemberDetail");
+  const vChat = document.getElementById("accViewChat");
+
+  if(vMain) vMain.style.display = (v==="main") ? "" : "none";
+  if(vMem)  vMem.style.display  = (v==="members") ? "" : "none";
+  if(vDet)  vDet.style.display  = (v==="member") ? "" : "none";
+  if(vChat) vChat.style.display = (v==="chat") ? "" : "none";
+
+  const title = document.getElementById("accTitle");
+  const back  = document.getElementById("btnAccBack");
+
+  if(back) back.style.display = (v==="main") ? "none" : "inline-flex";
+
+  if(title){
+    if(v==="main") title.textContent = "Cuenta";
+    if(v==="members") title.textContent = "Miembros";
+    if(v==="member") title.textContent = "Perfil";
+    if(v==="chat") title.textContent = "Mensajes";
+  }
+}
+
+function accBack(){
+  if(__accView === "chat") return accSetView("member");
+  if(__accView === "member") return accSetView("members");
+  if(__accView === "members") return accSetView("main");
+  accSetView("main");
+}
+
+function getMyInstName(){
+  const meU = findUserByUsername(session?.username || "");
+  // si el usuario tiene inst, usamos eso; si no, usamos inst.line1
+  const fromUser = (meU?.inst || "").trim();
+  if(fromUser) return fromUser;
+  return (getInst()?.line1 || "").trim() || "Institución";
+}
+
+function renderMembersList(){
+  const box = document.getElementById("accMembersList");
+  if(!box) return;
+
+  const instName = getMyInstName();
+  const me = session?.username || "";
+  const users = getUsers()
+    .filter(u => (String(u.inst||"").trim() || (getInst()?.line1||"").trim()) === instName)
+    .filter(u => u.username !== me);
+
+  if(!users.length){
+    box.innerHTML = `<div class="muted" style="font-size:12px;">No hay otros miembros en este sanatorio.</div>`;
+    return;
+  }
+
+  box.innerHTML = "";
+  users.forEach(u=>{
+    const div = document.createElement("div");
+    div.className = "memberItem";
+    div.dataset.member = u.username;
+
+    const av = document.createElement("div");
+    av.className = "memberAvatar";
+    av.innerHTML = u.photo
+      ? `<img src="${u.photo}" alt="avatar">`
+      : `<span class="muted" style="font-size:12px;">sin</span>`;
+
+    const nm = document.createElement("div");
+    nm.className = "memberNameBox";
+    nm.innerHTML = `
+      <div class="n1">${escHTML(u.name||u.username||"")}</div>
+      <div class="n2">@${escHTML(u.username||"")} • ${escHTML(u.role||"")}</div>
+    `;
+
+    div.appendChild(av);
+    div.appendChild(nm);
+
+    div.onclick = ()=>{
+      __accSelectedMember = u.username;
+      renderMemberDetail(u.username);
+      accSetView("member");
+    };
+
+    box.appendChild(div);
+  });
+}
+
+function renderMemberDetail(username){
+  const box = document.getElementById("memberDetailBox");
+  if(!box) return;
+
+  const u = findUserByUsername(username);
+  if(!u){
+    box.innerHTML = `<div class="muted">Miembro no encontrado.</div>`;
+    return;
+  }
+
+  // últimas acciones de este usuario
+  const acts = getActivity()
+    .filter(a => a.user === username)
+    .slice()
+    .reverse()
+    .slice(0, 12);
+
+  const actsHTML = acts.length ? acts.map(a=>{
+    const stamp = dmyhmFromISODateTime(a.ts);
+    return `
+      <div class="activityRow">
+        <div class="t">${escHTML(stamp)}</div>
+        <div class="m">${escHTML(a.message || "—")}</div>
+      </div>
+    `;
+  }).join("") : `<div class="muted" style="font-size:12px; margin-top:8px;">Sin actividad registrada.</div>`;
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="memberDetailCenter">
+        <div class="memberDetailPhoto">
+          ${u.photo ? `<img src="${u.photo}" alt="foto">` : `<span class="muted" style="font-size:12px;">sin foto</span>`}
+        </div>
+
+        <div class="memberDetailUser">@${escHTML(u.username||"")}</div>
+        <div class="memberDetailName">${escHTML(u.name||u.username||"")}</div>
+        <div class="muted" style="font-size:12px;">Rol: <b>${escHTML(u.role||"—")}</b></div>
+
+        <div style="margin-top:10px;">
+          <button class="btn primary" id="btnOpenChatWithMember" type="button">Mensajes</button>
+        </div>
+      </div>
+
+      <div class="activityBox">
+        <div style="font-weight:900;">Actividad reciente</div>
+        ${actsHTML}
+      </div>
+    </div>
+  `;
+
+  const btn = document.getElementById("btnOpenChatWithMember");
+  if(btn){
+    btn.onclick = ()=>{
+      __accChatWith = username;
+      renderChat(username);
+      accSetView("chat");
+    };
+  }
+}
+
+function chatKey(u1, u2){
+  const a = String(u1||"").trim();
+  const b = String(u2||"").trim();
+  return [a,b].sort().join("__");
+}
+
+function renderChat(otherUsername){
+  const box = document.getElementById("chatBox");
+  if(!box) return;
+
+  const me = session?.username || "";
+  const other = findUserByUsername(otherUsername);
+  if(!me || !other){
+    box.innerHTML = `<div class="muted">Chat no disponible.</div>`;
+    return;
+  }
+
+  const chats = getChats();
+  const k = chatKey(me, otherUsername);
+  const msgs = Array.isArray(chats[k]) ? chats[k] : [];
+
+  box.innerHTML = `
+    <div class="card">
+      <div class="muted" style="font-size:12px; opacity:.85;">
+        Chat con <b>${escHTML(other.name||other.username||"")}</b> (@${escHTML(other.username||"")})
+      </div>
+
+      <div class="chatWrap">
+        <div class="chatMsgs" id="chatMsgs"></div>
+
+        <div class="chatSend">
+          <input id="chatText" type="text" placeholder="Escribí un mensaje..." />
+          <input id="chatImg" type="file" accept="image/*" />
+          <button class="btn primary" id="btnChatSend" type="button">Enviar</button>
+        </div>
+        <div class="muted" style="font-size:11px; margin-top:8px; opacity:.8;">
+          (Se guardan mensajes e imágenes en localStorage de este navegador)
+        </div>
+      </div>
+    </div>
+  `;
+
+  // pintar mensajes
+  const msgBox = document.getElementById("chatMsgs");
+  msgBox.innerHTML = "";
+  msgs.forEach(m=>{
+    const mine = (m.from === me);
+    const stamp = dmyhmFromISODateTime(m.ts);
+
+    const div = document.createElement("div");
+    div.className = "bubble " + (mine ? "me" : "");
+    if(m.kind === "image"){
+      div.innerHTML = `
+        <div>${escHTML(m.text||"")}</div>
+        <img src="${m.dataURL}" alt="img" />
+        <div class="meta">${escHTML(stamp)} • ${mine ? "vos" : (other.name||other.username)}</div>
+      `;
+    }else{
+      div.innerHTML = `
+        <div>${escHTML(m.text||"")}</div>
+        <div class="meta">${escHTML(stamp)} • ${mine ? "vos" : (other.name||other.username)}</div>
+      `;
+    }
+    msgBox.appendChild(div);
+  });
+
+  // scroll al final
+  msgBox.scrollTop = msgBox.scrollHeight;
+
+  // enviar
+  document.getElementById("btnChatSend").onclick = async ()=>{
+    const text = (document.getElementById("chatText").value || "").trim();
+    const file = document.getElementById("chatImg").files?.[0] || null;
+
+    if(!text && !file) return;
+
+    const chats = getChats();
+    const k = chatKey(me, otherUsername);
+    const arr = Array.isArray(chats[k]) ? chats[k] : [];
+
+    if(file){
+      const dataURL = await readFileAsDataURL(file);
+      arr.push({
+        id: uid("msg"),
+        ts: isoNowLocalFull(),
+        from: me,
+        kind: "image",
+        text: text || "",
+        dataURL
+      });
+    }else{
+      arr.push({
+        id: uid("msg"),
+        ts: isoNowLocalFull(),
+        from: me,
+        kind: "text",
+        text
+      });
+    }
+
+    // limitar chat
+    while(arr.length > 300) arr.shift();
+
+    chats[k] = arr;
+    setChats(chats);
+
+    // limpiar inputs y re-render
+    document.getElementById("chatText").value = "";
+    document.getElementById("chatImg").value = "";
+    renderChat(otherUsername);
+  };
+}
+
+
+
+/* =========================================================
+   Boot
+========================================================= */
+function boot(){
+  syncSessionUI();
+
+  document.querySelectorAll("[data-admin-tab]").forEach(x=>{
+    x.addEventListener("click", ()=> setAdminTab(x.dataset.adminTab));
+  });
+
+  $("#btnLogin")?.addEventListener("click", ()=> login($("#loginUser")?.value||"", $("#loginPass")?.value||""));
+  $("#btnDemo")?.addEventListener("click", ()=>{ seedDemo(); alert("Demo cargada. Usuarios: admin/admin y medico/medico"); });
+  $("#btnReset")?.addEventListener("click", ()=>{
+    if(confirm("¿Resetear localStorage de esta app?")){
+      Object.values(LS).forEach(k=> localStorage.removeItem(k));
+      session=null;
+      selectedPatientId=null;
+      syncSessionUI();
+    }
+  });
+  $("#btnLogout")?.addEventListener("click", logout);
+
+  $("#btnSaveInst")?.addEventListener("click", ()=>{
+    setInst({
+      line1: $("#inst1")?.value.trim() || "",
+      line2: $("#inst2")?.value.trim() || "",
+      line3: $("#inst3")?.value.trim() || ""
+    });
+    toast("Institución guardada");
+    renderInstitutionHeader();
+  });
+
+  $("#pArea")?.addEventListener("change", ()=>{
+    if(editingAdmId){
+      const reg = getRegistry().find(r=>r.id===editingAdmId);
+      fillBedSelectForEditKeepCurrent(reg?.bedId);
+    }else fillBedSelectOnlyFree();
+  });
+
+  $("#pDob")?.addEventListener("change", ()=>{
+    const age = calcAge($("#pDob")?.value || "");
+    if($("#pAge")) $("#pAge").value = (age!=="" ? String(age) : "—");
+  });
+
+  $("#btnAdmit")?.addEventListener("click", admitFromUI);
+  $("#btnClearAdm")?.addEventListener("click", clearInternForm);
+  $("#btnAddUser")?.addEventListener("click", adminAddUser);
+
+  $("#btnArchSearch")?.addEventListener("click", archSearch);
+
+  $("#btnPrintAdminCenso")?.addEventListener("click", ()=>{
+    const html = buildPrintShell("Censo (Administración)", `<div class="box"><div class="line">Usá Imprimir censo en Médico o completamos el formato admin si querés.</div></div>`);
+    if(html) printByWindow(html);
+  });
+
+  $("#medAreaFilter")?.addEventListener("change", ()=> renderMedCenso());
+
+  document.addEventListener("click", (ev)=>{
+    const btn = ev.target.closest("[data-medtab]");
+    if(!btn) return;
+    medTab = btn.dataset.medtab;
+    document.querySelectorAll("[data-medtab]").forEach(b=> b.classList.toggle("active", b===btn));
+    renderMed();
+  });
+
+  $("#btnPrintMedCenso")?.addEventListener("click", ()=>{
+    const html = getPrintDocForMedCenso();
+    if(html) printByWindow(html);
+  });
+
+  $("#btnPrint")?.addEventListener("click", ()=>{
+    const html = getPrintDocForMed();
+    if(!html) return alert("No hay documento para imprimir (¿seleccionaste un paciente?).");
+    printByWindow(html);
+  });
+
+  $("#btnPreview")?.addEventListener("click", ()=>{
+    const html = getPrintDocForMed();
+    if(!html) return alert("No hay vista previa (¿seleccionaste un paciente?).");
+    openPreview(html);
+  });
+
+  $("#btnClosePreview")?.addEventListener("click", ()=>{
+    $("#previewModal").classList.remove("show");
+    $("#previewFrame").srcdoc = "";
+  });
+  $("#previewModal")?.addEventListener("click",(e)=>{
+    if(e.target.id==="previewModal"){
+      $("#previewModal").classList.remove("show");
+      $("#previewFrame").srcdoc = "";
+    }
+  });
+
+  $("#btnAccount")?.addEventListener("click", openAccount);
+  $("#btnCloseAccount")?.addEventListener("click", closeAccount);
+
+  $("#accountModal")?.addEventListener("click", (e)=>{
+    if(e.target.id === "accountModal") closeAccount();
+  });
+
+  // === FIX robusto: cierre de modal Cuenta por delegación ===
+  document.addEventListener("click", (e)=>{
+    const closeBtn = e.target.closest("#btnCloseAccount");
+    if(closeBtn){
+      closeAccount();
+      return;
+    }
+    if(e.target && e.target.id === "accountModal"){
+      closeAccount();
+      return;
+    }
+  });
+
+    // ===== Cuenta: listeners por delegación (funciona aunque el modal esté después del script) =====
+  document.addEventListener("change", (e)=>{
+    if(e.target && e.target.id === "accPhoto"){
+      const file = e.target.files?.[0];
+      if(!file){
+        __pendingPhotoDataURL = null;
+        showAccMsg("No seleccionaste archivo.");
+        renderAccountAvatar(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        __pendingPhotoDataURL = ev.target.result;
+        renderAccountAvatar(__pendingPhotoDataURL);
+        showAccMsg("Foto lista para guardar.");
+      };
+      reader.onerror = ()=>{
+        __pendingPhotoDataURL = null;
+        showAccMsg("Error leyendo la imagen.");
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  document.addEventListener("click", (e)=>{
+    // Guardar foto
+    if(e.target.closest("#btnSavePhoto")){
+      if(!session){ showAccMsg("Sin sesión activa."); return; }
+      if(!__pendingPhotoDataURL){ showAccMsg("No seleccionaste ninguna foto."); return; }
+
+      const users = getUsers();
+      const idx = users.findIndex(u => u.username === session.username);
+      if(idx < 0){ showAccMsg("Usuario no encontrado."); return; }
+
+      users[idx].photo = __pendingPhotoDataURL;
+      setUsers(users);
+
+      showAccMsg("Foto guardada correctamente.");
+      return;
+    }
+
+    // Quitar foto
+    if(e.target.closest("#btnRemovePhoto")){
+      if(!session){ showAccMsg("Sin sesión activa."); return; }
+
+      const users = getUsers();
+      const idx = users.findIndex(u => u.username === session.username);
+      if(idx < 0){ showAccMsg("Usuario no encontrado."); return; }
+
+      users[idx].photo = "";
+      setUsers(users);
+
+      __pendingPhotoDataURL = null;
+      const inp = document.querySelector("#accPhoto");
+      if(inp) inp.value = "";
+      renderAccountAvatar(null);
+      showAccMsg("Foto eliminada.");
+      return;
+    }
+
+    // Cambiar contraseña
+    if(e.target.closest("#btnChangePass")){
+      if(!session){ showAccMsg("Sin sesión activa."); return; }
+
+      const actual = (document.querySelector("#accPassCur")?.value || "").trim();
+      const nueva  = (document.querySelector("#accPassNew")?.value || "").trim();
+      const nueva2 = (document.querySelector("#accPassNew2")?.value || "").trim();
+
+      if(!actual || !nueva || !nueva2){ showAccMsg("Completá todos los campos."); return; }
+      if(nueva !== nueva2){ showAccMsg("Las nuevas contraseñas no coinciden."); return; }
+
+      const users = getUsers();
+      const idx = users.findIndex(u => u.username === session.username);
+      if(idx < 0){ showAccMsg("Usuario no encontrado."); return; }
+
+      if(users[idx].password !== actual){ showAccMsg("Contraseña actual incorrecta."); return; }
+
+      users[idx].password = nueva;
+      setUsers(users);
+
+      document.querySelector("#accPassCur").value = "";
+      document.querySelector("#accPassNew").value = "";
+      document.querySelector("#accPassNew2").value = "";
+
+      showAccMsg("Contraseña actualizada correctamente.");
+      return;
+    }
+  });
+
+  // ===== Cuenta: Miembros + Back =====
+  document.addEventListener("click", (e)=>{
+    if(e.target.closest("#btnAccMembers")){
+      if(!session) return;
+      renderMembersList();
+      accSetView("members");
+      return;
+    }
+    if(e.target.closest("#btnAccBack")){
+      accBack();
+      return;
+    }
+  });
+
+  fillAreaSelectors();
+  if(session) showAppByRole(session.role);
+  else showLogin();
+  setAdminTab("intern");
+}
+
+boot();
+</script>
+<!-- CUENTA -->
+<div id="accountModal" style="position:fixed; inset:0; display:none; place-items:center; background:#0b1220; z-index:1000;">
+  <div class="card" style="width:min(980px, 92vw); max-height:82vh; overflow:auto; padding:16px; background:#111827; border:1px solid rgba(255,255,255,.15);">
+    <div class="accTopRow" style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <button class="btn small accBackBtn" id="btnAccBack" type="button">Volver</button>
+        <button class="btn small" id="btnAccMembers" type="button">Miembros</button>
+        <div style="font-weight:900;" id="accTitle">Cuenta</div>
+      </div>
+
+      <button class="btn small" id="btnCloseAccount" type="button">Cerrar</button>
+    </div>
+
+
+    <!-- VISTA: Cuenta (original) -->
+    <div id="accViewMain" style="margin-top:10px;">
+      <div class="row">
+        <div class="card">
+          <div style="font-weight:900; margin-bottom:8px;">Perfil</div>
+
+          <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <div id="accAvatar"
+                style="width:72px;height:72px;border-radius:16px;border:1px solid rgba(255,255,255,.14);
+                        background:rgba(255,255,255,.06); display:grid; place-items:center; overflow:hidden;">
+              <span class="muted" style="font-size:12px;">sin foto</span>
+            </div>
+
+            <div style="flex:1; min-width:220px;">
+              <div class="muted" style="font-size:12px;">Usuario</div>
+              <div id="accUser" style="font-weight:900;"></div>
+              <div class="muted" style="font-size:12px; margin-top:4px;">Rol</div>
+              <div id="accRole"></div>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <div class="field">
+              <label>Subir foto (PNG/JPG)</label>
+              <input id="accPhoto" type="file" accept="image/*" />
+            </div>
+            <div class="field">
+              <label>Acción</label>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn small" id="btnRemovePhoto" type="button">Quitar foto</button>
+                <button class="btn small primary" id="btnSavePhoto" type="button">Guardar foto</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="muted" style="font-size:12px; margin-top:8px;">
+            (La foto se guarda en localStorage del navegador.)
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:900; margin-bottom:8px;">Seguridad</div>
+
+          <div class="field">
+            <label>Contraseña actual</label>
+            <input id="accPassCur" type="password" autocomplete="current-password" />
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <div class="field">
+              <label>Nueva contraseña</label>
+              <input id="accPassNew" type="password" autocomplete="new-password" />
+            </div>
+            <div class="field">
+              <label>Repetir nueva contraseña</label>
+              <input id="accPassNew2" type="password" autocomplete="new-password" />
+            </div>
+          </div>
+
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn primary" id="btnChangePass" type="button">Cambiar contraseña</button>
+          </div>
+
+          <div id="accMsg" class="muted" style="font-size:12px; margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VISTA: Miembros (lista) -->
+    <div id="accViewMembers" style="display:none; margin-top:10px;">
+      <div class="muted" style="font-size:12px; opacity:.85;">
+        Miembros del mismo sanatorio
+      </div>
+      <div id="accMembersList" class="memberList"></div>
+    </div>
+
+    <!-- VISTA: Perfil de miembro -->
+    <div id="accViewMemberDetail" style="display:none; margin-top:10px;">
+      <div id="memberDetailBox"></div>
+    </div>
+
+    <!-- VISTA: Chat -->
+    <div id="accViewChat" style="display:none; margin-top:10px;">
+      <div id="chatBox"></div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>
