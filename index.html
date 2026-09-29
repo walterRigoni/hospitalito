@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v254 · Prescripciones compactas · Supabase</title>
+<title>HC Demo v255 · Horarios exactos e imágenes · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5564,6 +5564,29 @@ html::-webkit-scrollbar-corner{
 #medPres .hcRxMedicationAck input{width:auto;margin:0;}
 #medPres .hcRxMedicationItem.hcNurseItemAlert{animation:nurseBlink 1s infinite;border-color:rgba(255,165,0,.8) !important;}
 @media(max-width:680px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationControls{justify-content:flex-start;}}
+
+/* v255: horarios exactos, controles centrales y selección clara de estudios. */
+#medPres .hcRxMedicationGrid{grid-template-columns:minmax(180px,1fr) minmax(220px,1.2fr) auto;}
+#medPres .hcRxMedicationSchedule{text-align:center;font-size:12px;line-height:1.2;font-weight:900;color:#9fd7ff;white-space:normal;}
+#medPres .hcRxMedicationSchedule.is-due{color:#fbd38d;}
+#medPres .hcRxMedicationControls .btn{font-size:11px;padding:5px 8px;}
+@media(max-width:900px){#medPres .hcRxMedicationGrid{grid-template-columns:minmax(140px,1fr) minmax(150px,1fr) auto;}}
+@media(max-width:680px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{text-align:left;}}
+#medSV .svTable td.sv-good,body[data-hc-theme] #medSV .svTable td.sv-good{color:#68d391 !important;font-weight:900 !important;}
+#medSV .svTable td.sv-bad,body[data-hc-theme] #medSV .svTable td.sv-bad{color:#fc8181 !important;font-weight:900 !important;}
+#medSV .svChartDot.sv-good,body[data-hc-theme] #medSV .svChartDot.sv-good{fill:#68d391 !important;}
+#medSV .svChartDot.sv-bad,body[data-hc-theme] #medSV .svChartDot.sv-bad{fill:#fc8181 !important;}
+#medSV .svChartValue.sv-good,#medSV .svChartSub.sv-good,body[data-hc-theme] #medSV .svChartValue.sv-good,body[data-hc-theme] #medSV .svChartSub.sv-good{color:#68d391 !important;fill:#68d391 !important;}
+#medSV .svChartValue.sv-bad,#medSV .svChartSub.sv-bad,body[data-hc-theme] #medSV .svChartValue.sv-bad,body[data-hc-theme] #medSV .svChartSub.sv-bad{color:#fc8181 !important;fill:#fc8181 !important;}
+#medSV input.sv-good,body[data-hc-theme] #medSV input.sv-good{color:#68d391 !important;border-color:#68d391 !important;}
+#medSV input.sv-bad,body[data-hc-theme] #medSV input.sv-bad{color:#fc8181 !important;border-color:#fc8181 !important;}
+#medImg .imgStudyOptions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px;margin-top:5px;max-height:270px;overflow:auto;}
+#medImg .imgStudyChoice{display:flex;align-items:center;gap:9px;padding:7px 9px;border:1px solid #487299;border-radius:8px;background:#0b2543;color:#e8f4ff;font-size:13px;font-weight:750;line-height:1.2;cursor:pointer;}
+#medImg .imgStudyChoice:has(input:checked){border-color:#68d391;background:#173f51;color:#fff;}
+#medImg .imgStudyChoice input{width:17px;height:17px;margin:0;flex:none;accent-color:#68d391 !important;}
+#medImg .imgExternalPortal{border:1px solid #487299;border-radius:9px;padding:8px;margin:5px 0 10px;background:#102b49;}
+#medImg .imgExternalPortal .btn{margin-top:5px;}
+@media(max-width:680px){#medImg .imgStudyOptions{grid-template-columns:1fr;}}
 
 </style>
 
@@ -11250,11 +11273,14 @@ function hcIsScheduledMedicationItem(item){
   return true;
 }
 function hcMedicationFirstDoseAt(item){
+  if(hcIsIntermittentInfusionItem(item)) return item?.scheduleStartAt || item?.firstDoseAt || item?.medicationScheduleStartAt || item?.startedAt || item?.startAt || item?.createdAt || "";
   return item?.medicationScheduleStartAt || item?.firstDoseAt || item?.scheduleStartAt || item?.startedAt || item?.startAt || item?.createdAt || "";
 }
 function hcMedicationAnchorSlot(item){
-  const firstDoseAt = hcMedicationFirstDoseAt(item) || new Date();
-  return hcNextMedicationGridSlot(firstDoseAt);
+  const source = hcMedicationFirstDoseAt(item) || new Date();
+  const date = new Date(source);
+  const at = hcLocalDateTimeValue(isNaN(date.getTime()) ? new Date() : date);
+  return { planDate:hcMedicationOperationalDateKey(at), key:at.slice(11,16), at };
 }
 function hcAdministrationRecordForSlot(item, slotKey){
   const records = Array.isArray(item?.administrationRecords) ? item.administrationRecords : [];
@@ -11262,34 +11288,30 @@ function hcAdministrationRecordForSlot(item, slotKey){
 }
 function hcMedicationSlotsForDate(item, planDate){
   if(!planDate || !(hcIsScheduledMedicationItem(item) || (hcIsIntermittentInfusionItem(item) && item.active !== false && !hcIsTerminalPrescriptionItem(item)))) return [];
-  const anchor = hcMedicationAnchorSlot(item);
-  const anchorMs = new Date(anchor.at).getTime();
-  if(!isFinite(anchorMs)) return [];
+  const anchorMs = new Date(hcMedicationAnchorSlot(item).at).getTime();
+  const planStartMs = new Date(`${planDate}T06:00`).getTime();
+  const planEndMs = new Date(`${hcDateKeyAddDays(planDate,1)}T06:00`).getTime();
+  if(!Number.isFinite(anchorMs) || !Number.isFinite(planStartMs) || !Number.isFinite(planEndMs)) return [];
 
-  // Evita que una orden nueva genere tareas vencidas hacia atrás.
-  // Ejemplo: si el médico carga vancomicina a las 00:20 y el plan quedó anclado
-  // a 06:00/18:00 del día operativo anterior, Enfermería debe ver primero
-  // "Visto indicación", pero no debe habilitar administración retroactiva.
   const orderMs = hcParseTimeMs(item.createdAt || item.orderedAt || item.pendingNurseAt || "");
-  const effectiveStartMs = Math.max(anchorMs, Number.isFinite(orderMs) ? orderMs : anchorMs);
-
+  // Admitir un inicio exacto registrado poco antes de guardar la orden.
+  // Dosis antiguas no generan una lista de administraciones retroactivas.
+  const earliestMs = Math.max(anchorMs, Number.isFinite(orderMs) ? orderMs - 24*3600000 : anchorMs);
+  const treatmentEndMs = hcParseTimeMs(hcPrescriptionTreatmentEndAt(item));
   const intervalH = hcMedicationFrequencyHours(item.regularidad || "dosis_unica");
-  const endMs = hcParseTimeMs(hcPrescriptionTreatmentEndAt(item));
-  return HC_MEDICATION_PLAN_HOURS.reduce((slots, h) => {
-    const at = hcMedicationGridAt(planDate, h.key);
-    const ms = new Date(at).getTime();
-    if(!isFinite(ms) || ms < effectiveStartMs) return slots;
-    if(Number.isFinite(endMs) && ms > endMs) return slots;
-    let scheduled = false;
-    if(!intervalH){
-      scheduled = ms === anchorMs;
-    }else{
-      const diffMin = Math.round((ms - anchorMs) / 60000);
-      scheduled = diffMin >= 0 && diffMin % (intervalH * 60) === 0;
+  const intervalMs = intervalH ? intervalH * 3600000 : 0;
+  const firstIndex = intervalMs ? Math.max(0, Math.ceil((Math.max(planStartMs,earliestMs)-anchorMs)/intervalMs)) : 0;
+  const slots = [];
+  for(let index=firstIndex; index<firstIndex+72; index++){
+    const ms = anchorMs + index*intervalMs;
+    if(ms >= planEndMs || (Number.isFinite(treatmentEndMs) && ms > treatmentEndMs)) break;
+    if(ms >= planStartMs && ms >= earliestMs){
+      const at = hcLocalDateTimeValue(new Date(ms));
+      slots.push({ at, key:`${item.id}|${at}`, gridKey:at.slice(11,13), time:at.slice(11,16) });
     }
-    if(scheduled) slots.push({ at, key:`${item.id}|${at}`, gridKey:h.key, time:h.label });
-    return slots;
-  }, []);
+    if(!intervalMs) break;
+  }
+  return slots;
 }
 function hcScheduledMedicationHasDisplaySlot(item, planDate = hcCurrentMedicationPlanDate()){
   if(!hcIsMedicationOrderItem(item) || hcIsIntermittentInfusionItem(item)) return true;
@@ -13799,10 +13821,23 @@ function renderSV(){
 
     $("#sv_ta_sys")?.addEventListener("input", updateTAM);
     $("#sv_ta_dia")?.addEventListener("input", updateTAM);
+    const colorSVInputs=()=>{
+      const limits={sv_ta_sys:[90,140],sv_ta_dia:[60,90],sv_tam:[65,105],sv_fc:[50,100],sv_fr:[12,20],sv_temp:[36,37.5],sv_sat:[94,100],sv_glucemia:[70,180]};
+      Object.entries(limits).forEach(([id,[min,max]])=>{
+        const input=document.getElementById(id); if(!input) return;
+        input.classList.remove("sv-good","sv-bad");
+        const cls=svValueClass(input.value,min,max);
+        if(cls!=="sv-neutral") input.classList.add(cls);
+      });
+    };
+    ["sv_ta_sys","sv_ta_dia","sv_fc","sv_fr","sv_temp","sv_sat","sv_glucemia"].forEach(id=>document.getElementById(id)?.addEventListener("input",colorSVInputs));
+    $("#sv_ta_sys")?.addEventListener("input",colorSVInputs);
+    $("#sv_ta_dia")?.addEventListener("input",colorSVInputs);
     $("#btnSaveSV").onclick = saveSV;
 
     if(isEditing){
       fillSVFormFromRecord(arr[svEditIndex]);
+      colorSVInputs();
       $("#btnCancelSVEdit")?.addEventListener("click", ()=>{
         resetSVEditState();
         renderSV();
@@ -13924,13 +13959,13 @@ function renderSVCharts(arr){
 
   box.innerHTML = `
     <div class="svChartsGrid">
-      ${buildSVChartCard("TAS", "mmHg", last, r => numOrNull(r.ta_sys), 90, 160)}
-      ${buildSVChartCard("TAD", "mmHg", last, r => numOrNull(r.ta_dia), 50, 100)}
-      ${buildSVChartCard("TAM", "mmHg", last, r => numOrNull(calcTAM(r.ta_sys, r.ta_dia)), 65, 110)}
-      ${buildSVChartCard("FC", "lpm", last, r => numOrNull(r.fc), 50, 120)}
-      ${buildSVChartCard("FR", "rpm", last, r => numOrNull(r.fr), 8, 30)}
-      ${buildSVChartCard("Temp", "°C", last, r => numOrNull(r.temp), 35, 38.5)}
-      ${buildSVChartCard("SatO₂", "%", last, r => numOrNull(r.sat), 92, 100)}
+      ${buildSVChartCard("TAS", "mmHg", last, r => numOrNull(r.ta_sys), 90, 140)}
+      ${buildSVChartCard("TAD", "mmHg", last, r => numOrNull(r.ta_dia), 60, 90)}
+      ${buildSVChartCard("TAM", "mmHg", last, r => numOrNull(calcTAM(r.ta_sys, r.ta_dia)), 65, 105)}
+      ${buildSVChartCard("FC", "lpm", last, r => numOrNull(r.fc), 50, 100)}
+      ${buildSVChartCard("FR", "rpm", last, r => numOrNull(r.fr), 12, 20)}
+      ${buildSVChartCard("Temp", "°C", last, r => numOrNull(r.temp), 36, 37.5)}
+      ${buildSVChartCard("SatO₂", "%", last, r => numOrNull(r.sat), 94, 100)}
       ${buildSVChartCard("Glucemia", "mg%", last, r => numOrNull(r.glucemia), 70, 180)}
     </div>
   `;
@@ -14014,7 +14049,7 @@ function buildSVChartCard(title, unit, rows, getter, minNormal, maxNormal){
     const valY = y < 24 ? y + 16 : y - 10;
 
     return `
-      <circle class="svChartDot" cx="${x}" cy="${y}" r="3"></circle>
+      <circle class="svChartDot ${cls}" cx="${x}" cy="${y}" r="3"></circle>
       <text class="svChartLabel" x="${x}" y="${H-8}" text-anchor="middle">${escHTML(p.label)}</text>
       <text class="svChartValue ${cls}" x="${x}" y="${valY}" text-anchor="middle">${p.value}</text>
     `;
@@ -14026,7 +14061,7 @@ function buildSVChartCard(title, unit, rows, getter, minNormal, maxNormal){
     <div class="svChartCard">
       <div class="svChartTitle">
         <span>${escHTML(title)}</span>
-        <span class="svChartSub">Último: ${lastVal} ${escHTML(unit)}</span>
+        <span class="svChartSub ${svValueClass(lastVal,minNormal,maxNormal)}">Último: ${lastVal} ${escHTML(unit)}</span>
       </div>
       <svg class="svChartSvg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
         <line class="svChartAxis" x1="${PL}" y1="${H-PB}" x2="${W-PR}" y2="${H-PB}"></line>
@@ -17529,6 +17564,13 @@ function renderIMG(){
     return;
   }
   const p = findPatient(pid);
+  const drafts=window.__hcImageRequestDrafts || (window.__hcImageRequestDrafts={});
+  const draft=drafts[pid] || (drafts[pid]={studies:[],note:""});
+  if(root.dataset.imgDraftPatient === String(pid) && root.querySelector("[data-img-study]")){
+    draft.studies=Array.from(root.querySelectorAll("[data-img-study]:checked")).map(el=>el.value);
+    draft.note=root.querySelector("#imgReqNote")?.value || draft.note;
+  }
+  root.dataset.imgDraftPatient=String(pid);
   const { cl, cur } = hcEnsureClinicalPatient(pid);
   cur.imageRequests = Array.isArray(cur.imageRequests) ? cur.imageRequests : [];
   cur.imageResults = Array.isArray(cur.imageResults) ? cur.imageResults : [];
@@ -17538,22 +17580,40 @@ function renderIMG(){
   root.innerHTML = `<div class="imgWorkspaceGrid">
     <div class="card moduleTinyCard imgRequestCard">
       <div class="labSectionTitle">Solicitar estudio</div>
-      ${isMedico ? `<div class="field"><label>Estudios disponibles</label><select id="imgReqStudies" multiple size="5">${catalog.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="field" style="margin-top:6px;"><label>Motivo / observaciones</label><textarea id="imgReqNote" placeholder="Motivo clínico, región, contraste, urgencia..."></textarea></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:11px;">Las solicitudes las realiza el médico.</div>`}
+      ${isMedico ? `<div class="field"><label>Estudios disponibles</label><div class="imgStudyOptions">${catalog.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-img-study value="${hcEscAttr(x)}" ${draft.studies.includes(x) ? "checked" : ""}><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="field" style="margin-top:6px;"><label>Motivo / observaciones</label><textarea id="imgReqNote" placeholder="Motivo clínico, región, contraste, urgencia...">${escHTML(draft.note)}</textarea></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:11px;">Las solicitudes las realiza el médico.</div>`}
       <div style="margin-top:9px;"><div class="labSectionTitle">Pendientes</div><div class="imgPendingList">${pending.length ? pending.map(r=>`<div class="moduleListItem"><b>${escHTML((r.studies||[]).join(", "))}</b><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="margin-top:4px;font-size:11px;white-space:pre-wrap;">${escHTML(r.note)}</div>` : ``}</div>`).join("") : `<div class="muted" style="font-size:11px;">Sin solicitudes pendientes.</div>`}</div></div>
     </div>
     <div class="card moduleTinyCard imgViewerCard">
       <div class="labSectionTitle">Imágenes e informes</div>
+      ${canView ? `<div class="imgExternalPortal"><b>Consultar estudios en Informe Médico</b><div class="moduleMeta">Paciente abierto: DNI ${escHTML(p?.dni || "—")}. Abra el portal y pegue el DNI en su buscador.</div><button type="button" class="btn small" id="imgOpenExternalPortal">Copiar DNI y abrir portal</button></div>` : ``}
       ${isImagenologo ? `<details class="imgReportForm" open><summary>Cargar estudio e informe</summary><div class="row" style="margin-top:8px;"><div class="field"><label>Solicitud asociada</label><select id="imgResultReq"><option value="">— Nueva / sin solicitud —</option>${pending.map(r=>`<option value="${hcEscAttr(r.id)}">${escHTML((r.studies||[]).join(", "))}</option>`).join("")}</select></div><div class="field"><label>Modalidad</label><select id="imgResultModality">${modalityOptions.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div></div><div class="field" style="margin-top:6px;"><label>Nombre del estudio informado</label><input id="imgResultStudy" placeholder="Ej: TAC de tórax con contraste" /></div><div class="field" style="margin-top:6px;"><label>Página web / PACS / visor externo</label><input id="imgResultUrl" placeholder="https://..." /></div><div class="field" style="margin-top:6px;"><label>Adjuntar imágenes, serie, PDF o película</label><input id="imgResultFiles" type="file" accept="image/*,video/mp4,video/webm,application/pdf,.pdf,.dcm,.dicom" multiple /></div><div class="imgUploadHelp">Se visualizan JPG/PNG/WebP, PDF y películas MP4/WebM. Para estudios DICOM completos o películas grandes, use el enlace del PACS/visor externo. Las imágenes se comprimen para no saturar la sincronización.</div><div class="field" style="margin-top:6px;"><label>Informe</label><textarea id="imgResultReport" placeholder="Informe del estudio"></textarea></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgResult" type="button">Guardar estudio e informe</button></div></details>` : ``}
       ${canView ? `<div class="imgResultsList">${results.length ? results.map(r=>{
         const files=Array.isArray(r.files)?r.files:[]; const url=hcImageSafeUrl(r.url); return `<article class="imgResultItem"><div class="imgResultHead"><div><span class="imgResultTitle">${escHTML(r.study || "Estudio")}</span>${r.modality?`<span class="imgModalityBadge">${escHTML(r.modality)}</span>`:""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.reportedAt||""))} • ${escHTML(r.reportedByName||"—")} • ${files.length} adjunto${files.length===1?"":"s"}</div></div><div class="imgResultActions">${files.length?`<button class="btn primary small" type="button" data-img-open="${hcEscAttr(r.id)}" data-img-index="0">Abrir estudio</button>`:""}${url?`<button class="btn small" type="button" data-img-url="${hcEscAttr(url)}">Abrir web/PACS</button>`:""}<button class="btn small" type="button" data-img-print="${hcEscAttr(r.id)}">Imprimir</button></div></div><div class="imgReportText">${escHTML(r.report || "Sin informe escrito.")}</div>${hcRenderAttachments(files,r.id)}</article>`;
       }).join("") : `<div class="muted" style="font-size:12px;">Todavía no hay imágenes ni informes cargados.</div>`}</div>` : `<div class="muted" style="font-size:12px;">Este perfil no tiene acceso al visor de imágenes.</div>`}
     </div>
   </div>`;
+  root.querySelectorAll("[data-img-study]").forEach(box=>box.addEventListener("change",()=>{
+    draft.studies=Array.from(root.querySelectorAll("[data-img-study]:checked")).map(el=>el.value);
+  }));
+  $("#imgReqNote")?.addEventListener("input",()=>{ draft.note=$("#imgReqNote")?.value || ""; });
+  $("#imgOpenExternalPortal")?.addEventListener("click", async()=>{
+    const dni=String(p?.dni || "").replace(/\D/g,"");
+    const portal="https://portal.informemedico.com.ar/";
+    const tab=window.open(portal,"_blank");
+    if(tab) tab.opener=null;
+    if(dni){
+      let copied=false;
+      try{ await navigator.clipboard.writeText(dni); copied=true; }catch(_){ }
+      if(!copied) window.prompt("Copie el DNI para buscarlo en el portal:",dni);
+      else toast("DNI copiado. Péguelo en la búsqueda del portal.");
+    }
+    if(!tab) toast("El navegador bloqueó el portal. Permita las ventanas emergentes.");
+  });
   $("#btnSaveImgReq")?.addEventListener("click", ()=>{
-    const studies = Array.from($("#imgReqStudies")?.selectedOptions || []).map(o=>o.value);
+    const studies = Array.from(root.querySelectorAll("[data-img-study]:checked")).map(o=>o.value);
     if(!studies.length) return alert("Elegí al menos un estudio.");
     const req = { id:uid("imgreq"), studies, note:($("#imgReqNote")?.value||"").trim(), createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name, completed:false };
-    cur.imageRequests.push(req); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó imágenes para ${buildPatientDisplayName(p)}`, pid); renderIMG();
+    cur.imageRequests.push(req); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó imágenes para ${buildPatientDisplayName(p)}`, pid); draft.studies=[]; draft.note=""; root.dataset.imgDraftPatient=""; renderIMG();
   });
   $("#imgResultReq")?.addEventListener("change", ()=>{ const req=pending.find(r=>r.id===$("#imgResultReq")?.value); if(req && !($("#imgResultStudy")?.value||"").trim()) $("#imgResultStudy").value=(req.studies||[]).join(", "); });
   $("#btnSaveImgResult")?.addEventListener("click", async ()=>{
@@ -22486,8 +22546,8 @@ function patientHasPendingNurseAlert(patientId){
         <div class="hcRxMedicationGrid">
           <div class="hcRxCompactMain">
             <div class="hcRxCompactDrug" title="${escHTML(title)}">${escHTML(title)}</div>
-            <div class="hcRxCompactPrep" title="${escHTML(subtitle)}">${escHTML(subtitle)}</div>
           </div>
+          <div class="hcRxMedicationSchedule ${needsAttention ? "is-due" : ""}" title="${escHTML(subtitle)}">${escHTML(subtitle)}</div>
           <div class="hcRxMedicationControls">
             ${pendingAck ? `<label class="btn small hcRxMedicationAck"><input type="checkbox" data-pr-action="nurse-ack" data-pr-id="${id}">⚠ Visto</label>` : ``}
             ${dueSlot ? `<label class="btn small primary hcRxMedicationAck"><input type="checkbox" data-pr-action="dose-administered" data-pr-id="${id}" data-slot-key="${escHTML(dueSlot.key)}" data-slot-at="${escHTML(dueSlot.at)}">Administrado ${escHTML(String(dueSlot.at || "").slice(11,16))}</label><button type="button" class="btn small" data-pr-action="dose-observation" data-pr-id="${id}" data-slot-key="${escHTML(dueSlot.key)}" data-slot-at="${escHTML(dueSlot.at)}">Obs</button>` : ``}
@@ -24217,15 +24277,13 @@ function patientHasPendingNurseAlert(patientId){
   const currentContinua = currentEVMode === "continua";
   const currentManualStartTouched = root.dataset.prStartTouched === "1";
   const currentDefaultMedicationAnchor = hcNextMedicationGridSlot(new Date());
-  const currentDefaultMedicationStartAt = currentDefaultMedicationAnchor.at || isoFromNow();
+  const currentDefaultMedicationStartAt = isoFromNow();
   const currentIsRegladaForDefault = !!currentDrug && (!currentIVMode || currentBolo);
   const currentIsInfusionForDefault = !!currentDrug && currentIVMode && !currentBolo;
   const currentAmiodaroneAutoNow = currentAmiodarone && currentIVMode && currentProgramada && !isEditingPrescription && !currentManualStartTouched;
-  const currentStartAt = currentManualStartTouched && root.dataset.prStartAt
+  const currentStartAt = (currentManualStartTouched || isEditingPrescription) && root.dataset.prStartAt
     ? root.dataset.prStartAt
-    : (currentIsRegladaForDefault
-      ? currentDefaultMedicationStartAt
-      : (currentIsInfusionForDefault ? currentDefaultMedicationStartAt : (root.dataset.prStartAt || isoFromNow())));
+    : currentDefaultMedicationStartAt;
   if(!currentManualStartTouched){
     root.dataset.prStartAt = currentStartAt;
     if(currentAmiodaroneAutoNow) root.dataset.prStartSource = "amiodarona";
@@ -24392,6 +24450,13 @@ function patientHasPendingNurseAlert(patientId){
           </div>
         ` : ``}
 
+        ${currentIVMode && currentContinua ? `
+          <div class="card hcPrescriptionStartBox" style="margin-top:10px;padding:8px;">
+            <div class="field"><label>Momento de inicio</label><input id="prStartAtInput" type="datetime-local" value="${escHTML(currentStartAt)}" /></div>
+            <div class="muted" style="font-size:11px;margin-top:4px;">Puede elegir fecha y hora. Si no la cambia, se usa el momento de guardar.</div>
+          </div>
+        ` : ``}
+
         ${currentIVMode && currentProgramada && !currentAmiodarone ? `
           <div class="card" style="margin-top:10px; padding:8px; border-color:rgba(255,165,0,.28); background:rgba(255,165,0,.07);">
             <div style="font-size:12px; font-weight:900; color:#f6ad55; margin-bottom:8px;">Infusión EV no continua / programada</div>
@@ -24431,7 +24496,7 @@ function patientHasPendingNurseAlert(patientId){
                 <input id="prEndAtInput" type="datetime-local" value="${escHTML(currentEndAt)}" />
               </div>
             </div>
-            <div class="muted" style="font-size:11px; margin-top:6px;">El inicio queda con fecha y hora actual en forma predeterminada, pero puede elegirse cualquier fecha/hora. La tabla de enfermería se organiza en casilleros de 1 hora.</div>
+            <div class="muted" style="font-size:11px; margin-top:6px;">El inicio queda con fecha y hora actual en forma predeterminada, pero puede elegirse cualquier fecha/hora. Enfermería verá y registrará la hora exacta indicada.</div>
           </div>
         ` : ``}
 
@@ -25234,10 +25299,16 @@ function patientHasPendingNurseAlert(patientId){
     };
     if(prStartPlanDateInput) prStartPlanDateInput.addEventListener("change", syncMedicationPlanStart);
     if(prStartGridHourSel) prStartGridHourSel.addEventListener("change", syncMedicationPlanStart);
-    if(prStartAtInput) prStartAtInput.addEventListener("change", ()=>{
-      root.dataset.prStartTouched = "1";
-      syncMedicationPlanStart();
-    });
+    if(prStartAtInput){
+      prStartAtInput.addEventListener("input", ()=>{
+        root.dataset.prStartTouched = "1";
+        root.dataset.prStartAt = prStartAtInput.value;
+      });
+      prStartAtInput.addEventListener("change", ()=>{
+        root.dataset.prStartTouched = "1";
+        syncMedicationPlanStart();
+      });
+    }
     if(prTreatmentDaysInput) prTreatmentDaysInput.addEventListener("input", syncTreatmentEndFromDays);
     if(prDurationUnitSel) prDurationUnitSel.addEventListener("change", ()=>{
       root.dataset.prDurationUnit = prDurationUnitSel.value || "days";
@@ -25960,9 +26031,9 @@ function patientHasPendingNurseAlert(patientId){
         const w = Number(String($("#prWeightInput")?.value || "").replace(",","."));
         const nowAtClick = isoNowLocalFull();
         const manualStartValue = $("#prStartAtInput")?.value || root.dataset.prStartAt || "";
-        const startAtInput = root.dataset.prStartTouched === "1" && manualStartValue
+        const startAtInput = manualStartValue && (root.dataset.prStartTouched === "1" || !!root.dataset.prEditingId)
           ? manualStartValue
-          : ((!ivMode || isBolo || isProgramada) ? hcDefaultMedicationStartAtNow() : nowAtClick);
+          : nowAtClick;
         const durationUnitInput = $("#prDurationUnitSel")?.value || root.dataset.prDurationUnit || ($("#prHoursInput") ? "hours" : "days");
         const treatmentDaysInput = durationUnitInput === "days" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prTreatmentDays || "") : "";
         const treatmentHoursInput = $("#prHoursInput")?.value || root.dataset.prHours || "";
@@ -26126,7 +26197,7 @@ function patientHasPendingNurseAlert(patientId){
         const editingPrevious = editingIdx >= 0 ? cl2[pid].prescripciones.infusionesContinuas[editingIdx] : null;
 
         const gridScheduleStartAt = (isBolo || !ivMode || isProgramada)
-          ? (hcNextMedicationGridSlot(startAtInput || nowAtClick).at || startAtInput || nowAtClick)
+          ? startAtInput
           : "";
         const intervalHoursForOrder = isProgramada ? hcMedicationFrequencyHours(regularidadFinal) : null;
         const preparedDurationForOrder = isProgramada && mlh > 0 && vol > 0 ? vol/mlh : 0;
@@ -26153,7 +26224,7 @@ function patientHasPendingNurseAlert(patientId){
           treatmentHours: endIsOnePrepared ? "" : (treatmentHoursInput || ""),
           preparedDurationHours: isProgramada && preparedDurationForOrder > 0 ? preparedDurationForOrder : null,
           durationUnit: durationUnitInput,
-          medicationScheduleStartAt: (isBolo || !ivMode || (isProgramada && !(isAmiodarone && !isBolo))) ? gridScheduleStartAt : "",
+          medicationScheduleStartAt: (isBolo || !ivMode || isProgramada) ? gridScheduleStartAt : "",
           medicationScheduleEndAt: (isBolo || !ivMode || (isProgramada && !(isAmiodarone && !isBolo))) ? treatmentEndAtForSave : "",
           administrationRecords: [],
 
@@ -26270,8 +26341,8 @@ function patientHasPendingNurseAlert(patientId){
           createdAt: nowAtClick,
           startedAt: startAtInput || nowAtClick,
           startAt: startAtInput || nowAtClick,
-          currentBagStartedAt: ivMode && !isBolo ? (isProgramada ? "" : (drug.noGammas ? (startAtInput || nowAtClick) : nowAtClick)) : "",
-          currentPreparedStartedAt: ivMode && !isBolo && !drug.noGammas ? (isProgramada ? "" : nowAtClick) : "",
+          currentBagStartedAt: ivMode && !isBolo ? (isProgramada ? "" : startAtInput) : "",
+          currentPreparedStartedAt: ivMode && !isBolo && !drug.noGammas ? (isProgramada ? "" : startAtInput) : "",
           intermittentInfusionRunning: false,
           currentInfusionSlotKey: "",
           currentInfusionScheduledAt: "",
@@ -45119,7 +45190,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v254';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v255';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -46078,7 +46149,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 254;
+  const CURRENT_VERSION = 255;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46160,8 +46231,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v254";
-    document.title = "HC Demo v254 · Supabase";
+    window.HC_DEMO_VERSION = "v255";
+    document.title = "HC Demo v255 · Supabase";
   }catch(_){}
 })();
 </script>
