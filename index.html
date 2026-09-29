@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v252 · Horarios y alarmas de infusiones · Supabase</title>
+<title>HC Demo v253 · Alertas de prescripciones · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -11059,7 +11059,9 @@ function hcClearStaleNurseAlertsForPatientItems(items){
     if(!item || !item.pendingNurseAlert) return;
 
     // Si la orden ya no está activa o ya fue vista, no debe seguir encendiendo el censo.
-    if(item.active === false || item.finishedAt || item.suspendedAt || nurseAckSuppressesPendingAlert(item)){
+    const medicationWithoutPlan = hcIsMedicationOrderItem(item) && !hcIsIntermittentInfusionItem(item) &&
+      !hcScheduledMedicationHasDisplaySlot(item);
+    if(item.active === false || item.finishedAt || item.suspendedAt || nurseAckSuppressesPendingAlert(item) || medicationWithoutPlan){
       item.pendingNurseAlert = false;
       item.pendingNurseField = "";
       item.pendingHydrationChangeAlert = false;
@@ -11280,6 +11282,14 @@ function hcMedicationSlotsForDate(item, planDate){
     return slots;
   }, []);
 }
+function hcScheduledMedicationHasDisplaySlot(item, planDate = hcCurrentMedicationPlanDate()){
+  if(!hcIsMedicationOrderItem(item) || hcIsIntermittentInfusionItem(item)) return true;
+  const dates = [planDate];
+  const firstDate = String(hcMedicationFirstDoseAt(item) || "").slice(0,10);
+  if(firstDate > planDate) dates.push(firstDate);
+  for(let offset=1; offset<=7; offset++) dates.push(hcDateKeyAddDays(planDate,offset));
+  return [...new Set(dates.filter(Boolean))].some(dateKey => hcMedicationSlotsForDate(item,dateKey).length > 0);
+}
 function hcMedicationSlotIsDue(slot, now = new Date()){
   const at = new Date(slot?.at || "");
   return !isNaN(at.getTime()) && at.getTime() <= now.getTime();
@@ -11347,6 +11357,7 @@ function hcNursePrescriptionTasks(items, now = new Date()){
   const planDate = hcCurrentMedicationPlanDate();
   (Array.isArray(items) ? items : []).forEach(item=>{
     if(!item || hcIsDeletedPrescriptionItem(item) || item.active === false || hcIsTerminalPrescriptionItem(item,now.getTime())) return;
+    if(hcIsMedicationOrderItem(item) && !hcIsIntermittentInfusionItem(item) && !hcScheduledMedicationHasDisplaySlot(item,planDate)) return;
     const name = item.drugName || String(item.text || "").slice(0,32) || "Indicación";
     const needsAck = !!item.pendingNurseAlert && !nurseAckSuppressesPendingAlert(item);
     if(needsAck) tasks.push({itemId:item.id,kind:"visto",name,label:item.pendingNurseField || "Nueva indicación"});
@@ -22267,13 +22278,8 @@ function patientHasPendingNurseAlert(patientId){
     });
 
     const visibleRows = preparedRows.filter(row => row.slots.length > 0);
-    const hiddenFinishedCount = Math.max(0, preparedRows.length - visibleRows.length);
-
     if(!visibleRows.length){
-      const extra = hiddenFinishedCount
-        ? `<div class="medScheduleExpiredNotice">${hiddenFinishedCount} prescripción/es finalizada/s no se muestran en el plan actual. Puede consultarlas seleccionando una fecha anterior.</div>`
-        : "";
-      return `<div class="muted" style="font-size:12px;">${historicalView ? "Sin medicación reglada archivada para este día." : "Sin medicación reglada activa para este plan."}</div>${extra}`;
+      return `<div class="muted" style="font-size:12px;">${historicalView ? "Sin medicación reglada archivada para este día." : "Sin medicación reglada activa para este plan."}</div>`;
     }
 
     const meNow = getCurrentUser ? getCurrentUser() : null;
@@ -22405,10 +22411,6 @@ function patientHasPendingNurseAlert(patientId){
       slots.some(slot => hcMedicationSlotNeedsAlert(item, slot, now))
     );
 
-    const hiddenNotice = hiddenFinishedCount && !historicalView
-      ? `<div class="medScheduleExpiredNotice">${hiddenFinishedCount} prescripción/es finalizada/s fueron apartadas del plan actual para evitar filas vacías. Continúan disponibles en el historial por fecha.</div>`
-      : "";
-
     return `
       <div class="medScheduleBox ${scheduleNeedsAttention ? "hcNurseScheduleAlert" : ""}">
         <div class="medScheduleTools medScheduleToolsCompact">
@@ -22426,7 +22428,6 @@ function patientHasPendingNurseAlert(patientId){
             <tbody>${allRows}</tbody>
           </table>
         </div>
-        ${hiddenNotice}
       </div>`;
   }
 
@@ -45033,7 +45034,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v252';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v253';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -45992,7 +45993,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 252;
+  const CURRENT_VERSION = 253;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46054,7 +46055,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 
   // El horario puede vencer sin interacción del usuario: actualizar el censo
   // y la pestaña de Prescripciones para que la alarma aparezca a tiempo.
-  if(!window.__hcV252NurseAlarmTimer){
+  if(!window.__hcV253NurseAlarmTimer){
     const refreshNurseDueAlarms = ()=>{
       try{
         if(document.hidden || getCurrentUser?.()?.role !== "enfermero") return;
@@ -46067,14 +46068,14 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
         }
       }catch(_){ }
     };
-    window.__hcV252NurseAlarmTimer = setInterval(refreshNurseDueAlarms,15000);
+    window.__hcV253NurseAlarmTimer = setInterval(refreshNurseDueAlarms,15000);
     window.addEventListener("focus",refreshNurseDueAlarms);
     document.addEventListener("visibilitychange",()=>{ if(!document.hidden) refreshNurseDueAlarms(); });
   }
 
   try{
-    window.HC_DEMO_VERSION = "v252";
-    document.title = "HC Demo v252 · Supabase";
+    window.HC_DEMO_VERSION = "v253";
+    document.title = "HC Demo v253 · Supabase";
   }catch(_){}
 })();
 </script>
