@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v257 · Protocolos fijos de heparina e insulina · Supabase</title>
+<title>HC Demo v258 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5590,6 +5590,31 @@ html::-webkit-scrollbar-corner{
 
 </style>
 
++<style id="hcV258HemotherapyStyles">
+#medPres .hcRxVasoactiveDose{display:block;font-size:9px;line-height:1.05;font-weight:800;color:#e1efff;margin-top:2px}
+#medPres .hcRxCompactMlh:has(.hcRxVasoactiveDose){min-width:94px}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc .hcInfusionFlowDot,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma .hcInfusionFlowDot,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets .hcInfusionFlowDot{box-shadow:none;transform:scale(.9)}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc .hcInfusionFlowDot{width:8px;flex-basis:8px;height:10px;border:0;border-radius:55% 55% 55% 8%;transform:rotate(-45deg) scale(.8);background:#fb7185}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma .hcInfusionFlowDot{border-color:#fde68a;background:#facc15}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets .hcInfusionFlowDot{width:10px;flex-basis:10px;height:5px;border-radius:999px;border-color:#fda4af;background:#ef4444}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc.is-active .hcInfusionFlowDot{animation:hcV258RbcPulse 1.35s linear infinite;animation-delay:calc(var(--flow-i)*.12s)}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma.is-active .hcInfusionFlowDot{animation:hcV258PlasmaPulse 1.35s linear infinite;animation-delay:calc(var(--flow-i)*.12s)}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets.is-active .hcInfusionFlowDot{animation:hcV258PlateletPulse 1.35s linear infinite;animation-delay:calc(var(--flow-i)*.12s)}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc .hcInfusionFlowArrow{color:#fb7185}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma .hcInfusionFlowArrow{color:#facc15}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets .hcInfusionFlowArrow{color:#ef4444}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc.is-active .hcInfusionFlowArrow,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma.is-active .hcInfusionFlowArrow,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets.is-active .hcInfusionFlowArrow{animation:none}
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc.is-paused .hcInfusionFlowDot,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma.is-paused .hcInfusionFlowDot,
+#medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets.is-paused .hcInfusionFlowDot{animation:none;opacity:.5}
+@keyframes hcV258RbcPulse{0%,15%{background:#ff253f;box-shadow:0 0 10px #ff253f;transform:rotate(-45deg) scale(1.25)}28%,100%{background:#7f1d1d;box-shadow:none;transform:rotate(-45deg) scale(.8)}}
+@keyframes hcV258PlasmaPulse{0%,15%{background:#fde047;box-shadow:0 0 10px #fde047;transform:scale(1.28)}28%,100%{background:#854d0e;box-shadow:none;transform:scale(.82)}}
+@keyframes hcV258PlateletPulse{0%,15%{background:#fb7185;box-shadow:0 0 10px #fb7185;transform:scale(1.28)}28%,100%{background:#7f1d1d;box-shadow:none;transform:scale(.82)}}
+</style>
 </head>
 
 <body>
@@ -17734,6 +17759,17 @@ function renderNUT(){
   $("#btnSaveNutEvo")?.addEventListener("click", ()=>{ if(!isNut) return alert("Solo el personal de Nutrición puede cargar evoluciones."); const text = ($("#nutEvoTxt")?.value || "").trim(); if(!text) return alert("Escribí una evolución."); cur.nutritionEvolutions.push({id:uid("nutevo"), text, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name}); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`guardó evolución de Nutrición de ${buildPatientDisplayName(p)}`, pid); renderNUT(); });
 }
 
+function hcHemotherapyProductKind(item){
+  const normalized = String(item||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(normalized.includes("globulos rojos")) return "rbc";
+  if(normalized.includes("plasma fresco")) return "plasma";
+  if(normalized.includes("plaquetas")) return "platelets";
+  return "";
+}
+function hcHemotherapyProductName(kind){
+  return kind==="rbc" ? "Unidad de glóbulos rojos" : kind==="plasma" ? "Plasma fresco congelado" : kind==="platelets" ? "Plaquetas" : "Hemoderivado";
+}
+
 function renderHEMO(){
   const root = $("#medHemoterapia");
   if(!root) return;
@@ -17763,8 +17799,16 @@ function renderHEMO(){
     <div style="margin-top:8px;"><button class="btn primary" id="btnSaveHemoReq" type="button">Guardar solicitud</button></div>
   ` : `<div class="muted" style="font-size:11px; margin-bottom:8px;">Las solicitudes son realizadas por el médico.</div>`;
 
+  const supportedHemoRequests = reqs.map(r=>({
+    request:r,
+    product:hcHemotherapyProductKind(r.item),
+    started:(cur.prescripciones?.infusionesContinuas || []).filter(it=>it?.hemotherapyRequestId === r.id && it?.hemotherapyProduct && !hcIsDeletedPrescriptionItem(it)).length
+  })).filter(x=>x.product);
+  const availableHemoRequests = supportedHemoRequests.filter(x=>x.started < Math.max(1,Number(x.request.qty)||1));
+
   const evolutionForm = isHemo ? `
     <div class="field"><label>Evolución / procedimiento realizado</label><textarea id="hemoEvoTxt" placeholder="Ej: Se administra 1 U de glóbulos rojos, sin reacciones adversas."></textarea></div>
+    ${availableHemoRequests.length ? `<div class="field" style="margin-top:8px;"><label>Solicitud de hemoderivado</label><select id="hemoAdministrationRequest"><option value="">Solo registrar evolución</option>${availableHemoRequests.map(x=>`<option value="${hcEscAttr(x.request.id)}">${escHTML(x.request.item)} • ${escHTML(dmyhmFromISODateTime(x.request.createdAt||""))} • ${x.started}/${Math.max(1,Number(x.request.qty)||1)} iniciada(s)</option>`).join("")}</select></div><label style="display:flex;align-items:center;gap:7px;margin-top:8px;font-weight:800;"><input id="hemoAdministrationStarted" type="checkbox" style="width:auto;margin:0;">Administración iniciada (crea fila en Prescripciones a 63 ml/h)</label>` : `<div class="muted" style="font-size:11px;margin-top:8px;">Sin solicitudes pendientes de glóbulos rojos, plasma o plaquetas.</div>`}
     <div style="margin-top:8px;"><button class="btn primary" id="btnSaveHemoEvo" type="button">Guardar evolución</button></div>
   ` : `<div class="muted" style="font-size:11px; margin-bottom:8px;">Solo el personal de Hemoterapia puede cargar evoluciones. El médico dispone de lectura.</div>`;
 
@@ -17778,6 +17822,7 @@ function renderHEMO(){
             <div class="moduleListItem">
               <b>${escHTML(r.item)}</b> • Cantidad: ${escHTML(r.qty||"—")}
               <div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>
+              ${supportedHemoRequests.find(x=>x.request.id===r.id) ? `<div class="moduleMeta">Administraciones iniciadas: ${supportedHemoRequests.find(x=>x.request.id===r.id).started} / ${Math.max(1,Number(r.qty)||1)}</div>` : ""}
               ${r.note ? `<div style="white-space:pre-wrap; margin-top:5px;">${escHTML(r.note)}</div>` : ""}
             </div>
           `).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes.</div>`}
@@ -17790,8 +17835,9 @@ function renderHEMO(){
         <div style="margin-top:10px;">
           ${evos.length ? evos.map(e=>`
             <div class="moduleListItem">
-              <div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div>
-              <div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div>
+               <div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div>
+               ${e.hemotherapyAdministrationStarted ? `<div class="moduleMeta" style="color:#fca5a5;font-weight:800;">Administración iniciada • ${escHTML(e.hemotherapyProductName||"Hemoderivado")} • 63 ml/h iniciales</div>` : ""}
+               <div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div>
             </div>
           `).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}
         </div>
@@ -17817,9 +17863,40 @@ function renderHEMO(){
     if(!isHemo) return alert("Solo el personal de Hemoterapia puede cargar evoluciones.");
     const text = ($("#hemoEvoTxt")?.value || "").trim();
     if(!text) return alert("Escribí una evolución.");
-    cur.hemotherapyEvolutions.push({id:uid("hemoevo"), text, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name});
+    const startAdministration = !!$("#hemoAdministrationStarted")?.checked;
+    const requestId = $("#hemoAdministrationRequest")?.value || "";
+    const selected = startAdministration ? availableHemoRequests.find(x=>String(x.request.id)===String(requestId)) : null;
+    if(startAdministration && !selected) return alert("Elegí la solicitud médica de glóbulos rojos, plasma o plaquetas para iniciar su administración.");
+    const at = isoNowLocalFull();
+    const evo = {id:uid("hemoevo"), text, createdAt:at, createdBy:me.username, createdByName:me.name};
+    if(selected){
+      const count = (cur.prescripciones?.infusionesContinuas || []).filter(it=>it?.hemotherapyRequestId===selected.request.id && it?.hemotherapyProduct && !hcIsDeletedPrescriptionItem(it)).length;
+      if(count >= Math.max(1,Number(selected.request.qty)||1)) return alert("La cantidad solicitada ya tiene sus administraciones iniciadas.");
+      const name = hcHemotherapyProductName(selected.product);
+      evo.hemotherapyAdministrationStarted = true;
+      evo.hemotherapyRequestId = selected.request.id;
+      evo.hemotherapyProductName = name;
+      hcEnsurePresArray(cur);
+      cur.prescripciones.infusionesContinuas.unshift({
+        id:uid("prhemo"), type:"infusion_continua", administrationMode:"continua",
+        continua:true, active:true, status:"activa", via:"EV",
+        drugId:"hemotherapy_"+selected.product, drugName:name, presentationLabel:name,
+        hemotherapyProduct:selected.product, hemotherapyRequestId:selected.request.id,
+        hemotherapyEvolutionId:evo.id, hemotherapyEvolutionText:text,
+        rateMlH:63, mlHour:63, mlHourLabel:"63",
+        preparationText:"1 unidad • Hemoterapia • volumen no informado",
+        totalAmountLabel:"1 unidad", diluent:"No aplica",
+        startedAt:at, startAt:at, createdAt:at, updatedAt:at,
+        createdById:me.id||me.username||"", createdByName:me.name||me.username||"",
+        administeredById:me.id||me.username||"", administeredByName:me.name||me.username||""
+      });
+      hcEnsurePrescriptionDailySnapshot(pid, cl);
+    }
+    cur.hemotherapyEvolutions.push(evo);
     cl[pid]=cur;
     setClinical(cl);
+    window.hc224MarkClinicalFieldDirty?.(pid,"hemotherapyEvolutions");
+    if(selected) window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
     hcBackendMarkLocalSavedSoon();
     hcBackendScheduleUrgentPush();
     logAction(`guardó evolución de Hemoterapia de ${buildPatientDisplayName(p)}`, pid);
@@ -22038,7 +22115,7 @@ function buildPreparedInfusionConsumptionRecord(item, meta, me, patientId){
 }
 
 function hcRegisterPharmacyConsumptionOnPrescriptionDelete(item, meta, me, patientId, prescripciones){
-  if(!item || !prescripciones || hcIsFreeTextPrescriptionItem(item)) return null;
+  if(!item || !prescripciones || hcIsFreeTextPrescriptionItem(item) || item.hemotherapyProduct) return null;
   if(item.deleteConsumptionRegisteredAt) return null;
 
   const now = isoNowLocalFull();
@@ -22726,7 +22803,7 @@ function patientHasPendingNurseAlert(patientId){
   }
 
   return items.map(it=>{
-    const meta = getDrugMeta(it.drugId) || {};
+    const meta = it.hemotherapyProduct ? {} : (getDrugMeta(it.drugId) || {});
     const isIntermittent = hcIsIntermittentInfusionItem(it);
     const intermittentRunning = isIntermittent && hcIntermittentInfusionIsRunning(it);
     const intermittentSchedule = isIntermittent && !historicalView ? hcIntermittentInfusionScheduleState(it, new Date()) : null;
@@ -22830,6 +22907,23 @@ function patientHasPendingNurseAlert(patientId){
       return scheduleLabel;
     })();
 
+    const vasoactiveDose = (()=>{
+      const vasoactiveId = ["noradrenalina","dopamina","dobutamina","nitroglicerina","nitroprusiato","vasopresina","milrinona"].includes(String(it.drugId||""));
+      const vasoactiveCategory = /vasopresor|inotr|inodilata|vasodilat/i.test(String(meta.categoria||""));
+      if(!vasoactiveId && !vasoactiveCategory) return "";
+      if(!hcIsContinuousInfusionDisplayItem(it) || !(mlh>0)) return "";
+      const volume = Number(it.volumeMl || it.finalVolumeMl || 0);
+      const weight = Number(it.weightKg || 0);
+      const total = Number(it.totalAmount || 0);
+      const calculated = it?.genericProtocol?.doseUnit
+        ? hcProtocolDoseFromMlHour(mlh,it.genericProtocol.doseUnit,weight,volume,total,it.totalAmountUnit)
+        : calcDoseFromMlHour(meta,mlh,volume,weight,total,it.totalAmountUnit);
+      const value = Number.isFinite(calculated) && calculated>0 ? calculated : Number(it.doseValue ?? it.dose);
+      if(!(value>0)) return "";
+      const label = it.doseUnitLabel || it.unitLabel || meta.unidadLabel || "";
+      return label ? `${formatDoseValue(value)} ${label}` : "";
+    })();
+
     const compactAlert = hydrationBlink
       ? `⚠ ${hydrationAlertText || it.pendingNurseField || "Cambio de hidratación"}`
       : (preparedBlink
@@ -22861,7 +22955,7 @@ function patientHasPendingNurseAlert(patientId){
           </div>
 
           ${!isMedicationWithoutIVInfusion ? `
-            <div class="hcInfusionFlowIndicator hcRxCompactFlow ${flowActive ? "is-active" : "is-paused"}"
+            <div class="hcInfusionFlowIndicator hcRxCompactFlow ${it.hemotherapyProduct ? "hcHemoFlow-"+it.hemotherapyProduct : ""} ${flowActive ? "is-active" : "is-paused"}"
                  title="${isIntermittent ? (flowActive ? "Infusión programada en curso" : "Infusión programada en espera") : (it.active ? "Infusión activa" : "Infusión pausada")}"
                  aria-label="${isIntermittent ? (flowActive ? "Infusión programada en curso" : "Infusión programada en espera") : (it.active ? "Infusión activa" : "Infusión pausada")}">
               <div class="hcInfusionFlowTrack" aria-hidden="true">
@@ -22875,7 +22969,7 @@ function patientHasPendingNurseAlert(patientId){
             ${!isMedicationWithoutIVInfusion ? `
               <div class="hcRxRateRow hcRxCompactRate">
                 ${canAdjust ? `<button class="btn small" data-pr-action="dose-down" data-pr-id="${it.id}" title="Bajar ml/h">↓</button>` : ``}
-                <div class="hcRxCompactMlh" style="color:${velocidadColor};">${escHTML(formatDoseValue(mlh))} ml/h</div>
+                <div class="hcRxCompactMlh" style="color:${velocidadColor};">${escHTML(formatDoseValue(mlh))} ml/h${vasoactiveDose ? `<span class="hcRxVasoactiveDose">${escHTML(vasoactiveDose)}</span>` : ""}</div>
                 ${canAdjust ? `<button class="btn small" data-pr-action="dose-up" data-pr-id="${it.id}" title="Subir ml/h">↑</button>` : ``}
               </div>
             ` : ``}
@@ -22923,7 +23017,7 @@ function patientHasPendingNurseAlert(patientId){
     const item = (Array.isArray(items) ? items : []).find(x => String(x?.id || "") === String(itemId || ""));
     if(!item) return;
 
-    const meta = getDrugMeta(item.drugId) || {};
+    const meta = item.hemotherapyProduct ? {} : (getDrugMeta(item.drugId) || {});
     const nombre = meta.nombre || item.drugName || item.drugId || "Medicación";
     const via = item.via || "—";
     const isBolo = item.type === "bolo_ev" || item.administrationMode === "bolo" || !!item.bolo;
@@ -23014,7 +23108,13 @@ function patientHasPendingNurseAlert(patientId){
           </div>
         </div>
 
-        ${protocolSnapshot ? `
+        ${item.hemotherapyProduct ? `
+          <div class="hcRxDetailsSection">
+            <div class="hcRxDetailsSectionTitle">Administración de Hemoterapia</div>
+            <div class="hcRxDetailsText">Iniciada por ${escHTML(item.administeredByName||"Hemoterapia")} • solicitud vinculada ${escHTML(item.hemotherapyRequestId||"—")}. El volumen de la unidad no fue informado; la duración no se calcula automáticamente.</div>
+            ${item.hemotherapyEvolutionText ? `<div class="hcRxDetailsText" style="margin-top:7px;">${escHTML(item.hemotherapyEvolutionText)}</div>` : ""}
+          </div>
+        ` : (protocolSnapshot ? `
           <div class="hcRxDetailsSection">
             <div class="hcRxDetailsSectionTitle">Protocolo aplicado al crear esta prescripción</div>
             <div class="hcRxDetailsGrid">
@@ -23037,7 +23137,7 @@ function patientHasPendingNurseAlert(patientId){
             <div class="hcRxDetailsSectionTitle">Protocolo institucional</div>
             <div class="hcRxDetailsText">Esta prescripción no tiene una modalidad de protocolo guardada asociada. Podés crearla desde “Editar protocolo”.</div>
           </div>
-        `}
+        `)}
 
         ${(item.renalAdjustmentText || item.renalWarnings || protocolSnapshot?.renal?.enabled || protocolSnapshot?.hepatic?.enabled) ? `
           <div class="hcRxDetailsSection">
@@ -26776,7 +26876,7 @@ function patientHasPendingNurseAlert(patientId){
       const idx = items.findIndex(x => x.id === id);
       if(idx < 0) return;
       const item = items[idx];
-      const name = getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación";
+      const name = item.hemotherapyProduct ? item.drugName : (getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación");
       if(!confirm(`¿Suspender ${name}?`)) return;
       item.active = false;
       item.editing = false;
@@ -26859,7 +26959,7 @@ function patientHasPendingNurseAlert(patientId){
       const id = btn.getAttribute("data-pr-id");
       const idx = items.findIndex(x => x.id === id);
       if(idx < 0) return;
-      const meta = getDrugMeta(items[idx].drugId);
+      const meta = items[idx].hemotherapyProduct ? {nombre:items[idx].drugName} : getDrugMeta(items[idx].drugId);
       items[idx].active = false;
       items[idx].editing = false;
       if(hcIsIntermittentInfusionItem(items[idx])){
@@ -26880,7 +26980,7 @@ function patientHasPendingNurseAlert(patientId){
     const id = btn.getAttribute("data-pr-id");
     const idx = items.findIndex(x => x.id === id);
     if(idx < 0) return;
-    const meta = getDrugMeta(items[idx].drugId);
+    const meta = items[idx].hemotherapyProduct ? {nombre:items[idx].drugName} : getDrugMeta(items[idx].drugId);
     items[idx].active = true;
     items[idx].editing = false;
     if(hcIsHydrationDisplayItem(items[idx])){
@@ -26923,7 +27023,7 @@ function patientHasPendingNurseAlert(patientId){
       const item = liveIdx >= 0 ? liveList[liveIdx] : items.find(x => x.id === id);
       if(!item) return;
 
-      const meta = getDrugMeta(item.drugId);
+      const meta = item.hemotherapyProduct ? {} : getDrugMeta(item.drugId);
       const name = hcIsFreeTextPrescriptionItem(item) ? "Indicación libre" : (meta?.nombre || item.drugName || "prescripción");
       if(!confirm(`¿Eliminar ${name}?
 
@@ -27346,7 +27446,12 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
       ev.preventDefault();
       ev.stopPropagation();
       const id = btn.getAttribute("data-pr-id") || "";
-      hcOpenPrescriptionDetailsModal(id, { historicalView: !isCurrentPlanView });
+      const item = items.find(x=>String(x?.id||"")===String(id));
+      const meta = item && !item.hemotherapyProduct ? getDrugMeta(item.drugId) : null;
+      const continuous = item && (item.type==="infusion_continua" || item.administrationMode==="continua" || item.continua===true);
+      if(continuous && (item.heparinProtocol || isHeparinaSodicaDrug(meta))) showHeparinProtocolModal(item);
+      else if(continuous && (item.insulinProtocol || isInsulinaCorrienteDrug(meta))) showInsulinProtocolModal(item);
+      else hcOpenPrescriptionDetailsModal(id, { historicalView: !isCurrentPlanView });
     });
   });
 
@@ -27402,13 +27507,13 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
     if(idx < 0) return;
 
     const item = items[idx];
-    const meta = getDrugMeta(item.drugId);
-    if(!meta) return;
+    const meta = item.hemotherapyProduct ? null : getDrugMeta(item.drugId);
+    if(!meta && !item.hemotherapyProduct) return;
 
     const currentMlh = Number(item.rateMlH ?? item.mlHour ?? 0);
     if(!isFinite(currentMlh)) return;
 
-    const step = hcInfusionMlStepForItem(item, meta);
+    const step = item.hemotherapyProduct ? 1 : hcInfusionMlStepForItem(item, meta);
     const configuredMinMlh = Number(item.minRateMlH || 0);
     const configuredMaxMlh = Number(item.maxRateMlH || 0);
     let nextMlh = Math.max(0, currentMlh + (direction > 0 ? step : -step));
@@ -27416,13 +27521,21 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
     if(direction < 0 && configuredMinMlh > 0) nextMlh = Math.max(nextMlh, configuredMinMlh);
     if(nextMlh <= 0 || Math.abs(nextMlh - currentMlh) < 1e-9) return;
 
-    if(!hcUpdateInfusionItemFromMlHour(item, meta, nextMlh)) return;
+    if(item.hemotherapyProduct){
+      item.rateMlH=nextMlh;
+      item.mlHour=nextMlh;
+      item.mlHourLabel=formatDoseValue(nextMlh);
+      item.updatedAt=isoNowLocalFull();
+      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
+      hcBackendMarkLocalSavedSoon();
+      hcBackendScheduleUrgentPush();
+    }else if(!hcUpdateInfusionItemFromMlHour(item, meta, nextMlh)) return;
 
     if((getCurrentUser ? getCurrentUser()?.role : "") === "medico"){
       markNurseAlert(item, "dosis / ml/h");
     }
     setClinical(cl2);
-    logAction(`Ajustó ml/h ${direction > 0 ? "hacia arriba" : "hacia abajo"}: ${meta.nombre} → ${formatDoseValue(item.mlHour)} ml/h (${formatDoseValue(item.doseValue)} ${item.doseUnitLabel || item.unitLabel || meta.unidadLabel || ""})`, pid);
+    logAction(`Ajustó ml/h ${direction > 0 ? "hacia arriba" : "hacia abajo"}: ${item.hemotherapyProduct ? item.drugName : meta.nombre} → ${formatDoseValue(item.mlHour)} ml/h${item.hemotherapyProduct ? "" : ` (${formatDoseValue(item.doseValue)} ${item.doseUnitLabel || item.unitLabel || meta.unidadLabel || ""})`}`, pid);
     renderPrescripciones();
   }
 
@@ -45330,7 +45443,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v257';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v258';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -46289,7 +46402,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 257;
+  const CURRENT_VERSION = 258;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46371,8 +46484,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v257";
-    document.title = "HC Demo v257 · Supabase";
+    window.HC_DEMO_VERSION = "v258";
+    document.title = "HC Demo v258 · Supabase";
   }catch(_){}
 })();
 </script>
