@@ -17805,6 +17805,9 @@ function renderHEMO(){
     started:(cur.prescripciones?.infusionesContinuas || []).filter(it=>it?.hemotherapyRequestId === r.id && it?.hemotherapyProduct && !hcIsDeletedPrescriptionItem(it)).length
   })).filter(x=>x.product);
   const availableHemoRequests = supportedHemoRequests.filter(x=>x.started < Math.max(1,Number(x.request.qty)||1));
+  const hemoInfusions = (cur.prescripciones?.infusionesContinuas || [])
+    .filter(it=>it?.hemotherapyProduct && !hcIsDeletedPrescriptionItem(it) && !hcIsTerminalPrescriptionItem(it))
+    .sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
 
   const evolutionForm = isHemo ? `
     <div class="field"><label>Evolución / procedimiento realizado</label><textarea id="hemoEvoTxt" placeholder="Ej: Se administra 1 U de glóbulos rojos, sin reacciones adversas."></textarea></div>
@@ -17832,6 +17835,10 @@ function renderHEMO(){
       <div class="card moduleTinyCard">
         <div class="labSectionTitle">Evoluciones de Hemoterapia</div>
         ${evolutionForm}
+        <div style="margin-top:12px;">
+          <div class="labSectionTitle">Hemoderivados en Prescripciones</div>
+          ${hemoInfusions.length ? hemoInfusions.map(it=>`<div class="moduleListItem" data-hemo-infusion-id="${hcEscAttr(it.id)}"><b>${escHTML(it.drugName||hcHemotherapyProductName(it.hemotherapyProduct))}</b> • ${it.active===false ? "Pausada" : "En curso"}<div class="moduleMeta">${escHTML(it.administeredByName||"Hemoterapia")} • ${escHTML(dmyhmFromISODateTime(it.startedAt||it.createdAt||""))}</div><div style="display:flex;align-items:center;gap:7px;margin-top:5px;">${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="-1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Bajar ml/h">↓</button>` : ""}<b>${escHTML(String(Number(it.rateMlH??it.mlHour??0)))} ml/h</b>${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Subir ml/h">↑</button>` : ""}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin hemoderivados activos.</div>`}
+        </div>
         <div style="margin-top:10px;">
           ${evos.length ? evos.map(e=>`
             <div class="moduleListItem">
@@ -17902,6 +17909,21 @@ function renderHEMO(){
     logAction(`guardó evolución de Hemoterapia de ${buildPatientDisplayName(p)}`, pid);
     renderHEMO();
   });
+  root.querySelectorAll("[data-hemo-rate]").forEach(btn=>btn.addEventListener("click",()=>{
+    if(!isHemo) return;
+    const item = (cur.prescripciones?.infusionesContinuas||[]).find(it=>String(it.id)===String(btn.dataset.hemoId));
+    if(!item?.hemotherapyProduct || item.active===false || hcIsTerminalPrescriptionItem(item)) return;
+    const current = Number(item.rateMlH??item.mlHour??0);
+    const next = Math.max(1,current+Number(btn.dataset.hemoRate||0));
+    if(!Number.isFinite(next) || next===current) return;
+    item.rateMlH=next;item.mlHour=next;item.mlHourLabel=String(next);
+    item.updatedAt=isoNowLocalFull();item.updatedByName=me.name||me.username||"";
+    cl[pid]=cur;setClinical(cl);
+    window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
+    hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+    logAction(`Hemoterapia ajustó ${item.drugName||"hemoderivado"} a ${next} ml/h`,pid);
+    renderHEMO();
+  }));
 }
 
 /* =========================================================
