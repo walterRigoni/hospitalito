@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v256 · Protocolos e imágenes · Supabase</title>
+<title>HC Demo v257 · Protocolos fijos de heparina e insulina · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -16715,6 +16715,16 @@ document.addEventListener("click", function(e){
       return;
     }
 
+    const kpttRow=(Array.isArray(r.resultRows)?r.resultRows:[]).find(row=>/kptt/i.test(String(row?.key||"")+" "+String(row?.label||"")));
+    const oldKptt=kpttRow ? Number(String(kpttRow.value||"").replace(",",".")) : null;
+    const kpttLine=txt.match(/^\s*KPTT(?:\s*\([^)]*\))?\s*:\s*(\d+(?:[,.]\d+)?)/im);
+    const correctedKptt=kpttLine ? Number(kpttLine[1].replace(",",".")) : null;
+    const kpttChanged=Number.isFinite(correctedKptt) && (!Number.isFinite(oldKptt) || correctedKptt!==oldKptt);
+    if(kpttLine){
+      r.resultRows=Array.isArray(r.resultRows)?r.resultRows:[];
+      if(kpttRow) kpttRow.value=kpttLine[1];
+      else r.resultRows.push({key:"kptt",label:"KPTT",unit:"seg",ref:"",value:kpttLine[1]});
+    }
     r.prettyText = txt;
     r.resultText = txt;
     r.editedAt = isoNowLocalFull();
@@ -16722,7 +16732,20 @@ document.addEventListener("click", function(e){
     r.editedByName = me.name;
 
     cl[pid] = cur;
+    let heparinChanged=false;
+    if(kpttChanged){
+      try{heparinChanged=hcApplyHeparinProtocolAfterLabResult(pid,r,cl)===true;}
+      catch(err){console.error("No se pudo aplicar el KPTT corregido:",err);alert("El resultado se guardó, pero no se pudo ajustar la heparina automáticamente. Revise la prescripción.");}
+    }
     setClinical(cl);
+    if(heparinChanged){
+      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
+      window.hc224MarkClinicalFieldDirty?.(pid,"labResults");
+      hcBackendScheduleUrgentPush?.();
+    }
+    if(kpttChanged && !heparinChanged && (cur.prescripciones?.infusionesContinuas||[]).some(it=>it?.active!==false && !it?.suspendedAt && !it?.finishedAt && (it?.heparinProtocol || /heparina/i.test(String(it?.drugName||it?.drugId||""))) && (it?.type==="infusion_continua" || it?.administrationMode==="continua"))){
+      alert("El KPTT se corrigió, pero no se ajustó automáticamente la heparina. Revise la prescripción activa y el peso de cálculo.");
+    }
 
     const patient = findPatient(pid);
     logAction("editó resultado de laboratorio de " + buildPatientDisplayName(patient), pid);
@@ -32784,7 +32807,13 @@ function hcApplyHeparinProtocolAfterLabResult(patientId, result, clObj = null){
     const w = calcWeight(item);
     if(!w) return;
 
-    const prevDose = Number(item.heparinCurrentDoseUiKgH || item.doseValue || 18);
+    const currentDose = Number(item.heparinCurrentDoseUiKgH || item.doseValue || 18);
+    const history = Array.isArray(item.heparinAdjustmentHistory) ? item.heparinAdjustmentHistory : [];
+    const last = history.length ? history[history.length-1] : null;
+    const correctedLatest = !!result?.editedAt && !!result?.id && String(item.heparinLastLabResultId||"")===String(result.id) && String(last?.labResultId||"")===String(result.id);
+    if(result?.editedAt && item.heparinLastLabResultId && !correctedLatest) return;
+    if(correctedLatest && Number.isFinite(Number(last?.newDose)) && Math.abs(currentDose-Number(last.newDose))>0.0001) return;
+    const prevDose = correctedLatest && Number.isFinite(Number(last?.previousDose)) ? Number(last.previousDose) : currentDose;
     const nextDose = rule.noAuto ? prevDose : Math.max(0, prevDose + Number(rule.delta || 0));
     const prep = prepProfile(item);
     const nextRate = mlh(nextDose, w, prep);
@@ -32808,11 +32837,11 @@ function hcApplyHeparinProtocolAfterLabResult(patientId, result, clObj = null){
     item.diluent = prep.diluent;
     item.heparinConcentrationUiMl = prep.concentration;
     item.heparinProtocolVersion = prep.version;
-    item.heparinNextKpttAt = addHoursIso(result?.reportedAt || nowIso(), 6);
+    item.heparinNextKpttAt = addHoursIso(result?.editedAt || result?.reportedAt || nowIso(), 6);
     item.heparinAdjustmentHistory = Array.isArray(item.heparinAdjustmentHistory) ? item.heparinAdjustmentHistory : [];
 
     if(rule.hold){
-      const holdUntil = addHoursIso(result?.reportedAt || nowIso(), 1);
+      const holdUntil = addHoursIso(result?.editedAt || result?.reportedAt || nowIso(), 1);
       item.heparinHoldUntil = holdUntil;
       item.heparinTemporarilyHeld = true;
       item.heparinPendingRestartDoseUiKgH = nextDose;
@@ -32834,7 +32863,7 @@ function hcApplyHeparinProtocolAfterLabResult(patientId, result, clObj = null){
 
     const bolusUi = rule.bolus ? Math.round(Number(rule.bolus) * w) : null;
     item.heparinLastKptt = kptt;
-    item.heparinLastKpttAt = result?.reportedAt || nowIso();
+    item.heparinLastKpttAt = result?.editedAt || result?.reportedAt || nowIso();
     item.heparinLastProcessedKey = processKey;
     item.heparinLastLabResultId = result?.id || "";
     item.heparinAdjustmentHistory.push({
@@ -32912,14 +32941,24 @@ document.addEventListener("click", function(e){
 
     cur.labResults.push(result);
     cl[currentLabPatient] = cur;
+    let heparinChanged=false;
     try{
       if(typeof hcApplyHeparinProtocolAfterLabResult === "function"){
-        hcApplyHeparinProtocolAfterLabResult(currentLabPatient, result, cl);
+        heparinChanged=hcApplyHeparinProtocolAfterLabResult(currentLabPatient, result, cl)===true;
       }
     }catch(err){
       console.error("No se pudo aplicar automáticamente el protocolo de heparina, pero el laboratorio se guardó:", err);
+      alert("El resultado se guardó, pero no se pudo ajustar la heparina automáticamente. Revise la prescripción.");
     }
     setClinical(cl);
+    if(heparinChanged){
+      window.hc224MarkClinicalFieldDirty?.(currentLabPatient,"prescripciones");
+      window.hc224MarkClinicalFieldDirty?.(currentLabPatient,"labResults");
+      hcBackendScheduleUrgentPush?.();
+    }
+    if(!heparinChanged && resultRows.some(row=>/kptt/i.test(String(row?.key||"")+" "+String(row?.label||""))) && (cur.prescripciones?.infusionesContinuas||[]).some(it=>it?.active!==false && !it?.suspendedAt && !it?.finishedAt && (it?.heparinProtocol || /heparina/i.test(String(it?.drugName||it?.drugId||""))) && (it?.type==="infusion_continua" || it?.administrationMode==="continua"))){
+      alert("El KPTT se informó, pero no se ajustó automáticamente la heparina. Revise la prescripción activa y el peso de cálculo.");
+    }
 
     const pname = buildPatientDisplayName(findPatient(currentLabPatient));
     logAction(`informó laboratorio de ${pname}`, currentLabPatient);
@@ -45291,7 +45330,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v256';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v257';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -46250,7 +46289,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 256;
+  const CURRENT_VERSION = 257;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46332,8 +46371,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v256";
-    document.title = "HC Demo v256 · Supabase";
+    window.HC_DEMO_VERSION = "v257";
+    document.title = "HC Demo v257 · Supabase";
   }catch(_){}
 })();
 </script>
