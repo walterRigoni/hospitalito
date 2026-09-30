@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v255 · Horarios exactos e imágenes · Supabase</title>
+<title>HC Demo v256 · Protocolos e imágenes · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -10970,11 +10970,11 @@ function selectConsultorioAppointment(apptId){
 
 function renderPatientHeader(){
   const me = getCurrentUser();
-if(me?.role === "bioquimico" && !selectedPatientId){
+if((me?.role === "bioquimico" || me?.role === "imagenologo") && !selectedPatientId){
   const hdr = $("#pacHdrBar");
   if(hdr){
     hdr.innerHTML = `
-      <div class="l1">Laboratorio</div>
+      <div class="l1">${me?.role === "imagenologo" ? "Imagenología" : "Laboratorio"}</div>
       <div class="l2">Bandeja general de solicitudes pendientes</div>
       <div class="l3">${escHTML(nowStr())} • ${escHTML(session?.name||session?.username||"")} (${escHTML(session?.role||"")})</div>
     `;
@@ -11675,8 +11675,7 @@ document.querySelectorAll("[data-medtab]").forEach(btn=>{
     const allowed = ["prescripciones", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isImagenologo){
-    const allowed = ["imagenes", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
-    btn.style.display = allowed.includes(t) ? "" : "none";
+    btn.style.display = "";
   }else if(isNutricionista){
     const allowed = ["nutricion", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
@@ -17538,6 +17537,26 @@ function hcPrintImageResult(resultId){
 window.hcOpenImageViewer = hcOpenImageViewer;
 window.hcPrintImageResult = hcPrintImageResult;
 
+function hcImageTimingLabel(req){
+  if(!req?.priority) return "Solicitud anterior";
+  if(req?.priority === "urgent") return "URGENTE";
+  const turn = {morning:"Turno mañana",afternoon:"Turno tarde",night:"Turno noche"}[req?.timing] || "Programado";
+  const when = req?.scheduledAt ? dmyhmFromISODateTime(req.scheduledAt) : (req?.scheduledDate ? dmyFromDateISO(req.scheduledDate) : "");
+  return when ? `${turn} · ${when}` : turn;
+}
+function hcImageTimingClass(req){ return !req?.priority ? "imgReqLegacy" : (req.priority === "urgent" ? "imgReqUrgent" : "imgReqScheduled"); }
+function hcCopyPatientDni(dni){
+  const value=String(dni||"").replace(/\D/g,"");
+  if(!value) return false;
+  const field=document.createElement("textarea");
+  field.value=value; field.setAttribute("readonly","");
+  field.style.cssText="position:fixed;left:-9999px;top:0;opacity:0";
+  document.body.appendChild(field); field.select();
+  let copied=false;
+  try{ copied=!!document.execCommand("copy"); }catch(_){ }
+  field.remove();
+  return copied;
+}
 function renderIMG(){
   const root = $("#medImg"); if(!root) return;
   const me = getCurrentUser();
@@ -17556,19 +17575,27 @@ function renderIMG(){
       });
       rows.sort((a,b)=> String(b.r.createdAt||"").localeCompare(String(a.r.createdAt||"")));
       root.innerHTML = `<div class="imgWorkspaceGrid">
-        <div class="card moduleTinyCard imgRequestCard"><div class="panelTitle">Catálogo de estudios</div><div class="field"><label>Agregar estudio</label><input id="imgNewStudy" placeholder="Ej: Angio-TAC de tórax" /></div><div style="margin-top:6px;"><button class="btn primary" id="btnAddImgStudy" type="button">Agregar al catálogo</button></div><div class="moduleMeta" style="margin-top:7px;">${escHTML(catalog.join(", "))}</div></div>
-        <div class="card moduleTinyCard imgViewerCard"><div class="labSectionTitle">Solicitudes pendientes</div><div class="imgPendingList">${rows.length ? rows.map(x=>`<div class="moduleListItem"><b>${escHTML(buildPatientDisplayName(x.p))}</b> • ${escHTML(x.info.area||"—")} ${escHTML(x.info.cama||"—")}<br>${escHTML((x.r.studies||[]).join(", "))}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(x.r.createdAt||""))} • Solicitó: ${escHTML(x.r.createdByName||"—")}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes pendientes.</div>`}</div></div>
+        <div class="card moduleTinyCard imgRequestCard"><div class="panelTitle">Bandeja general de Imagenología</div><div class="moduleMeta">${rows.length} solicitud${rows.length===1?"":"es"} pendiente${rows.length===1?"":"s"}. Para ver la historia, seleccione al paciente en el censo.</div><div class="panelTitle" style="margin-top:12px;">Catálogo de estudios</div><div class="field"><label>Agregar estudio</label><input id="imgNewStudy" placeholder="Ej: Angio-TAC de tórax" /></div><div style="margin-top:6px;"><button class="btn primary" id="btnAddImgStudy" type="button">Agregar al catálogo</button></div><div class="moduleMeta" style="margin-top:7px;">${escHTML(catalog.join(", "))}</div></div>
+        <div class="card moduleTinyCard imgViewerCard"><div class="labSectionTitle">Solicitudes pendientes</div><div class="imgPendingList">${rows.length ? rows.map(x=>`<div class="moduleListItem imgRequestCard ${hcImageTimingClass(x.r)}" data-img-request-id="${hcEscAttr(x.r.id)}" data-img-patient-id="${hcEscAttr(x.p.id)}" role="button" tabindex="0"><b>${escHTML(buildPatientDisplayName(x.p))}</b> • ${escHTML(x.info.area||"—")} ${escHTML(x.info.cama||"—")}<br><span class="imgPriorityBadge ${hcImageTimingClass(x.r)}">${escHTML(hcImageTimingLabel(x.r))}</span><br>${escHTML((x.r.studies||[]).join(", "))}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(x.r.createdAt||""))} • Solicitó: ${escHTML(x.r.createdByName||"—")}</div><b>Responder solicitud →</b></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes pendientes.</div>`}</div></div>
       </div>`;
       $("#btnAddImgStudy")?.addEventListener("click", ()=>{ const v = ($("#imgNewStudy")?.value || "").trim(); if(!v) return alert("Escribí el nombre del estudio."); hcSetStudyCatalog([...catalog, v]); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); renderIMG(); });
+      root.querySelectorAll("[data-img-request-id]").forEach(card=>{
+        const open=()=>{ window.__hcImageTargetRequest={pid:card.dataset.imgPatientId,reqId:card.dataset.imgRequestId}; selectedPatientId=card.dataset.imgPatientId; medTab="imagenes"; renderMed(); };
+        card.addEventListener("click",open);
+        card.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" "){ev.preventDefault();open();}});
+      });
     }else root.innerHTML = `<div class="muted" style="font-size:12px;">Seleccioná un paciente.</div>`;
     return;
   }
   const p = findPatient(pid);
   const drafts=window.__hcImageRequestDrafts || (window.__hcImageRequestDrafts={});
-  const draft=drafts[pid] || (drafts[pid]={studies:[],note:""});
+  const draft=drafts[pid] || (drafts[pid]={studies:[],note:"",timing:"",scheduledDate:isoNowLocalFull().slice(0,10),scheduledAt:""});
   if(root.dataset.imgDraftPatient === String(pid) && root.querySelector("[data-img-study]")){
     draft.studies=Array.from(root.querySelectorAll("[data-img-study]:checked")).map(el=>el.value);
-    draft.note=root.querySelector("#imgReqNote")?.value || draft.note;
+    draft.note=root.querySelector("#imgReqNote")?.value ?? draft.note;
+    draft.timing=root.querySelector("#imgReqTiming")?.value || draft.timing;
+    draft.scheduledDate=root.querySelector("#imgReqScheduledDate")?.value || draft.scheduledDate;
+    draft.scheduledAt=root.querySelector("#imgReqScheduledAt")?.value || draft.scheduledAt;
   }
   root.dataset.imgDraftPatient=String(pid);
   const { cl, cur } = hcEnsureClinicalPatient(pid);
@@ -17577,15 +17604,15 @@ function renderIMG(){
   const pending = cur.imageRequests.filter(r => !r.completed && !r.deletedAt).sort((a,b)=> String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
   const results = cur.imageResults.filter(r => !r.deletedAt).sort((a,b)=> String(b.reportedAt||"").localeCompare(String(a.reportedAt||"")));
   const modalityOptions = ["Radiografía","Tomografía computada","Resonancia magnética","Ecografía","Hemodinamia","Ecocardiografía","Doppler","Endoscopía","Otro"];
-  root.innerHTML = `<div class="imgWorkspaceGrid">
+  root.innerHTML = `${isImagenologo ? `<div class="card moduleTinyCard"><button type="button" class="btn small" id="btnImgGeneral">← Vista general de solicitudes</button><span class="moduleMeta" style="margin-left:8px;">Paciente: ${escHTML(buildPatientDisplayName(p))}</span></div>` : ``}<div class="imgWorkspaceGrid">
     <div class="card moduleTinyCard imgRequestCard">
       <div class="labSectionTitle">Solicitar estudio</div>
-      ${isMedico ? `<div class="field"><label>Estudios disponibles</label><div class="imgStudyOptions">${catalog.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-img-study value="${hcEscAttr(x)}" ${draft.studies.includes(x) ? "checked" : ""}><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="field" style="margin-top:6px;"><label>Motivo / observaciones</label><textarea id="imgReqNote" placeholder="Motivo clínico, región, contraste, urgencia...">${escHTML(draft.note)}</textarea></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:11px;">Las solicitudes las realiza el médico.</div>`}
-      <div style="margin-top:9px;"><div class="labSectionTitle">Pendientes</div><div class="imgPendingList">${pending.length ? pending.map(r=>`<div class="moduleListItem"><b>${escHTML((r.studies||[]).join(", "))}</b><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="margin-top:4px;font-size:11px;white-space:pre-wrap;">${escHTML(r.note)}</div>` : ``}</div>`).join("") : `<div class="muted" style="font-size:11px;">Sin solicitudes pendientes.</div>`}</div></div>
+      ${isMedico ? `<div class="field"><label>Estudios disponibles</label><div class="imgStudyOptions">${catalog.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-img-study value="${hcEscAttr(x)}" ${draft.studies.includes(x) ? "checked" : ""}><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="field" style="margin-top:6px;"><label>Motivo / observaciones</label><textarea id="imgReqNote" placeholder="Motivo clínico, región, contraste, urgencia...">${escHTML(draft.note)}</textarea></div><div class="imgTimingControls"><div class="field"><label>Prioridad y programación</label><select id="imgReqTiming"><option value="" ${!draft.timing?"selected":""}>Elegir prioridad y horario…</option><option value="urgent" ${draft.timing==="urgent"?"selected":""}>Urgente</option><option value="morning" ${draft.timing==="morning"?"selected":""}>Programado · turno mañana</option><option value="afternoon" ${draft.timing==="afternoon"?"selected":""}>Programado · turno tarde</option><option value="night" ${draft.timing==="night"?"selected":""}>Programado · turno noche</option><option value="custom" ${draft.timing==="custom"?"selected":""}>Programado · fecha y hora</option></select></div><div class="field" id="imgReqDateField"><label>Fecha del turno</label><input id="imgReqScheduledDate" type="date" value="${escHTML(draft.scheduledDate)}"></div><div class="field" id="imgReqDateTimeField"><label>Fecha y hora programada</label><input id="imgReqScheduledAt" type="datetime-local" value="${escHTML(draft.scheduledAt)}"></div></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:11px;">Las solicitudes las realiza el médico.</div>`}
+      <div style="margin-top:9px;"><div class="labSectionTitle">Pendientes</div><div class="imgPendingList">${pending.length ? pending.map(r=>`<div class="moduleListItem imgRequestCard ${hcImageTimingClass(r)}" data-img-request-id="${hcEscAttr(r.id)}"><b>${escHTML((r.studies||[]).join(", "))}</b><br><span class="imgPriorityBadge ${hcImageTimingClass(r)}">${escHTML(hcImageTimingLabel(r))}</span><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="margin-top:4px;font-size:11px;white-space:pre-wrap;">${escHTML(r.note)}</div>` : ``}</div>`).join("") : `<div class="muted" style="font-size:11px;">Sin solicitudes pendientes.</div>`}</div></div>
     </div>
     <div class="card moduleTinyCard imgViewerCard">
       <div class="labSectionTitle">Imágenes e informes</div>
-      ${canView ? `<div class="imgExternalPortal"><b>Consultar estudios en Informe Médico</b><div class="moduleMeta">Paciente abierto: DNI ${escHTML(p?.dni || "—")}. Abra el portal y pegue el DNI en su buscador.</div><button type="button" class="btn small" id="imgOpenExternalPortal">Copiar DNI y abrir portal</button></div>` : ``}
+      ${canView ? `<div class="imgExternalPortal"><b>Consultar estudios en Informe Médico</b><div class="moduleMeta">DNI del paciente: <span class="imgDniValue">${escHTML(p?.dni || "—")}</span></div><div class="imgPortalActions"><button type="button" class="btn small" id="imgCopyDni">Copiar DNI</button><button type="button" class="btn small" id="imgOpenExternalPortal">Copiar DNI y abrir portal</button></div><div class="moduleMeta">En el portal, use Pegar en el buscador. El sitio externo requiere su propio inicio de sesión.</div></div>` : ``}
       ${isImagenologo ? `<details class="imgReportForm" open><summary>Cargar estudio e informe</summary><div class="row" style="margin-top:8px;"><div class="field"><label>Solicitud asociada</label><select id="imgResultReq"><option value="">— Nueva / sin solicitud —</option>${pending.map(r=>`<option value="${hcEscAttr(r.id)}">${escHTML((r.studies||[]).join(", "))}</option>`).join("")}</select></div><div class="field"><label>Modalidad</label><select id="imgResultModality">${modalityOptions.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div></div><div class="field" style="margin-top:6px;"><label>Nombre del estudio informado</label><input id="imgResultStudy" placeholder="Ej: TAC de tórax con contraste" /></div><div class="field" style="margin-top:6px;"><label>Página web / PACS / visor externo</label><input id="imgResultUrl" placeholder="https://..." /></div><div class="field" style="margin-top:6px;"><label>Adjuntar imágenes, serie, PDF o película</label><input id="imgResultFiles" type="file" accept="image/*,video/mp4,video/webm,application/pdf,.pdf,.dcm,.dicom" multiple /></div><div class="imgUploadHelp">Se visualizan JPG/PNG/WebP, PDF y películas MP4/WebM. Para estudios DICOM completos o películas grandes, use el enlace del PACS/visor externo. Las imágenes se comprimen para no saturar la sincronización.</div><div class="field" style="margin-top:6px;"><label>Informe</label><textarea id="imgResultReport" placeholder="Informe del estudio"></textarea></div><div style="margin-top:6px;"><button class="btn primary" id="btnSaveImgResult" type="button">Guardar estudio e informe</button></div></details>` : ``}
       ${canView ? `<div class="imgResultsList">${results.length ? results.map(r=>{
         const files=Array.isArray(r.files)?r.files:[]; const url=hcImageSafeUrl(r.url); return `<article class="imgResultItem"><div class="imgResultHead"><div><span class="imgResultTitle">${escHTML(r.study || "Estudio")}</span>${r.modality?`<span class="imgModalityBadge">${escHTML(r.modality)}</span>`:""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.reportedAt||""))} • ${escHTML(r.reportedByName||"—")} • ${files.length} adjunto${files.length===1?"":"s"}</div></div><div class="imgResultActions">${files.length?`<button class="btn primary small" type="button" data-img-open="${hcEscAttr(r.id)}" data-img-index="0">Abrir estudio</button>`:""}${url?`<button class="btn small" type="button" data-img-url="${hcEscAttr(url)}">Abrir web/PACS</button>`:""}<button class="btn small" type="button" data-img-print="${hcEscAttr(r.id)}">Imprimir</button></div></div><div class="imgReportText">${escHTML(r.report || "Sin informe escrito.")}</div>${hcRenderAttachments(files,r.id)}</article>`;
@@ -17596,24 +17623,56 @@ function renderIMG(){
     draft.studies=Array.from(root.querySelectorAll("[data-img-study]:checked")).map(el=>el.value);
   }));
   $("#imgReqNote")?.addEventListener("input",()=>{ draft.note=$("#imgReqNote")?.value || ""; });
-  $("#imgOpenExternalPortal")?.addEventListener("click", async()=>{
+  const timingUI=()=>{
+    const timing=$("#imgReqTiming")?.value || "";
+    if($("#imgReqDateField")) $("#imgReqDateField").style.display=["morning","afternoon","night"].includes(timing)?"":"none";
+    if($("#imgReqDateTimeField")) $("#imgReqDateTimeField").style.display=timing==="custom"?"":"none";
+    draft.timing=timing;
+  };
+  $("#imgReqTiming")?.addEventListener("change",timingUI);
+  $("#imgReqScheduledDate")?.addEventListener("change",()=>{draft.scheduledDate=$("#imgReqScheduledDate")?.value||"";});
+  $("#imgReqScheduledAt")?.addEventListener("change",()=>{draft.scheduledAt=$("#imgReqScheduledAt")?.value||"";});
+  timingUI();
+  $("#btnImgGeneral")?.addEventListener("click",()=>{selectedPatientId=null;renderMed();});
+  root.querySelectorAll(".imgPendingList [data-img-request-id]").forEach(card=>card.addEventListener("click",()=>{
+    const select=$("#imgResultReq"); if(!select) return;
+    select.value=card.dataset.imgRequestId;
+    select.dispatchEvent(new Event("change",{bubbles:true}));
+    $("#imgResultReport")?.focus();
+    $("#imgResultReq")?.scrollIntoView({behavior:"smooth",block:"center"});
+  }));
+  const target=window.__hcImageTargetRequest;
+  if(target && String(target.pid)===String(pid)){
+    const select=$("#imgResultReq");
+    if(select){select.value=target.reqId;const chosen=pending.find(r=>String(r.id)===String(target.reqId));if($("#imgResultStudy") && chosen) $("#imgResultStudy").value=(chosen.studies||[]).join(", ");setTimeout(()=>select.scrollIntoView({behavior:"smooth",block:"center"}),30);}
+    window.__hcImageTargetRequest=null;
+  }
+  const copyDni=async()=>{
     const dni=String(p?.dni || "").replace(/\D/g,"");
-    const portal="https://portal.informemedico.com.ar/";
-    const tab=window.open(portal,"_blank");
+    if(!dni){toast("Este paciente no tiene DNI registrado.");return false;}
+    let copied=hcCopyPatientDni(dni);
+    if(!copied && navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(dni);copied=true;}catch(_){ }}
+    if(copied) toast("DNI copiado: use Pegar en el buscador del portal.");
+    else window.prompt("Presione Ctrl+C para copiar el DNI:",dni);
+    return copied;
+  };
+  $("#imgCopyDni")?.addEventListener("click",copyDni);
+  $("#imgOpenExternalPortal")?.addEventListener("click",()=>{
+    copyDni();
+    const tab=window.open("https://portal.informemedico.com.ar/","_blank");
     if(tab) tab.opener=null;
-    if(dni){
-      let copied=false;
-      try{ await navigator.clipboard.writeText(dni); copied=true; }catch(_){ }
-      if(!copied) window.prompt("Copie el DNI para buscarlo en el portal:",dni);
-      else toast("DNI copiado. Péguelo en la búsqueda del portal.");
-    }
-    if(!tab) toast("El navegador bloqueó el portal. Permita las ventanas emergentes.");
+    else toast("El navegador bloqueó el portal. Permita las ventanas emergentes.");
   });
   $("#btnSaveImgReq")?.addEventListener("click", ()=>{
     const studies = Array.from(root.querySelectorAll("[data-img-study]:checked")).map(o=>o.value);
     if(!studies.length) return alert("Elegí al menos un estudio.");
-    const req = { id:uid("imgreq"), studies, note:($("#imgReqNote")?.value||"").trim(), createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name, completed:false };
-    cur.imageRequests.push(req); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó imágenes para ${buildPatientDisplayName(p)}`, pid); draft.studies=[]; draft.note=""; root.dataset.imgDraftPatient=""; renderIMG();
+    const timing=$("#imgReqTiming")?.value||"";
+    if(!timing) return alert("Elegí la prioridad y el horario del estudio.");
+    const scheduledDate=["morning","afternoon","night"].includes(timing)?($("#imgReqScheduledDate")?.value||""):"";
+    const scheduledAt=timing==="custom"?($("#imgReqScheduledAt")?.value||""):"";
+    if(timing!=="urgent" && !scheduledDate && !scheduledAt) return alert("Elegí la fecha para el estudio programado.");
+    const req = { id:uid("imgreq"), studies, note:($("#imgReqNote")?.value||"").trim(), priority:timing==="urgent"?"urgent":"scheduled", timing, scheduledDate, scheduledAt, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name, completed:false };
+    cur.imageRequests.push(req); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó imágenes para ${buildPatientDisplayName(p)}`, pid); draft.studies=[]; draft.note=""; draft.timing=""; draft.scheduledAt=""; root.dataset.imgDraftPatient=""; renderIMG();
   });
   $("#imgResultReq")?.addEventListener("change", ()=>{ const req=pending.find(r=>r.id===$("#imgResultReq")?.value); if(req && !($("#imgResultStudy")?.value||"").trim()) $("#imgResultStudy").value=(req.studies||[]).join(", "); });
   $("#btnSaveImgResult")?.addEventListener("click", async ()=>{
@@ -24327,7 +24386,10 @@ function patientHasPendingNurseAlert(patientId){
       evModes.forEach(evMode=>{
         const matching = profiles.filter(p => String(p.via || "EV") === via && String(p.evMode || "") === evMode);
         const label = via === "EV" ? (evMode === "bolo" ? "Bolo EV" : evMode === "programada" ? (isFenitoinaInjectablePresentation(currentDrug,currentPresentation) ? "Infusión de carga" : "Infusión programada") : "Infusión continua") : `Vía ${via}`;
-        if(matching.length){
+        if(via === "EV" && evMode === "continua" && (isHeparinaSodicaPresentation(currentDrug,currentPresentation) || isInsulinaCorrientePresentation(currentDrug,currentPresentation))){
+          const heparin = isHeparinaSodicaPresentation(currentDrug,currentPresentation);
+          modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-built-in="${heparin ? "heparina-continua" : "insulina-continua"}">Infusión continua<br><small>${heparin ? "Protocolo fijo: 18 UI/kg/h · KPTT" : "Protocolo fijo: según glucemia"}</small></button></div>`);
+        }else if(matching.length){
           matching.forEach(p=>modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-profile="${escHTML(p.profileId)}">${escHTML(label)} · ${escHTML(p.profileName || "Protocolo")}<br><small>${escHTML(prescriptionFrequencyLabel(p.regularidad || "dosis_unica"))}</small></button><button type="button" class="btn small" data-pr-edit-profile="${escHTML(p.profileId)}" title="Configurar esta modalidad">⚙</button></div>`));
         }else if(isHeparinaSodicaPresentation(currentDrug,currentPresentation) && via === "EV" && evMode === "continua"){
           modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-built-in="heparina-continua">Infusión continua<br><small>Protocolo de heparina configurado</small></button><button type="button" class="btn small" data-pr-configure-mode="1" data-pr-mode-via="EV" data-pr-mode-ev="continua" data-pr-mode-label="Infusión continua" title="Configurar otra modalidad">⚙</button></div>`);
@@ -24858,16 +24920,24 @@ function patientHasPendingNurseAlert(patientId){
           ? (btn.dataset.prModeEv === "continua" ? "UI/kg/h" : "UI") : "")
     });
   }));
-  root.querySelectorAll("[data-pr-quick-built-in='heparina-continua']").forEach(btn=>btn.addEventListener("click",()=>{
+  root.querySelectorAll("[data-pr-quick-built-in]").forEach(btn=>btn.addEventListener("click",()=>{
+    const heparin = btn.dataset.prQuickBuiltIn === "heparina-continua";
+    const glucose = heparin ? null : hcLatestGlucemiaRecordForPatient(pid);
+    const insulinRate = glucose ? hcInsulinInfusionRateFromGlucose(glucose.value) : null;
+    if(!heparin && (!glucose || !Number.isFinite(insulinRate) || insulinRate <= 0)){
+      alert("Para iniciar insulina EV continua se necesita una glucemia registrada que indique una velocidad mayor que cero.");
+      return;
+    }
     root.dataset.prProtocolProfile="";
     root.dataset.prProtocolApplied="";
     root.dataset.prVia="EV";
     root.dataset.prEVMode="continua";
     root.dataset.prContinua="1";
-    root.dataset.prDose="18";
-    root.dataset.prVol="500";
+    root.dataset.prDose=heparin ? "18" : String(insulinRate);
+    root.dataset.prVol=heparin ? "500" : "100";
     root.dataset.prAmp="1";
-    root.dataset.prDil="Dextrosa 5%";
+    root.dataset.prDil=heparin ? "Dextrosa 5%" : "Solución fisiológica";
+    root.dataset.prRegularidad="dosis_unica";
     root.dataset.prModeDetails="1";
     root.dataset.prPanelOpen="1";
     renderPrescripciones();
@@ -26054,7 +26124,17 @@ function patientHasPendingNurseAlert(patientId){
         }
         const isHeparin = isHeparinaSodicaDrug(drug);
         const isInsulin = isInsulinaCorrienteDrug(drug);
-        const genericProtocolForSave = root.dataset.prProtocolProfile ? hcGenericProtocolForDrug(drug, root.dataset.prProtocolProfile) : null;
+        const builtInContinuous = isContinua && (isHeparin || isInsulin);
+        const genericProtocolForSave = !builtInContinuous && root.dataset.prProtocolProfile ? hcGenericProtocolForDrug(drug, root.dataset.prProtocolProfile) : null;
+        if(isHeparin && isContinua && !root.dataset.prEditingId){
+          dose = 18;
+          vol = 500;
+          amp = 1;
+          root.dataset.prDose="18";
+          root.dataset.prVol="500";
+          root.dataset.prAmp="1";
+          root.dataset.prDil="Dextrosa 5%";
+        }
         const genericProtocolEvalForSave = genericProtocolForSave?.enabled
           ? hcEvaluateGenericProtocolMax(drug, genericProtocolForSave, pid, w)
           : null;
@@ -28219,7 +28299,7 @@ if(isBioq && medTab !== "laboratorio" && medTab !== "informes_enfermeria" && med
 if(isMicrobio && medTab !== "micro" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "micro";
 }
-if(isImagenologo && medTab !== "imagenes" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isImagenologo && !selectedPatientId && medTab !== "imagenes"){
   medTab = "imagenes";
 }
 if(isNutricionista && medTab !== "nutricion" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
@@ -42382,6 +42462,26 @@ console.info("HC v216: conexión automática + recuperación no destructiva del 
   0%,100%{ box-shadow:0 0 0 0 rgba(56,189,248,.18),0 0 7px rgba(56,189,248,.22); filter:brightness(1); }
   50%{ box-shadow:0 0 0 3px rgba(56,189,248,.28),0 0 18px rgba(56,189,248,.62); filter:brightness(1.2); }
 }
+
+/* v256: restore contrast in Biochemistry and show Imaging priorities. */
+body[data-hc-theme] #medPanel .labBioRequestCard{background:#f8fafc !important;border-color:#cbd5e1 !important;color:#172033 !important;}
+body[data-hc-theme] #medPanel .labBioRequestCard *{color:#172033 !important;-webkit-text-fill-color:#172033 !important;}
+body[data-hc-theme] #medPanel .labBioRequestCard .labMeta{color:#475569 !important;-webkit-text-fill-color:#475569 !important;}
+body[data-hc-theme] #medPanel .labBioRequestCard .labBadge.urg{background:#fee2e2 !important;color:#991b1b !important;-webkit-text-fill-color:#991b1b !important;}
+body[data-hc-theme] #medPanel .labBioRequestCard .labBadge.prog{background:#dbeafe !important;color:#1e3a8a !important;-webkit-text-fill-color:#1e3a8a !important;}
+#medImg .imgTimingControls{display:grid;grid-template-columns:minmax(180px,1fr) minmax(180px,1fr);gap:8px;margin-top:8px;}
+#medImg .imgTimingControls .field{min-width:0;}
+#medImg .imgPendingList .imgRequestCard{cursor:pointer;border:1px solid #4385b7;border-radius:8px;padding:8px;margin-top:6px;background:#112c4a;}
+#medImg .imgPendingList .imgRequestCard:hover{filter:brightness(1.18);}
+body[data-hc-theme] #medImg .imgPendingList .moduleListItem.imgRequestCard.imgReqUrgent{border-color:#ef4444 !important;background:#4b1d28 !important;}
+body[data-hc-theme] #medImg .imgPendingList .moduleListItem.imgRequestCard.imgReqScheduled{border-color:#38bdf8 !important;background:#103a5b !important;}
+#medImg .imgPriorityBadge{display:inline-block;border-radius:999px;padding:2px 7px;margin:3px 0;font-size:11px;font-weight:900;}
+#medImg .imgPriorityBadge.imgReqUrgent{background:#fca5a5;color:#4b1111;}
+#medImg .imgPriorityBadge.imgReqScheduled{background:#7dd3fc;color:#082f49;}
+#medImg .imgExternalPortal .imgDniValue{font-size:15px;font-weight:900;letter-spacing:.04em;}
+#medImg .imgExternalPortal .imgPortalActions{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+body.hcImageReadOnly #medPanel .hcImageWriteControl{display:none !important;}
+@media(max-width:700px){#medImg .imgTimingControls{grid-template-columns:1fr;}}
 </style>
 <script id="hc-v219-imagenologia-fix">
 (function(){
@@ -42460,6 +42560,7 @@ console.info("HC v216: conexión automática + recuperación no destructiva del 
     const rows=v219PendingImageRows();
     const cards=Array.from(root.querySelectorAll(".imgPendingList .moduleListItem"));
     cards.forEach((el,i)=>{
+      if(el.dataset.imgRequestId) return;
       const row=rows[i];
       if(!row?.p?.id) return;
       el.classList.add("hcImagePendingItem");
@@ -45190,7 +45291,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
   function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
-  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v255';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
+  function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v256';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
   function localNotification(kind,title,body){const k=title+'|'+body;if(localNotifs.some(x=>x._k===k&&Date.now()-Date.parse(x.created_at)<60000))return;localNotifs.unshift({_k:k,kind,title,body,created_at:new Date().toISOString(),read_at:null});localNotifs=localNotifs.slice(0,30);updateBadge();}
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
@@ -46149,7 +46250,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 255;
+  const CURRENT_VERSION = 256;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46231,11 +46332,45 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v255";
-    document.title = "HC Demo v255 · Supabase";
+    window.HC_DEMO_VERSION = "v256";
+    document.title = "HC Demo v256 · Supabase";
   }catch(_){}
 })();
 </script>
 
+
+<script id="hc-v256-imagenologo-read-only">
+(function(){
+  const viewWords=/^(ver|abrir|mostrar|ocultar|detalles|imprimir|general|anterior|siguiente|volver|cerrar|buscar|filtrar|expandir|contraer|vista|historial)/i;
+  const writeWords=/(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar|borrar|subir)/i;
+  function locked(){return typeof getCurrentUser==="function" && getCurrentUser()?.role==="imagenologo" && String(medTab||"")!=="imagenes";}
+  function decorate(){
+    document.body.classList.toggle("hcImageReadOnly",locked());
+    if(!locked())return;
+    const panel=document.getElementById("medPanel"); if(!panel)return;
+    panel.querySelectorAll("button").forEach(btn=>{
+      if(btn.closest("#medImg") || btn.hasAttribute("data-medtab"))return;
+      const label=`${btn.textContent||""} ${btn.id||""} ${btn.getAttribute("data-pr-action")||""}`.trim();
+      btn.classList.toggle("hcImageWriteControl",writeWords.test(label) && !viewWords.test(label));
+    });
+    panel.querySelectorAll("input,textarea,select").forEach(el=>{
+      if(el.closest("#medImg") || /search|filter|fecha|date|history|historial/i.test(el.id||""))return;
+      if(el.matches('input[type="checkbox"],input[type="radio"],select'))el.disabled=true;
+      else el.readOnly=true;
+    });
+  }
+  const base=renderMed;
+  renderMed=function(){const r=base.apply(this,arguments);decorate();return r;};
+  document.addEventListener("click",ev=>{
+    if(!locked())return;
+    const btn=ev.target.closest?.("#medPanel button,#medPanel [data-pr-action]");
+    if(btn && !btn.closest("#medImg") && (btn.classList.contains("hcImageWriteControl") || writeWords.test(`${btn.textContent||""} ${btn.id||""} ${btn.getAttribute("data-pr-action")||""}`) && !viewWords.test(String(btn.textContent||"").trim()))){
+      ev.preventDefault();ev.stopImmediatePropagation();toast?.("Imagenología: este módulo es solo de lectura.");
+    }
+  },true);
+  document.addEventListener("submit",ev=>{if(locked()&&ev.target.closest?.("#medPanel")&&!ev.target.closest?.("#medImg")){ev.preventDefault();ev.stopImmediatePropagation();}},true);
+  setTimeout(decorate,100);
+})();
+</script>
 </body>
 </html>
