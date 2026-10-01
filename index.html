@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v258 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v259 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -12149,10 +12149,11 @@ autoGrowTA($("#in_plan"));
       wrapPretty.style.display = "none";
       wrapForm.style.display = "";
 
-      btnNuevo.style.display  = "none";
-      btnEditar.style.display = "none";
-      btnPrint.style.display  = "none";
-      btnCancel.style.display = freshRec ? "" : "none";
+      // v259: al existir ingreso no se renderiza Nuevo; no acceder a un botón ausente.
+      showEl(btnNuevo, false);
+      showEl(btnEditar, false);
+      showEl(btnPrint, false);
+      showEl(btnCancel, !!freshRec);
 
       // si hay ingreso => editando
       if(freshRec){
@@ -46507,7 +46508,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 
   try{
     window.HC_DEMO_VERSION = "v258";
-    document.title = "HC Demo v258 · Supabase";
+    document.title = "HC Demo v259 · Supabase";
   }catch(_){}
 })();
 </script>
