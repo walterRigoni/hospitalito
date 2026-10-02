@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v262 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v263 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -7307,12 +7307,49 @@ let hcBackendLocalEditDirty = false;
 let hcBackendLastLocalEditAt = 0;
 let hcBackendDirtyClearTimer = null;
 
+// v263: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+function hc263PackJSON(value){
+  const input = new TextEncoder().encode(JSON.stringify(value));
+  if(!input.length) return "HC263LZW:";
+  let dict=new Map(),next=256,w=String.fromCharCode(input[0]),codes=[];
+  const emit=x=>codes.push(x.length===1?x.charCodeAt(0):dict.get(x));
+  for(let i=1;i<input.length;i++){
+    const c=String.fromCharCode(input[i]),wc=w+c;
+    if(dict.has(wc)){w=wc;continue;}
+    emit(w);
+    if(next<32767)dict.set(wc,next++);
+    else {codes.push(32767);dict=new Map();next=256;}
+    w=c;
+  }
+  emit(w);
+  let packed="HC263LZW:";
+  for(let i=0;i<codes.length;i+=8192)packed+=String.fromCharCode(...codes.slice(i,i+8192));
+  return packed;
+}
+function hc263UnpackJSON(raw){
+  if(!String(raw).startsWith("HC263LZW:")) return JSON.parse(raw);
+  const encoded=raw.slice(9);let dict=[],next=256,previous="",parts=[];
+  for(let i=0;i<encoded.length;i++){
+    const code=encoded.charCodeAt(i);
+    if(code===32767){dict=[];next=256;previous="";continue;}
+    let entry=code<256?String.fromCharCode(code):dict[code];
+    if(entry===undefined && code===next && previous)entry=previous+previous[0];
+    if(entry===undefined)throw Error("La copia clínica comprimida no pudo leerse.");
+    parts.push(entry);
+    if(previous && next<32767)dict[next++]=previous+entry[0];
+    previous=entry;
+  }
+  const bytesString=parts.join("");const bytes=new Uint8Array(bytesString.length);
+  for(let i=0;i<bytes.length;i++)bytes[i]=bytesString.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
 function loadJSON(key, fallback){
   try{
     const raw = localStorage.getItem(key);
     if(!raw) return fallback;
-    return JSON.parse(raw);
-  }catch(e){ return fallback; }
+    return hc263UnpackJSON(raw);
+  }catch(e){ console.error("No se pudo leer la copia local",key,e); return fallback; }
 }
 function saveJSON(key, obj){
   const ok = hcSafeSetJSON(key, obj);
@@ -8163,9 +8200,8 @@ function hcStorageValueShrinkForKey(key, value, level = 0){
 
 function hcReplaceStorageJSON(key, value){
   const old = localStorage.getItem(key);
-  localStorage.removeItem(key);
   try{
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, key === LS.clinical ? hc263PackJSON(value) : JSON.stringify(value));
     return true;
   }catch(e){
     // Reponer lo anterior sólo si entra; si no entra, preferimos liberar espacio
@@ -8179,8 +8215,7 @@ function hcBackendFreeLocalStorageSpace(){
   const candidates = [
     [LS.activity, ()=> hcStorageValueShrinkForKey(LS.activity, loadJSON(LS.activity, []), 1)],
     [LS.chats, ()=> hcStorageValueShrinkForKey(LS.chats, loadJSON(LS.chats, {}), 1)],
-    [LS.users, ()=> hcNormalizeBackendUsers(loadJSON(LS.users, []), { photoLimit: 0, signatureLimit: 50000 })],
-    [LS.clinical, ()=> hcStorageValueShrinkForKey(LS.clinical, loadJSON(LS.clinical, {}), 1)]
+    [LS.users, ()=> hcNormalizeBackendUsers(loadJSON(LS.users, []), { photoLimit: 0, signatureLimit: 50000 })]
   ];
 
   // Limpiar borradores/transitorios que no son historia clínica.
@@ -8198,6 +8233,10 @@ function hcBackendFreeLocalStorageSpace(){
 }
 
 function hcSafeSetJSON(key, value){
+  if(key === LS.clinical){
+    try{localStorage.setItem(key,hc263PackJSON(value));return true;}
+    catch(error){console.error("No se guardó la copia clínica; se conservó la anterior",error);return false;}
+  }
   let v = value;
   for(let attempt = 0; attempt < 3; attempt++){
     try{
@@ -11900,6 +11939,26 @@ function renderIngresoUI(){
   const cl = getClinical();
   const cur = cl[pid] || {};
   const rec = cur.ingresoFull || null;
+  const connectedInstitution = typeof hc207Inst === "function" ? hc207Inst() : "";
+  const admissionChecked = window.hc263AdmissionChecked?.get(String(connectedInstitution)+"::"+String(pid));
+  if(!rec && connectedInstitution && !admissionChecked){
+    root.innerHTML=`<div class="card"><b>Recuperando el ingreso guardado…</b><p>La copia de este equipo aún no tiene el ingreso. Se consultará el servidor antes de habilitar un formulario nuevo.</p><button type="button" class="btn" id="hc263RetryIngreso">Reintentar recuperación</button><div id="hc263IngresoRecoveryStatus"></div></div>`;
+    const recover=async()=>{
+      const status=root.querySelector("#hc263IngresoRecoveryStatus");
+      const ok=await window.hc221PullPatientClinical?.(pid,true);
+      if(String(selectedPatientId)!==String(pid))return;
+      if(ok){renderIngresoUI();return;}
+      if(status)status.textContent="Todavía no se pudo recuperar el ingreso. Revisá la conexión y reintentá. No se guardó un ingreso vacío.";
+    };
+    root.querySelector("#hc263RetryIngreso")?.addEventListener("click",recover);
+    if(!window.hc263AdmissionRecovering)window.hc263AdmissionRecovering=new Set();
+    const recoveryKey=String(connectedInstitution)+"::"+String(pid);
+    if(!window.hc263AdmissionRecovering.has(recoveryKey)){
+      window.hc263AdmissionRecovering.add(recoveryKey);
+      Promise.resolve().then(recover).finally(()=>window.hc263AdmissionRecovering.delete(recoveryKey));
+    }
+    return;
+  }
 
   const isAuthor = rec ? (String(rec.author?.id||"") === String(me?.id||"")) : true;
 
@@ -18552,7 +18611,7 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
-// v262: suspensión independiente del formulario de cálculo y del paciente anterior.
+// v263: suspensión independiente del formulario de cálculo y del paciente anterior.
 function hcV262BindSuspension(root){
   if(root.hcV262SuspensionBound) return;
   root.hcV262SuspensionBound = true;
@@ -18586,15 +18645,15 @@ function hcV262BindSuspension(root){
       });
       hcEnsurePrescriptionDailySnapshot(pid,live);
       setClinical(live);
-      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
       const saved = getClinical()?.[pid]?.prescripciones?.infusionesContinuas?.find(x=>String(x.id)===String(id));
-      if(!saved?.suspendedAt || saved.active !== false) throw Error("No se pudo conservar la suspensión en este equipo.");
+      if(!saved?.suspendedAt || saved.active !== false) throw Error("No hay espacio disponible para guardar la suspensión; la orden anterior se conservó.");
+      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
       hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
       logAction(`Suspendió prescripción ${name}`,pid);
       // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
-      try{renderMed();}catch(renderError){console.error("v262 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      try{renderMed();}catch(renderError){console.error("v263 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
       if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
-    }catch(error){console.error("v262 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+    }catch(error){console.error("v263 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
   },true);
 }
 
@@ -26911,7 +26970,7 @@ function patientHasPendingNurseAlert(patientId){
     // los controles de las prescripciones existentes.
     try{ bindCalc(); refreshCalc(); }
     catch(error){
-      console.error("v262 formulario de prescripción",error);
+      console.error("v263 formulario de prescripción",error);
       const box=root.querySelector("#prCalcBox");
       if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
     }
@@ -41067,7 +41126,7 @@ bootWithBackend();
         next=protectPharmacyWrite(value,before);
       }
 
-      const raw=JSON.stringify(next);
+      const raw=backendKey==="clinical" ? hc263PackJSON(next) : JSON.stringify(next);
       let ok=false;
       try{
         localStorage.setItem(key,raw);
@@ -41848,7 +41907,7 @@ function hc224SelectedPid(){
   catch(_){return "";}
 }
 function hc224WarmClinicalFields(){
-  const fields=new Set(["prescripciones"]);
+  const fields=new Set(["prescripciones","ingresoFull","ingresosPrev"]);
   try{
     const role=String((typeof getCurrentUser==="function"?getCurrentUser()?.role:"")||"");
     if(role==="imagenologo"){fields.add("imageRequests");fields.add("imageResults");}
@@ -42067,6 +42126,7 @@ function hc215ApplyIncoming(rows){
       clinical[pid]=clinical[pid]&&typeof clinical[pid]==="object"?clinical[pid]:{};
       const before=clinical[pid][field];
 
+      if(field==="ingresoFull" && before && (r.deleted || !r?.payload?.value)) return;
       if(r.deleted){
         // Una eliminación remota sólo se difiere si existe una edición local
         // NUEVA del mismo campo ocurrida mientras viajaba esta respuesta.
@@ -42192,6 +42252,8 @@ async function hc221PullPatientClinical(pid,force=false){
     const applied=rows.length?hc215ApplyIncoming(rows):false;
     if(rows.length&&!hc221LastApplyPersistOk)throw new Error("El dispositivo no pudo persistir la historia clínica recibida; se reintentará.");
     hc221PatientLastPull.set(pid,Date.now());
+    window.hc263AdmissionChecked ||= new Map();
+    window.hc263AdmissionChecked.set(String(hc207Inst())+"::"+pid,true);
     if(applied){
       hc214HotUntil=Date.now()+120000;
       hc214RefreshUI();
@@ -43851,7 +43913,7 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
     return {keep,full};
   }
   function warmFields(){
-    const f=new Set(["prescripciones"]);
+    const f=new Set(["prescripciones","ingresoFull","ingresosPrev"]);
     try{const role=String(getCurrentUser?.()?.role||"");
       if(role==="imagenologo"){f.add("imageRequests");f.add("imageResults");}
       if(role==="bioquimico"){f.add("labRequests");f.add("labResults");}
@@ -43873,7 +43935,8 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
       console.info("HC v224: caché clínica heredada compactada",raw.length,"→",JSON.stringify(out).length);
     }catch(e){console.warn("v224 compactación inicial de caché:",e);}
   }
-  setTimeout(trimLegacy,40);setTimeout(trimLegacy,1200);
+  // v263: no ejecutar la limpieza heredada que descarta ingresos de la caché.
+  // La compresión conserva el contenido completo en menos espacio.
   console.info("HC v225: contraste clínico restaurado, prescripciones por servicio y scroll móvil activos.");
 })();
 </script>
@@ -46606,8 +46669,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v262";
-    document.title = "HC Demo v262 · Supabase";
+    window.HC_DEMO_VERSION = "v263";
+    document.title = "HC Demo v263 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46646,7 +46709,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v262-style">
+<style id="hc-v263-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46664,8 +46727,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v262-features">
-/* v262: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v263-features">
+/* v263: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46751,7 +46814,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v262.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v263.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46768,7 +46831,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v262';document.title='Hospitalito v262 · Supabase';
+  window.HC_DEMO_VERSION='v263';document.title='Hospitalito v263 · Supabase';
 })();
 </script>
 </body>
