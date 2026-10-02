@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v266 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v267 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -7316,10 +7316,10 @@ let hcBackendLocalEditDirty = false;
 let hcBackendLastLocalEditAt = 0;
 let hcBackendDirtyClearTimer = null;
 
-// v266: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+// v267: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
 let hc264EncodedCache=null,hc264DecodedCache=null;
 function hc264Clone(value){return typeof structuredClone==="function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));}
-// v266: el desplazamiento táctil nunca equivale a elegir una fila.
+// v267: el desplazamiento táctil nunca equivale a elegir una fila.
 function hc266BindScrollableChoice(button,container,choose){
   let gesture=null;
   button.addEventListener("pointerdown",ev=>{
@@ -18678,7 +18678,7 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
-// v266: suspensión independiente del formulario de cálculo y del paciente anterior.
+// v267: suspensión independiente del formulario de cálculo y del paciente anterior.
 function hcV262BindSuspension(root){
   if(root.hcV262SuspensionBound) return;
   root.hcV262SuspensionBound = true;
@@ -18718,9 +18718,9 @@ function hcV262BindSuspension(root){
       hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
       logAction(`Suspendió prescripción ${name}`,pid);
       // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
-      try{renderMed();}catch(renderError){console.error("v266 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      try{renderMed();}catch(renderError){console.error("v267 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
       if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
-    }catch(error){console.error("v266 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+    }catch(error){console.error("v267 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
   },true);
 }
 
@@ -20443,8 +20443,11 @@ function renderPrescripciones(){
     const profileId = explicitProfileId || (seededNorad ? "infusion_continua" : hcProtocolSafeId(inferredName, "protocolo"));
     return {
       profileId,
+      profileAliases:Array.from(new Set((Array.isArray(src.profileAliases)?src.profileAliases:[]).map(String))).filter(id=>id!==profileId),
+      deletedAt:String(src.deletedAt||""),
+      deletedBy:String(src.deletedBy||""),
       profileName: inferredName,
-      enabled: src.enabled === true || seededNorad,
+      enabled: !src.deletedAt && (src.enabled === true || seededNorad),
       version: Number(src.version || 1),
       via: inferredVia,
       evMode: inferredEVMode,
@@ -20479,21 +20482,52 @@ function renderPrescripciones(){
     };
   }
 
+  function hc267ProtocolFingerprint(profile){
+    const copy={...profile};
+    ["profileId","profileAliases","updatedAt","updatedBy","deletedAt","deletedBy","version"].forEach(key=>delete copy[key]);
+    copy.profileName=String(copy.profileName||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
+    return JSON.stringify(copy);
+  }
   function hcNormalizeProtocolProfiles(rawProfiles, legacyProtocol, drugLike){
-    const source = Array.isArray(rawProfiles) && rawProfiles.length
-      ? rawProfiles
-      : ((legacyProtocol && typeof legacyProtocol === "object") ? [legacyProtocol] : []);
-    if(!source.length && String(drugLike?.id || "") === "noradrenalina"){
-      return [hcNormalizeGenericDrugProtocol(null, drugLike)];
-    }
-    const seen = new Set();
-    return source.map((p,idx)=>{
-      const n = hcNormalizeGenericDrugProtocol(p || {}, drugLike);
-      let id = String(n.profileId || `protocolo_${idx+1}`);
-      if(seen.has(id)) id = `${id}_${idx+1}`;
-      seen.add(id);
-      return { ...n, profileId:id };
+    // Una lista explícitamente vacía no debe resucitar el protocolo legado.
+    const source=Array.isArray(rawProfiles)?rawProfiles:
+      (legacyProtocol && typeof legacyProtocol==="object" && Object.keys(legacyProtocol).length ? [legacyProtocol] : []);
+    if(!source.length && !Array.isArray(rawProfiles) && String(drugLike?.id||"")==="noradrenalina")return [hcNormalizeGenericDrugProtocol(null,drugLike)];
+    const byId=new Map();
+    source.forEach(raw=>{
+      const p=hcNormalizeGenericDrugProtocol(raw||{},drugLike),id=String(p.profileId);
+      const prev=byId.get(id);
+      if(!prev){byId.set(id,p);return;}
+      const winner=hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(prev) ||
+        (hcProtocolUpdatedMs(p)===hcProtocolUpdatedMs(prev) && (!!p.deletedAt || !prev.deletedAt)) ? p : prev;
+      byId.set(id,{...winner,profileAliases:Array.from(new Set([...prev.profileAliases,...p.profileAliases])).filter(alias=>alias!==id)});
     });
+    // Todos los identificadores de una copia pertenecen a la misma modalidad.
+    // Así una copia vieja tampoco reaparece después de editar dosis o notas.
+    const parents=new Map();
+    const rootOf=id=>{if(!parents.has(id))parents.set(id,id);let root=id;while(parents.get(root)!==root)root=parents.get(root);let next=id;while(parents.get(next)!==next){const old=parents.get(next);parents.set(next,root);next=old;}return root;};
+    byId.forEach(p=>p.profileAliases.forEach(alias=>parents.set(rootOf(alias),rootOf(p.profileId))));
+    const groups=new Map();
+    byId.forEach(p=>{
+      const key=rootOf(p.profileId),group=groups.get(key)||{winner:p,ids:new Set()};
+      [p.profileId,...p.profileAliases].forEach(id=>group.ids.add(id));
+      const prev=group.winner;
+      if(hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(prev) ||
+        (hcProtocolUpdatedMs(p)===hcProtocolUpdatedMs(prev) && p.deletedAt && !prev.deletedAt))group.winner=p;
+      groups.set(key,group);
+    });
+    const out=[],byContents=new Map();
+    groups.forEach(group=>{
+      const p={...group.winner,profileAliases:[...group.ids].filter(id=>id!==group.winner.profileId).sort()};
+      if(p.deletedAt){out.push(p);return;}
+      const fingerprint=hc267ProtocolFingerprint(p),previous=byContents.get(fingerprint);
+      if(!previous){byContents.set(fingerprint,p);out.push(p);return;}
+      // Sólo agrupar configuraciones idénticas. Distintas dosis/vías se conservan.
+      const winner=hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(previous)?p:previous;
+      const aliases=Array.from(new Set([previous.profileId,p.profileId,...previous.profileAliases,...p.profileAliases])).filter(id=>id!==winner.profileId).sort();
+      Object.assign(previous,winner,{profileAliases:aliases});
+    });
+    return out;
   }
 
   const HC_PROTOCOL_STORE_KEY = "hc.rx.protocols.v246";
@@ -20581,47 +20615,36 @@ function renderPrescripciones(){
     return Number.isFinite(ms) ? ms : 0;
   }
 
+  let hc267ProtocolCatalogSnapshot=null,hc267ProtocolCatalogRaw=null;
+  function hc267SavedProtocolCatalog(){
+    const raw=localStorage.getItem(LS.pharmacyDrugs);
+    if(hc267ProtocolCatalogSnapshot===null || raw!==hc267ProtocolCatalogRaw){
+      hc267ProtocolCatalogSnapshot=loadJSON(LS.pharmacyDrugs,[]);hc267ProtocolCatalogRaw=raw;
+    }
+    return hc267ProtocolCatalogSnapshot;
+  }
   function hcProtocolProfilesForDrug(drug){
-    if(!drug) return [];
-    const base = hcNormalizeProtocolProfiles(drug.protocolProfiles, drug.protocol, drug);
-    const localRaw = hcProtocolStoreProfiles(drug.id);
-    if(!localRaw.length) return base;
-
-    const local = localRaw.map(p=>hcNormalizeGenericDrugProtocol(p, drug));
-    const map = new Map(base.map(p=>[String(p.profileId || ""), p]));
-    local.forEach(p=>{
-      const id = String(p.profileId || "");
-      if(!id) return;
-      const prev = map.get(id);
-      // La copia local gana en empate; una copia realmente más nueva llegada
-      // desde el backend gana por updatedAt.
-      if(!prev || hcProtocolUpdatedMs(p) >= hcProtocolUpdatedMs(prev)){
-        map.set(id, p);
-      }
-    });
-    const merged = Array.from(map.values());
-    const localById = new Map(local.map(p=>[String(p.profileId||""),p]));
-    const backendHasNewer = base.some(p=>{
-      const lp = localById.get(String(p.profileId||""));
-      return !lp || hcProtocolUpdatedMs(p) > hcProtocolUpdatedMs(lp);
-    });
-    if(backendHasNewer) hcProtocolStoreSetProfiles(drug.id, merged);
-    // Recuperar perfiles que versiones anteriores guardaban solo en este equipo.
-    // Solo el médico publica los campos de protocolo; nunca altera presentaciones.
-    const localHasNewer = local.some(p=>!base.some(b=>String(b.profileId)===String(p.profileId)) ||
-      hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(base.find(b=>String(b.profileId)===String(p.profileId))));
-    if(localHasNewer && getCurrentUser()?.role === "medico"){
-      const saved = loadJSON(LS.pharmacyDrugs, []);
-      const idx = saved.findIndex(d=>String(d.id)===String(drug.id));
-      if(idx>=0 && JSON.stringify(saved[idx].protocolProfiles)!==JSON.stringify(merged)){
-        const latest = merged.reduce((v,p)=>hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(v)?p:v,{});
-        saved[idx]={...saved[idx],protocolProfiles:merged,protocol:merged.find(p=>p.enabled)||merged[0]||{},
-          updatedAt:latest.updatedAt || isoNowLocalFull()};
-        saveJSON(LS.pharmacyDrugs,saved);
-        hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+    if(!drug)return [];
+    const base=hcNormalizeProtocolProfiles(drug.protocolProfiles,drug.protocol,drug);
+    const local=hcProtocolStoreProfiles(drug.id);
+    const merged=hcNormalizeProtocolProfiles([...base,...local],null,drug);
+    if(JSON.stringify(local)!==JSON.stringify(merged))hcProtocolStoreSetProfiles(drug.id,merged);
+    // Reutilizar una lectura del catálogo durante el render; escribir sólo si
+    // cambian modalidades o se deben consolidar copias, no por añadir metadatos.
+    if(getCurrentUser()?.role==="medico"){
+      const saved=hc267SavedProtocolCatalog(),idx=saved.findIndex(d=>String(d.id)===String(drug.id));
+      if(idx>=0){
+        const previous=hcNormalizeProtocolProfiles(saved[idx].protocolProfiles,saved[idx].protocol,saved[idx]);
+        const hadCopies=Array.isArray(saved[idx].protocolProfiles) && saved[idx].protocolProfiles.length!==previous.length;
+        if(hadCopies || JSON.stringify(previous)!==JSON.stringify(merged)){
+          const next=saved.slice(),active=merged.filter(p=>!p.deletedAt),latest=merged.reduce((v,p)=>hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(v)?p:v,{});
+          next[idx]={...saved[idx],protocolProfiles:merged,protocol:active.find(p=>p.enabled)||active[0]||{},updatedAt:hcProtocolUpdatedMs(saved[idx])>=hcProtocolUpdatedMs(latest) ? (saved[idx].updatedAt||isoNowLocalFull()) : latest.updatedAt};
+          saveJSON(LS.pharmacyDrugs,next);hc267ProtocolCatalogSnapshot=null;
+          hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+        }
       }
     }
-    return merged;
+    return merged.filter(p=>!p.deletedAt);
   }
 
   function hcGenericProtocolForDrug(drug, profileId=""){
@@ -20629,7 +20652,7 @@ function renderPrescripciones(){
     const profiles = hcProtocolProfilesForDrug(drug);
     const wanted = String(profileId || "").trim();
     if(wanted){
-      const found = profiles.find(p=>String(p.profileId)===wanted);
+      const found = profiles.find(p=>String(p.profileId)===wanted || p.profileAliases?.includes(wanted));
       if(found) return found;
     }
     return profiles.find(p=>p.enabled) || profiles[0] || null;
@@ -20899,11 +20922,12 @@ function renderPrescripciones(){
     if(idx < 0) return null;
     const drug = list[idx];
     const draft = hcNormalizeGenericDrugProtocol(protocol, drug);
-    const oldId = String(originalProfileId || draft.profileId || "").trim();
+    const oldId = String(originalProfileId || "").trim();
     const desiredId = hcProtocolSafeId(draft.profileName || draft.profileId || "protocolo", "protocolo");
-    const profiles = hcProtocolProfilesForDrug(drug).slice();
-    const existingIndex = profiles.findIndex(p=>String(p.profileId)===oldId);
-    let finalId = oldId || desiredId;
+    const activeProfiles=hcProtocolProfilesForDrug(drug);
+    const profiles=hcNormalizeProtocolProfiles([...activeProfiles,...hcProtocolStoreProfiles(drugId).filter(p=>p.deletedAt)],null,drug);
+    const existingIndex = profiles.findIndex(p=>!p.deletedAt && (String(p.profileId)===oldId || p.profileAliases?.includes(oldId)));
+    let finalId = existingIndex>=0 ? profiles[existingIndex].profileId : desiredId;
     if(existingIndex < 0){
       finalId = desiredId;
       let n=2;
@@ -20915,6 +20939,9 @@ function renderPrescripciones(){
     const normalized = {
       ...draft,
       profileId: finalId,
+      profileAliases:existingIndex>=0 ? profiles[existingIndex].profileAliases : draft.profileAliases,
+      deletedAt:"",
+      deletedBy:"",
       updatedAt: now,
       updatedBy: draft.updatedBy || meNow.name || meNow.username || ""
     };
@@ -20925,7 +20952,7 @@ function renderPrescripciones(){
     // a los valores anteriores mientras se sincroniza el catálogo.
     hcProtocolStoreSetProfiles(drugId, profiles);
 
-    const legacy = profiles.find(p=>p.enabled) || profiles[0] || normalized;
+    const legacy = profiles.find(p=>p.enabled && !p.deletedAt) || profiles.find(p=>!p.deletedAt) || {};
     list[idx] = {
       ...drug,
       protocolProfiles: profiles,
@@ -20943,33 +20970,38 @@ function renderPrescripciones(){
     hcBackendScheduleUrgentPush();
 
     const freshProfile = fresh
-      ? hcProtocolProfilesForDrug(fresh).find(p=>String(p.profileId)===String(finalId))
+      ? hcProtocolProfilesForDrug(fresh).find(p=>String(p.profileId)===String(finalId) || p.profileAliases?.includes(String(finalId)))
       : null;
     return freshProfile || normalized;
   }
 
-  function hcDeleteGenericDrugProtocol(drugId, profileId){
-    const list=getPharmacyCatalog(DEFAULT_INFUSION_DRUGS,true);
-    const idx=list.findIndex(x=>String(x.id)===String(drugId));
-    if(idx<0) return false;
-    const drug=list[idx];
-    const profiles=hcProtocolProfilesForDrug(drug).filter(p=>String(p.profileId)!==String(profileId));
-    hcProtocolStoreSetProfiles(drugId, profiles);
-    const meNow = getCurrentUser ? (getCurrentUser() || {}) : {};
-    const now = isoNowLocalFull();
-    list[idx]={
-      ...drug,
-      protocolProfiles:profiles,
-      protocol:(profiles.find(p=>p.enabled)||profiles[0]||{}),
-      updatedAt:now,
-      updatedBy:meNow.username||drug.updatedBy||"",
-      updatedByName:meNow.name||meNow.username||drug.updatedByName||""
-    };
-    setPharmacyCatalog(list);
-    hcRefreshLiveDrugFromCatalog(drugId);
-    hcBackendMarkLocalSavedSoon();
-    hcBackendScheduleUrgentPush();
+  function hcDeleteGenericDrugProtocol(drugId,profileId){
+    if(getCurrentUser()?.role!=="medico")return false;
+    try{
+    const list=getPharmacyCatalog(DEFAULT_INFUSION_DRUGS,true),idx=list.findIndex(d=>String(d.id)===String(drugId));
+    if(idx<0)return false;
+    const drug=list[idx],active=hcProtocolProfilesForDrug(drug);
+    const selected=active.find(p=>String(p.profileId)===String(profileId) || p.profileAliases?.includes(String(profileId)));
+    if(!selected){
+      // Un segundo toque confirma la misma baja; no crea otra modalidad.
+      const tomb=hcProtocolStoreProfiles(drugId).find(p=>p.deletedAt && (String(p.profileId)===String(profileId) || p.profileAliases?.includes(String(profileId))));
+      if(!tomb)return false;
+      const stored=loadJSON(LS.pharmacyDrugs,[]).find(d=>String(d.id)===String(drugId));
+      return !!stored?.protocolProfiles?.some(p=>p.deletedAt && (p.profileId===tomb.profileId || p.profileAliases?.includes(tomb.profileId)));
+    }
+    const me=getCurrentUser()||{},now=isoNowLocalFull(),ids=new Set([selected.profileId,...(selected.profileAliases||[])]);
+    const all=hcNormalizeProtocolProfiles([...(drug.protocolProfiles||[]),...hcProtocolStoreProfiles(drugId)],null,drug);
+    const kept=all.filter(p=>!ids.has(p.profileId) && !(p.profileAliases||[]).some(id=>ids.has(id)));
+    kept.push({...selected,enabled:false,deletedAt:now,deletedBy:me.username||me.name||"",updatedAt:now,updatedBy:me.username||me.name||""});
+    hcProtocolStoreSetProfiles(drugId,kept);
+    const remaining=kept.filter(p=>!p.deletedAt);
+    list[idx]={...drug,protocolProfiles:kept,protocol:remaining.find(p=>p.enabled)||remaining[0]||{},updatedAt:now,updatedBy:me.username||"",updatedByName:me.name||me.username||""};
+    setPharmacyCatalog(list);hcRefreshLiveDrugFromCatalog(drugId);
+    const stored=loadJSON(LS.pharmacyDrugs,[]).find(d=>String(d.id)===String(drugId));
+    if(!stored?.protocolProfiles?.some(p=>p.deletedAt && ids.has(p.profileId)))return false;
+    hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
     return true;
+    }catch(err){console.warn("v267: no se pudo confirmar la eliminación del protocolo",err);return false;}
   }
 
   function showGenericDrugProtocolModal(drug, requestedProfileId="", requestedTemplateName="", template={}){
@@ -21182,7 +21214,7 @@ function renderPrescripciones(){
     document.getElementById("hcProtocolDeleteBtn")?.addEventListener("click",()=>{
       if(!originalProfileId) return;
       if(!confirm(`¿Eliminar el protocolo “${p.profileName||originalProfileId}”?`)) return;
-      hcDeleteGenericDrugProtocol(drug.id,originalProfileId);
+      if(!hcDeleteGenericDrugProtocol(drug.id,originalProfileId))return alert("No se pudo confirmar la eliminación guardada. Reintentá.");
       root.dataset.prProtocolProfile="";root.dataset.prProtocolApplied="";close();renderPrescripciones();toast(`${drug.nombre}: protocolo eliminado.`);
     });
     document.getElementById("hcProtocolSaveBtn")?.addEventListener("click",()=>{
@@ -27038,7 +27070,7 @@ function patientHasPendingNurseAlert(patientId){
     // los controles de las prescripciones existentes.
     try{ bindCalc(); refreshCalc(); }
     catch(error){
-      console.error("v266 formulario de prescripción",error);
+      console.error("v267 formulario de prescripción",error);
       const box=root.querySelector("#prCalcBox");
       if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
     }
@@ -44017,7 +44049,7 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
       console.info("HC v224: caché clínica heredada compactada",raw.length,"→",JSON.stringify(out).length);
     }catch(e){console.warn("v224 compactación inicial de caché:",e);}
   }
-  // v266: no ejecutar la limpieza heredada que descarta ingresos de la caché.
+  // v267: no ejecutar la limpieza heredada que descarta ingresos de la caché.
   // La compresión conserva el contenido completo en menos espacio.
   console.info("HC v225: contraste clínico restaurado, prescripciones por servicio y scroll móvil activos.");
 })();
@@ -46166,7 +46198,7 @@ document.addEventListener('dblclick',e=>{const tile=e.target.closest?.('.hc232Vi
 /* -------- Tiempo real práctico: cambios locales salen ya; pull visible sub-segundo -------- */
 function kickSync(){try{if(session&&session.role!=='superadmin'){hc215ScheduleSync?.(5);setTimeout(()=>{try{if(hc207Connected&&!hc215Syncing)hc215SyncCycle?.()}catch(_){ }},15)}}catch(_){ }}
 for(const name of ['setClinical','setPatients','setBeds','setRegistry','setAppointments','setActivity','setChats']){try{const old=window[name]||globalThis[name];if(typeof old==='function'&&!old.__hc232){const w=function(){const r=old.apply(this,arguments);kickSync();return r};w.__hc232=true;window[name]=w;try{globalThis[name]=w}catch(_){ }}}catch(_){ }}
-// v266: el watchdog clínico único ya gestiona reconexión y sincronización.
+// v267: el watchdog clínico único ya gestiona reconexión y sincronización.
 setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;refreshActiveCalls(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')||$('#hc232CallLobby')?.classList.contains('show')||$('#hcSettingsModal')?.classList.contains('show'))refreshCollabDirectory(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')){if(floatMode.type==='global')refreshGlobalChat();else if(floatMode.peer==='admin'||session?.localSeed)refreshSeedConversation(floatMode.peer,false).then(()=>renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer));}},3000);
 window.addEventListener('online',()=>{kickSync();refreshCollabDirectory(true);refreshActiveCalls(false)});window.addEventListener('focus',()=>{kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)}});
 
@@ -46761,8 +46793,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v266";
-    document.title = "HC Demo v266 · Supabase";
+    window.HC_DEMO_VERSION = "v267";
+    document.title = "HC Demo v267 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46801,7 +46833,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v266-style">
+<style id="hc-v267-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46819,8 +46851,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v266-features">
-/* v266: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v267-features">
+/* v267: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46906,7 +46938,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v266.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v267.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46923,11 +46955,11 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v266';document.title='Hospitalito v266 · Supabase';
+  window.HC_DEMO_VERSION='v267';document.title='Hospitalito v267 · Supabase';
 })();
 </script>
 
-<script id="hc-v266-request-drafts">
+<script id="hc-v267-request-drafts">
 const hc264RequestDrafts=new Map();
 function hc264RequestDraftKey(module,pid){return String(hc207Inst())+"::"+String(pid)+"::"+module;}
 function hc264ClearRequestDraft(root,module,pid){hc264RequestDrafts.delete(hc264RequestDraftKey(module,pid));root.dataset.hc264DraftReset="1";}
@@ -46960,7 +46992,7 @@ function hc264WrapRequestRenderer(base,module,selector,fields){
 renderNUT=hc264WrapRequestRenderer(renderNUT,"nut","#medNutricion","#nutType,#nutRate,#nutVolume,#nutNote,#nutReqTiming,#nutReqDate,#nutReqAt,[data-nut-feature]");
 window.renderKINE=hc264WrapRequestRenderer(window.renderKINE,"kine","#medKinesiologia","#kineReqObs,#kineReqTiming,#kineReqDate,#kineReqAt,[data-kine-req-type]");
 </script>
-<style id="hc-v266-touch-list">
+<style id="hc-v267-touch-list">
 #hcV245RxPortal,#hcV246RxPortal,#hcV196DrugPortal,.hcDrugSuggestions{overflow-y:auto!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;}
 .hcV245RxRow,.hcV196DrugRow,[data-hc-v246-rx],.hcDrugSuggestion{touch-action:pan-y!important;user-select:none;-webkit-user-select:none;}
 #medPres .prDrugPickRow>.field:first-child{min-width:0;}
