@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v267 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v268 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -20488,6 +20488,20 @@ function renderPrescripciones(){
     copy.profileName=String(copy.profileName||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/\s+/g," ").trim();
     return JSON.stringify(copy);
   }
+  // v268: una baja es definitiva para ese identificador. Para crear otra
+  // modalidad se asigna un ID nuevo, incluso si se reutiliza el mismo nombre.
+  function hcProtocolPreferredProfile(previous,incoming){
+    if(!!previous.deletedAt!==!!incoming.deletedAt)return incoming.deletedAt?incoming:previous;
+    return hcProtocolUpdatedMs(incoming)>=hcProtocolUpdatedMs(previous)?incoming:previous;
+  }
+  function hcProtocolMutationTime(drug,profiles=[]){
+    const now=Date.parse(isoNowLocalFull())||Date.now();
+    const recordTime=typeof hcBackendRecordTs==="function" ? Number(hcBackendRecordTs(drug))||0 : hcProtocolUpdatedMs(drug);
+    const latest=Math.max(recordTime,...profiles.map(hcProtocolUpdatedMs),0);
+    // La protección del catálogo compara fechas de todo el registro. Un reloj
+    // atrasado no debe impedir guardar una baja o una edición del médico.
+    return new Date(Math.max(now,latest+1)).toISOString();
+  }
   function hcNormalizeProtocolProfiles(rawProfiles, legacyProtocol, drugLike){
     // Una lista explícitamente vacía no debe resucitar el protocolo legado.
     const source=Array.isArray(rawProfiles)?rawProfiles:
@@ -20498,8 +20512,7 @@ function renderPrescripciones(){
       const p=hcNormalizeGenericDrugProtocol(raw||{},drugLike),id=String(p.profileId);
       const prev=byId.get(id);
       if(!prev){byId.set(id,p);return;}
-      const winner=hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(prev) ||
-        (hcProtocolUpdatedMs(p)===hcProtocolUpdatedMs(prev) && (!!p.deletedAt || !prev.deletedAt)) ? p : prev;
+      const winner=hcProtocolPreferredProfile(prev,p);
       byId.set(id,{...winner,profileAliases:Array.from(new Set([...prev.profileAliases,...p.profileAliases])).filter(alias=>alias!==id)});
     });
     // Todos los identificadores de una copia pertenecen a la misma modalidad.
@@ -20512,8 +20525,7 @@ function renderPrescripciones(){
       const key=rootOf(p.profileId),group=groups.get(key)||{winner:p,ids:new Set()};
       [p.profileId,...p.profileAliases].forEach(id=>group.ids.add(id));
       const prev=group.winner;
-      if(hcProtocolUpdatedMs(p)>hcProtocolUpdatedMs(prev) ||
-        (hcProtocolUpdatedMs(p)===hcProtocolUpdatedMs(prev) && p.deletedAt && !prev.deletedAt))group.winner=p;
+      group.winner=hcProtocolPreferredProfile(prev,p);
       groups.set(key,group);
     });
     const out=[],byContents=new Map();
@@ -20625,14 +20637,17 @@ function renderPrescripciones(){
   }
   function hcProtocolProfilesForDrug(drug){
     if(!drug)return [];
+    const saved=hc267SavedProtocolCatalog(),idx=saved.findIndex(d=>String(d.id)===String(drug.id));
     const base=hcNormalizeProtocolProfiles(drug.protocolProfiles,drug.protocol,drug);
+    const persisted=idx>=0?hcNormalizeProtocolProfiles(saved[idx].protocolProfiles,saved[idx].protocol,saved[idx]):[];
     const local=hcProtocolStoreProfiles(drug.id);
-    const merged=hcNormalizeProtocolProfiles([...base,...local],null,drug);
+    // Un render puede tener una referencia anterior a una escritura de otra
+    // pestaña. Incluir siempre la copia persistida antes de reconciliar.
+    const merged=hcNormalizeProtocolProfiles([...base,...persisted,...local],null,drug);
     if(JSON.stringify(local)!==JSON.stringify(merged))hcProtocolStoreSetProfiles(drug.id,merged);
     // Reutilizar una lectura del catálogo durante el render; escribir sólo si
     // cambian modalidades o se deben consolidar copias, no por añadir metadatos.
     if(getCurrentUser()?.role==="medico"){
-      const saved=hc267SavedProtocolCatalog(),idx=saved.findIndex(d=>String(d.id)===String(drug.id));
       if(idx>=0){
         const previous=hcNormalizeProtocolProfiles(saved[idx].protocolProfiles,saved[idx].protocol,saved[idx]);
         const hadCopies=Array.isArray(saved[idx].protocolProfiles) && saved[idx].protocolProfiles.length!==previous.length;
@@ -20927,6 +20942,8 @@ function renderPrescripciones(){
     const activeProfiles=hcProtocolProfilesForDrug(drug);
     const profiles=hcNormalizeProtocolProfiles([...activeProfiles,...hcProtocolStoreProfiles(drugId).filter(p=>p.deletedAt)],null,drug);
     const existingIndex = profiles.findIndex(p=>!p.deletedAt && (String(p.profileId)===oldId || p.profileAliases?.includes(oldId)));
+    // Un formulario abierto antes de una baja no es una solicitud de creación.
+    if(oldId && existingIndex<0)return null;
     let finalId = existingIndex>=0 ? profiles[existingIndex].profileId : desiredId;
     if(existingIndex < 0){
       finalId = desiredId;
@@ -20935,7 +20952,7 @@ function renderPrescripciones(){
     }
 
     const meNow = getCurrentUser ? (getCurrentUser() || {}) : {};
-    const now = isoNowLocalFull();
+    const now = hcProtocolMutationTime(drug,profiles);
     const normalized = {
       ...draft,
       profileId: finalId,
@@ -20989,7 +21006,7 @@ function renderPrescripciones(){
       const stored=loadJSON(LS.pharmacyDrugs,[]).find(d=>String(d.id)===String(drugId));
       return !!stored?.protocolProfiles?.some(p=>p.deletedAt && (p.profileId===tomb.profileId || p.profileAliases?.includes(tomb.profileId)));
     }
-    const me=getCurrentUser()||{},now=isoNowLocalFull(),ids=new Set([selected.profileId,...(selected.profileAliases||[])]);
+    const me=getCurrentUser()||{},now=hcProtocolMutationTime(drug,hcProtocolStoreProfiles(drugId)),ids=new Set([selected.profileId,...(selected.profileAliases||[])]);
     const all=hcNormalizeProtocolProfiles([...(drug.protocolProfiles||[]),...hcProtocolStoreProfiles(drugId)],null,drug);
     const kept=all.filter(p=>!ids.has(p.profileId) && !(p.profileAliases||[]).some(id=>ids.has(id)));
     kept.push({...selected,enabled:false,deletedAt:now,deletedBy:me.username||me.name||"",updatedAt:now,updatedBy:me.username||me.name||""});
@@ -46793,8 +46810,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v267";
-    document.title = "HC Demo v267 · Supabase";
+    window.HC_DEMO_VERSION = "v268";
+    document.title = "HC Demo v268 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46955,7 +46972,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v267';document.title='Hospitalito v267 · Supabase';
+  window.HC_DEMO_VERSION='v268';document.title='Hospitalito v268 · Supabase';
 })();
 </script>
 
