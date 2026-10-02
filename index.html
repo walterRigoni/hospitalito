@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v268 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v269 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -20690,21 +20690,24 @@ function renderPrescripciones(){
     if(protocol) return `${base} — ${protocol.profileName || "Protocolo"}`;
     return manual ? `${base} — Prescripción manual` : base;
   }
+  let hc269PrescriptionChoiceIndex=null;
   function hcPrescriptionChoiceRows(query=""){
     const q=String(query||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
-    const rows=[];
-    INFUSION_DRUGS.filter(d=>d&&d.enabled!==false).forEach(drug=>{
-      const profiles=hcProtocolProfilesForDrug(drug).filter(p=>p.enabled);
-      const baseSearch=`${pharmacyDrugSearchText(drug)} ${(profiles||[]).map(p=>hcProtocolChoiceLabel(drug,p,false)).join(" ")}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
-      if(q && !q.split(" ").every(token=>baseSearch.includes(token))) return;
-      (drug.presentaciones||[]).forEach(presentation=>{
-        const label=`${drug.nombre} — ${presentation.label || "Presentación"}`;
-        const rowSearch=(`${drug.nombre} ${presentation.label||""}`).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
-        if(q && !q.split(" ").every(token=>rowSearch.includes(token)))return;
-        rows.push({drug,presentation,protocol:null,value:hcProtocolChoiceValue(drug.id,"",presentation.id),label,manual:true});
+    // v269: el buscador sólo necesita presentaciones. Reconciliar protocolos
+    // de todas las drogas por cada tecla provocaba lecturas y escrituras masivas.
+    if(!hc269PrescriptionChoiceIndex){
+      const rows=[];
+      INFUSION_DRUGS.filter(d=>d&&d.enabled!==false).forEach(drug=>{
+        (drug.presentaciones||[]).forEach(presentation=>{
+          const label=`${drug.nombre} — ${presentation.label || "Presentación"}`;
+          const searchText=label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+          rows.push({drug,presentation,protocol:null,value:hcProtocolChoiceValue(drug.id,"",presentation.id),label,manual:true,searchText});
+        });
       });
-    });
-    return rows.sort((a,b)=>String(a.label||"").localeCompare(String(b.label||""),"es",{sensitivity:"base"}));
+      hc269PrescriptionChoiceIndex=rows.sort((a,b)=>String(a.label||"").localeCompare(String(b.label||""),"es",{sensitivity:"base"}));
+    }
+    const tokens=q.split(" ").filter(Boolean);
+    return tokens.length?hc269PrescriptionChoiceIndex.filter(row=>tokens.every(token=>row.searchText.includes(token))):hc269PrescriptionChoiceIndex.slice();
   }
 
   function normalizePharmacyDrugObject(d, idx){
@@ -20801,6 +20804,12 @@ function renderPrescripciones(){
     };
   }
   function getPharmacyCatalog(defaults, includeDisabled = true){
+    const raw=localStorage.getItem(LS.pharmacyDrugs),scope=hcProtocolStoreScope(),defaultsKey=JSON.stringify(defaults);
+    const cached=window.__hc269PharmacyCatalogCache;
+    if(cached && cached.raw===raw && cached.scope===scope && cached.defaultsKey===defaultsKey){
+      const rows=includeDisabled?cached.rows:cached.rows.filter(d=>d.enabled!==false);
+      return hc264Clone(rows);
+    }
     const normalizedDefaults = sortPharmacyCatalogList(defaults.map((d,i)=> normalizePharmacyDrugObject(d,i)));
     const stored = loadJSON(LS.pharmacyDrugs, null);
     if(!Array.isArray(stored) || !stored.length){
@@ -20813,7 +20822,10 @@ function renderPrescripciones(){
       if(!seen.has(d.id)) normalizedStored.push(d);
     });
     const visible = sortPharmacyCatalogList(normalizedStored.filter(d => !d.deleted));
-    return includeDisabled ? visible : visible.filter(d => d.enabled !== false);
+    // v269: normalizar una sola vez cada versión del catálogo. Las copias
+    // devueltas siguen siendo independientes para editar stock/presentaciones.
+    window.__hc269PharmacyCatalogCache={raw,scope,defaultsKey,rows:visible};
+    return hc264Clone(includeDisabled ? visible : visible.filter(d => d.enabled !== false));
   }
   function setPharmacyCatalog(list){
     saveJSON(LS.pharmacyDrugs, sortPharmacyCatalogList((Array.isArray(list) ? list : []).map((d,i)=> normalizePharmacyDrugObject(d,i))));
@@ -20927,6 +20939,7 @@ function renderPrescripciones(){
     };
     replaceIn(PHARMACY_CATALOG_ALL);
     replaceIn(INFUSION_DRUGS);
+    hc269PrescriptionChoiceIndex=null;
     if(window.hcRxCatalogAPI) window.hcRxCatalogAPI.drugs = INFUSION_DRUGS.slice();
     return fresh;
   }
@@ -24988,16 +25001,21 @@ function patientHasPendingNurseAlert(patientId){
                 <input id="prStartAtInput" type="datetime-local" value="${escHTML(currentStartAt)}" />
               </div>
               <div class="field">
-                <label>Días de tratamiento</label>
-                <input id="prTreatmentDaysInput" type="number" min="1" step="1" value="${escHTML(currentTreatmentDays || "")}" placeholder="Ej: 7" />
-                <input id="prDurationUnitSel" type="hidden" value="days" />
+                <label>Duración</label>
+                <div style="display:grid;grid-template-columns:1fr .8fr;gap:5px;">
+                  <input id="prTreatmentDaysInput" type="number" min="0.01" step="0.25" value="${escHTML(currentDurationValue || "")}" placeholder="Ej: 7" />
+                  <select id="prDurationUnitSel">
+                    <option value="days" ${currentDurationUnit === "days" ? "selected" : ""}>Días</option>
+                    <option value="hours" ${currentDurationUnit === "hours" ? "selected" : ""}>Horas</option>
+                  </select>
+                </div>
               </div>
               <div class="field">
                 <label>Final</label>
                 <input id="prEndAtInput" type="datetime-local" value="${escHTML(currentEndAt)}" />
               </div>
             </div>
-            <div class="muted" style="font-size:11px; margin-top:6px;">El inicio queda con fecha y hora actual en forma predeterminada, pero puede elegirse cualquier fecha/hora. Enfermería verá y registrará la hora exacta indicada.</div>
+            <div class="muted" style="font-size:11px; margin-top:6px;">Podés modificar el inicio y el final. La duración en días u horas ajusta el final automáticamente. Revisá estos datos antes de agregar a la lista.</div>
           </div>
         ` : ``}
 
@@ -25379,8 +25397,10 @@ function patientHasPendingNurseAlert(patientId){
     root.dataset.prRegularidad="dosis_unica";
     root.dataset.prModeDetails="1";
     root.dataset.prPanelOpen="1";
+    root.dataset.prStartAt=isoFromNow();
+    root.dataset.prStartTouched="1";
     renderPrescripciones();
-    root.querySelector("#btnAddInfusion")?.click();
+    root.querySelector("#prStartAtInput")?.scrollIntoView({block:"nearest"});
   }));
   root.querySelectorAll("[data-pr-edit-profile]").forEach(btn=>btn.addEventListener("click",()=>{
     if(currentDrug) showGenericDrugProtocolModal(currentDrug,btn.dataset.prEditProfile || "");
@@ -25397,16 +25417,13 @@ function patientHasPendingNurseAlert(patientId){
     root.dataset.prDurationUnit="";
     root.dataset.prTreatmentDays="";
     root.dataset.prEndAt="";
-    root.dataset.prStartTouched="";
+    root.dataset.prStartAt=isoFromNow();
+    root.dataset.prStartTouched="1";
     root.dataset.prDrugSearch=pharmacyDrugDisplayName(currentDrug);
     root.dataset.prModeDetails="1";
     root.dataset.prPanelOpen="1";
     renderPrescripciones();
-    if(profile.via === "EV" && profile.evMode === "programada" && !root.querySelector("#prEndAtInput")?.value){
-      alert("Para esta infusión falta una duración. Configurá un caudal fijo en el protocolo o completá la hora final antes de prescribir.");
-      return;
-    }
-    root.querySelector("#btnAddInfusion")?.click();
+    root.querySelector("#prStartAtInput")?.scrollIntoView({block:"nearest"});
   }));
 
   const btnDrugProtocol = $("#btnDrugProtocol");
@@ -25421,7 +25438,9 @@ function patientHasPendingNurseAlert(patientId){
     const selectedId = selectedChoiceNow.drugId || root.dataset.prDrug || "";
     root.dataset.prProtocolProfile = selectedChoiceNow.profileId || "";
     const doseRaw = $("#prDoseInput")?.value || "";
-    const hoursRaw = $("#prHoursInput")?.value || "";
+    const hoursRaw = $("#prHoursInput")?.value ||
+      (($("#prDurationUnitSel")?.value || root.dataset.prDurationUnit)==="hours"
+        ? ($("#prTreatmentDaysInput")?.value || root.dataset.prHours || "") : "");
     let ampRaw = $("#prAmpInput")?.value || "";
     let volRaw = $("#prVolInput")?.value || "";
     const weightRaw = $("#prWeightInput")?.value || "";
@@ -25733,9 +25752,10 @@ function patientHasPendingNurseAlert(patientId){
       const unit = getDurationUnit();
       root.dataset.prDurationUnit = unit;
       root.dataset.prStartAt = startEl.value || root.dataset.prStartAt || isoFromNow();
+      root.dataset.prStartTouched = "1";
       if(isAmiodaronaDrug(getDrugMeta(root.dataset.prDrug || ""))) root.dataset.prStartSource = "amiodarona";
 
-      const rawDuration = hoursEl ? (hoursEl.value || "") : (durEl?.value || "");
+      const rawDuration = durEl && durEl.type!=="hidden" ? (durEl.value || "") : (hoursEl?.value || "");
       if(unit === "hours"){
         root.dataset.prHours = rawDuration;
         root.dataset.prTreatmentDays = "";
@@ -25758,6 +25778,9 @@ function patientHasPendingNurseAlert(patientId){
           endEl.value = nextEnd;
           root.dataset.prEndAt = nextEnd;
         }
+      }else{
+        endEl.value="";
+        root.dataset.prEndAt="";
       }
       refreshCalc();
     };
@@ -25771,19 +25794,28 @@ function patientHasPendingNurseAlert(patientId){
       const unit = getDurationUnit();
       root.dataset.prDurationUnit = unit;
       root.dataset.prStartAt = startEl.value || root.dataset.prStartAt || isoFromNow();
+      root.dataset.prStartTouched = "1";
       if(isAmiodaronaDrug(getDrugMeta(root.dataset.prDrug || ""))) root.dataset.prStartSource = "amiodarona";
       root.dataset.prEndAt = endEl.value || "";
+      const spanHours=hcTreatmentHoursBetween(startEl.value,endEl.value);
+      if(!spanHours){
+        if(durEl)durEl.value="";
+        if(hoursEl)hoursEl.value="";
+        root.dataset.prHours="";root.dataset.prTreatmentDays="";
+        refreshCalc();return;
+      }
 
       if(unit === "hours"){
         const hours = hcTreatmentHoursBetween(startEl.value, endEl.value);
         if(hours){
-          if(hoursEl) hoursEl.value = hours;
-          else if(durEl) durEl.value = hours;
+          if(durEl && durEl.type!=="hidden")durEl.value=hours;
+          else if(hoursEl)hoursEl.value=hours;
           root.dataset.prHours = hours;
           root.dataset.prTreatmentDays = "";
         }
       }else{
-        const days = hcTreatmentDaysBetween(startEl.value, endEl.value);
+        const hours = hcTreatmentHoursBetween(startEl.value, endEl.value);
+        const days = hours ? String(Math.round(Number(hours)/24*10000)/10000) : "";
         if(days && durEl){
           durEl.value = days;
           root.dataset.prTreatmentDays = days;
@@ -25820,7 +25852,13 @@ function patientHasPendingNurseAlert(patientId){
     }
     if(prTreatmentDaysInput) prTreatmentDaysInput.addEventListener("input", syncTreatmentEndFromDays);
     if(prDurationUnitSel) prDurationUnitSel.addEventListener("change", ()=>{
-      root.dataset.prDurationUnit = prDurationUnitSel.value || "days";
+      const previous=root.dataset.prDurationUnit || currentDurationUnit;
+      const next=prDurationUnitSel.value || "days";
+      const duration=Number(prTreatmentDaysInput?.value || "");
+      if(prTreatmentDaysInput && duration>0 && previous!==next){
+        prTreatmentDaysInput.value=String(Math.round((next==="hours"?duration*24:duration/24)*10000)/10000);
+      }
+      root.dataset.prDurationUnit = next;
       syncTreatmentEndFromDays();
     });
     if(prEndAtInput) prEndAtInput.addEventListener("change", syncTreatmentDaysFromEnd);
@@ -25879,26 +25917,9 @@ function patientHasPendingNurseAlert(patientId){
     const evFrequencySel = $("#prEVFrequencySel");
     const drugSearchInput = $("#prDrugSearchInput");
 
-    function rebuildPrescriptionDrugSelect(query){
-      if(!drugSel) return;
-      const selected = hcProtocolChoiceValue(root.dataset.prDrug || "", root.dataset.prProtocolProfile || "",root.dataset.prPresentation||"");
-      let matches = hcPrescriptionChoiceRows(query);
-      if(selected && !matches.some(x=>x.value===selected)){
-        const d=getDrugMeta(root.dataset.prDrug||"");
-        const p=d && root.dataset.prProtocolProfile ? hcGenericProtocolForDrug(d,root.dataset.prProtocolProfile) : null;
-        if(d) matches.unshift({drug:d,protocol:p,value:selected,label:p?hcProtocolChoiceLabel(d,p,false):hcProtocolChoiceLabel(d,null,true),manual:!p});
-      }
-      drugSel.innerHTML = "";
-      const empty = document.createElement("option"); empty.value=""; empty.textContent="— lista —"; drugSel.appendChild(empty);
-      matches.forEach(x=>{const opt=document.createElement("option");opt.value=x.value;opt.textContent=x.label;if(x.value===selected)opt.selected=true;drugSel.appendChild(opt);});
-      const hint = $("#prDrugSearchHint");
-      if(hint) hint.textContent = query ? `${matches.length} coincidencia${matches.length === 1 ? "" : "s"}` : "Elegí una droga y después su modalidad.";
-    }
-
     if(drugSearchInput){
       drugSearchInput.addEventListener("input", ()=>{
         root.dataset.prDrugSearch = drugSearchInput.value || "";
-        rebuildPrescriptionDrugSelect(root.dataset.prDrugSearch);
       });
     }
 
@@ -25917,13 +25938,14 @@ function patientHasPendingNurseAlert(patientId){
         .trim();
     }
 
+    let hc269RankedSearchIndex=null;
     function hcV246PrescriptionRows(query){
       const q = hcV246RxNorm(query);
       const tokens = q.split(" ").filter(Boolean);
       const source = hcPrescriptionChoiceRows("");
       const scored = [];
 
-      source.forEach((row, index)=>{
+      if(!hc269RankedSearchIndex)hc269RankedSearchIndex=source.map((row,index)=>{
         const drug = row?.drug || {};
         const name = hcV246RxNorm(drug.nombre || "");
         const label = hcV246RxNorm(row?.label || "");
@@ -25937,7 +25959,10 @@ function patientHasPendingNurseAlert(patientId){
         ].join(" "));
         const pharmacySearch = hcV246RxNorm(pharmacyDrugSearchText(drug));
         const hay = hcV246RxNorm([name,label,presentation,category,protocol,pharmacySearch].join(" "));
+        return {row,index,name,label,presentation,protocol,hay};
+      });
 
+      hc269RankedSearchIndex.forEach(({row,index,name,label,presentation,protocol,hay})=>{
         if(tokens.length && !tokens.every(tok=>hay.includes(tok))) return;
 
         let score = 50;
@@ -26544,7 +26569,8 @@ function patientHasPendingNurseAlert(patientId){
           : nowAtClick;
         const durationUnitInput = $("#prDurationUnitSel")?.value || root.dataset.prDurationUnit || ($("#prHoursInput") ? "hours" : "days");
         const treatmentDaysInput = durationUnitInput === "days" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prTreatmentDays || "") : "";
-        const treatmentHoursInput = $("#prHoursInput")?.value || root.dataset.prHours || "";
+        const treatmentHoursInput = $("#prHoursInput")?.value ||
+          (durationUnitInput==="hours" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prHours || "") : "");
         let endAtInput = $("#prEndAtInput")?.value || "";
         if(!endAtInput && treatmentHoursInput){
           endAtInput = hcAddHoursToDateTimeLocal(startAtInput || isoNowLocalFull(), treatmentHoursInput);
@@ -26552,6 +26578,7 @@ function patientHasPendingNurseAlert(patientId){
         if(!endAtInput && treatmentDaysInput){
           endAtInput = hcAddDaysToDateTimeLocal(startAtInput || isoNowLocalFull(), treatmentDaysInput);
         }
+        if(endAtInput && Date.parse(endAtInput)<=Date.parse(startAtInput))return alert("La fecha final debe ser posterior al inicio.");
         const protocolDurationHours=hydrationHours>0 ? hydrationHours
           : (startAtInput && endAtInput ? (Date.parse(endAtInput)-Date.parse(startAtInput))/3600000 : null);
         let regularidadFinal = regularidad;
@@ -45969,7 +45996,7 @@ const obs=new MutationObserver(()=>{
 /* -------- Prescripciones -------- */
 let lastServicePatient='';
 document.addEventListener('click',e=>{if(e.target.closest?.('#btnPrServiceView')&&selectedPatientId)lastServicePatient=String(selectedPatientId);if(e.target.closest?.('#btnPrServiceReturn')){if(lastServicePatient){selectedPatientId=lastServicePatient;try{renderMedCenso?.();renderMed?.();}catch(_){ }}return;}},true);
-function cleanupPrescriptionNoise(){document.querySelectorAll('#medPres div').forEach(d=>{const t=(d.textContent||'').trim();if(t.includes('No corresponde indicar infusión continua para la vía seleccionada.')||t.startsWith('Administración por vía')&&t.includes('No corresponde'))d.remove();});}
+function cleanupPrescriptionNoise(){document.querySelectorAll('#medPres #prCalcBox > div,#medPres .prEVContinuousHint').forEach(d=>{const t=(d.textContent||'').trim();if(t.includes('No corresponde indicar infusión continua para la vía seleccionada.')||t.startsWith('Administración por vía')&&t.includes('No corresponde'))d.remove();});}
 
 /* -------- Colaboración / Miembros -------- */
 let collabDirectory=[],seedConv=new Map(),globalMsgs=[],floatMode={type:'global',peer:''},collabBusy=false,globalBusy=false,activeCalls=[],lastIncomingCall='';
@@ -46810,8 +46837,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v268";
-    document.title = "HC Demo v268 · Supabase";
+    window.HC_DEMO_VERSION = "v269";
+    document.title = "HC Demo v269 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46972,7 +46999,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v268';document.title='Hospitalito v268 · Supabase';
+  window.HC_DEMO_VERSION='v269';document.title='Hospitalito v269 · Supabase';
 })();
 </script>
 
