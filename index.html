@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v264 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v265 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -7028,9 +7028,9 @@ function hcDoctorModuleEvents(patientId, moduleName){
 */
 var HC_DOCTOR_DIRECT_ALERT_CUTOFF_MS = Date.parse("2026-07-27T00:45:00");
 
-function hcDoctorLatestDirectClinicalEvent(patientId, moduleName){
+function hcDoctorLatestDirectClinicalEvent(patientId, moduleName, clinicalSnapshot=null){
   if(!patientId || typeof getClinical !== "function") return null;
-  const cur = getClinical()?.[patientId] || {};
+  const cur = (clinicalSnapshot || getClinical())?.[patientId] || {};
   let rows = [];
 
   if(moduleName === "laboratorio"){
@@ -7080,13 +7080,22 @@ function hcDoctorLatestModuleEvent(patientId, moduleName){
     ? clinicalLatest
     : activityLatest;
 }
-function hcDoctorGetUnreadModules(patientId){
+var hc265DoctorAlertContext=null;
+function hcDoctorGetUnreadModules(patientId, context=null){
   if(!patientId) return [];
-  const reads = hcDoctorLoadAlertReads();
+  if(!context){
+    const reads=hcDoctorLoadAlertReads(),readKey=JSON.stringify(reads);
+    const clinicalRaw=localStorage.getItem(LS.clinical)||"",activityRaw=localStorage.getItem(LS.activity)||"";
+    if(!hc265DoctorAlertContext || hc265DoctorAlertContext.clinicalRaw!==clinicalRaw || hc265DoctorAlertContext.activityRaw!==activityRaw || hc265DoctorAlertContext.readKey!==readKey){
+      hc265DoctorAlertContext={clinicalRaw,activityRaw,readKey,context:{clinical:getClinical(),activity:typeof getActivity==="function"?getActivity():[],reads}};
+    }
+    context=hc265DoctorAlertContext.context;
+  }
+  const reads = context?.reads || hcDoctorLoadAlertReads();
   const patientReads = reads[String(patientId)] || {};
   const latestByModule = {};
 
-  const activity = (typeof getActivity === "function") ? getActivity() : [];
+  const activity = context?.activity || ((typeof getActivity === "function") ? getActivity() : []);
   activity.forEach(event=>{
     if(Number(event?.doctorAlertVersion || 0) < HC_DOCTOR_ALERT_VERSION) return;
     if(String(event?.patientId || "") !== String(patientId)) return;
@@ -7100,7 +7109,7 @@ function hcDoctorGetUnreadModules(patientId){
 
   // Resultados objetivos informados por servicios, aun si activity no llegó.
   ["laboratorio","micro","imagenes"].forEach(moduleName=>{
-    const event = hcDoctorLatestDirectClinicalEvent(patientId, moduleName);
+    const event = hcDoctorLatestDirectClinicalEvent(patientId, moduleName, context?.clinical || null);
     if(!event) return;
     const ms = hcDoctorAlertEventTimeMs(event);
     if(!latestByModule[moduleName] || ms > latestByModule[moduleName].ms){
@@ -7307,7 +7316,7 @@ let hcBackendLocalEditDirty = false;
 let hcBackendLastLocalEditAt = 0;
 let hcBackendDirtyClearTimer = null;
 
-// v264: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+// v265: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
 let hc264EncodedCache=null,hc264DecodedCache=null;
 function hc264Clone(value){return typeof structuredClone==="function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));}
 function hc263PackJSON(value){
@@ -11528,8 +11537,8 @@ function hcPrescriptionItemsForPlanDate(pres, dateKey){
     : [];
 }
 
-function patientHasPendingNurseAlertGlobal(patientId){
-  const cl = getClinical();
+function patientHasPendingNurseAlertGlobal(patientId, clinicalSnapshot=null, persist=true){
+  const cl = clinicalSnapshot || getClinical();
   let changed = false;
   if(applyNurseAckCacheToClinical(cl)) changed = true;
 
@@ -11539,7 +11548,7 @@ function patientHasPendingNurseAlertGlobal(patientId){
     : [];
 
   if(hcClearStaleNurseAlertsForPatientItems(items)) changed = true;
-  if(changed) setClinical(cl);
+  if(changed && persist) setClinical(cl);
 
   return hcNursePrescriptionTasks(items).length > 0;
 }
@@ -18645,7 +18654,7 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
-// v264: suspensión independiente del formulario de cálculo y del paciente anterior.
+// v265: suspensión independiente del formulario de cálculo y del paciente anterior.
 function hcV262BindSuspension(root){
   if(root.hcV262SuspensionBound) return;
   root.hcV262SuspensionBound = true;
@@ -18685,9 +18694,9 @@ function hcV262BindSuspension(root){
       hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
       logAction(`Suspendió prescripción ${name}`,pid);
       // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
-      try{renderMed();}catch(renderError){console.error("v264 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      try{renderMed();}catch(renderError){console.error("v265 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
       if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
-    }catch(error){console.error("v264 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+    }catch(error){console.error("v265 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
   },true);
 }
 
@@ -27005,7 +27014,7 @@ function patientHasPendingNurseAlert(patientId){
     // los controles de las prescripciones existentes.
     try{ bindCalc(); refreshCalc(); }
     catch(error){
-      console.error("v264 formulario de prescripción",error);
+      console.error("v265 formulario de prescripción",error);
       const box=root.querySelector("#prCalcBox");
       if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
     }
@@ -43992,7 +44001,7 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
       console.info("HC v224: caché clínica heredada compactada",raw.length,"→",JSON.stringify(out).length);
     }catch(e){console.warn("v224 compactación inicial de caché:",e);}
   }
-  // v264: no ejecutar la limpieza heredada que descarta ingresos de la caché.
+  // v265: no ejecutar la limpieza heredada que descarta ingresos de la caché.
   // La compresión conserva el contenido completo en menos espacio.
   console.info("HC v225: contraste clínico restaurado, prescripciones por servicio y scroll móvil activos.");
 })();
@@ -45706,8 +45715,8 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   const oldSyncUI=window.syncSessionUI||syncSessionUI;const wrapped=function(){session=loadJSON(LS.session,null);if(session?.role==='superadmin'){showPlatformShell();return;}const r=oldSyncUI.apply(this,arguments);setTimeout(()=>{observerMode();injectTopButtons();refreshContacts(false);refreshNotifications(false)},40);return r;};window.syncSessionUI=wrapped;try{syncSessionUI=wrapped}catch(_){}
   try{const oldErr=hc207Err;hc207Err=function(e,prefix){const r=oldErr.apply(this,arguments);localNotification('sync','Sincronización pendiente',String(prefix||'Supabase')+': '+String(e?.message||e));return r;}}catch(_){}
   window.addEventListener('online',()=>{try{hc215ScheduleSync?.(25)}catch(_){}refreshNotifications(false);refreshContacts(false)});window.addEventListener('focus',()=>{try{hc215ScheduleSync?.(25)}catch(_){}refreshNotifications(false);refreshContacts(false)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){try{hc215ScheduleSync?.(25)}catch(_){}refreshNotifications(false);refreshContacts(false)}});
-  setInterval(()=>{if(document.hidden)return;if(session?.role!=='superadmin'){refreshNotifications(false);refreshContacts(false);if(window.hc231ActiveChat)refreshConversation(window.hc231ActiveChat,true);try{if(hc207Connected&&!hc215Syncing)hc215ScheduleSync?.(25)}catch(_){}}},750);
-  setInterval(()=>{if(document.hidden&&session?.role!=='superadmin')refreshNotifications(false)},3000);
+  setInterval(()=>{if(document.hidden||!session)return;if(session.role!=='superadmin'){refreshNotifications(false);refreshContacts(false);if(window.hc231ActiveChat)refreshConversation(window.hc231ActiveChat,true);}},4000);
+  setInterval(()=>{if(document.hidden&&session&&session.role!=='superadmin')refreshNotifications(false)},15000);
   if('serviceWorker'in navigator){window.addEventListener('load',async()=>{try{const reg=await navigator.serviceWorker.register('./service-worker.js',{updateViaCache:'none'});try{await reg.update();}catch(_){ }try{const keys=await caches.keys();await Promise.all(keys.filter(k=>/^hospitalito-v(238|239)$/.test(k)).map(k=>caches.delete(k)));}catch(_){ }}catch(e){console.warn('PWA',e);}});}
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();window.hc231InstallPrompt=e;const right=$('.topbar>div:last-child');if(right&&!$('#hc231InstallApp')){const b=document.createElement('button');b.className='btn small';b.id='hc231InstallApp';b.type='button';b.textContent='Instalar app';right.insertBefore(b,$('#hc231NotifyBtn')||$('#btnAccount')||null);}});
   setTimeout(()=>{session=loadJSON(LS.session,null);if(session?.role==='superadmin')showPlatformShell();else{observerMode();injectTopButtons();refreshContacts(false);refreshNotifications(false)}},300);
@@ -45881,7 +45890,16 @@ const logoutBase=window.logout||logout;window.logout=logout=function(){try{$('#h
 const mutWords=/(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar|cambiar|mover|alta|defunci[oó]n)/i;
 const viewWords=/(imprimir|vista|ver |volver|buscar|actualizar|hoy|fecha|protocolo|gr[aá]fico|historial|cerrar|abrir|censo)/i;
 function observerPolish(){if(session?.role!=='observador')return;document.querySelectorAll('#appMed input,#appMed textarea,#appAdmin input,#appAdmin textarea').forEach(e=>{if(e.type==='date'||e.type==='search')return;e.readOnly=true;e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed select,#appAdmin select').forEach(e=>e.classList.add('hcV232ObserverLocked'));document.querySelectorAll('#appMed button,#appAdmin button').forEach(b=>{if(b.matches('.tab,[data-medtab],[data-admin-tab],#btnMobileCensusToggle,#btnMobileCensusClose'))return;const t=(b.textContent||'').trim();if(mutWords.test(t)&&!viewWords.test(t))b.classList.add('hcV232ObserverHidden');});}
-const obs=new MutationObserver(()=>{removeWrongTopButtons();observerPolish();cleanupPrescriptionNoise();augmentMembersV232();augmentSeedInstitution();});obs.observe(document.body,{childList:true,subtree:true});setInterval(applyInstitutionLogo,1200);
+let hc265DecorationTimer=null;
+const hc265ObserveOptions={childList:true,subtree:true};
+const obs=new MutationObserver(()=>{
+  if(hc265DecorationTimer!==null)return;
+  hc265DecorationTimer=setTimeout(()=>{
+    hc265DecorationTimer=null;obs.disconnect();
+    try{removeWrongTopButtons();observerPolish();cleanupPrescriptionNoise();augmentMembersV232();augmentSeedInstitution();}
+    finally{obs.observe(document.body,hc265ObserveOptions);}
+  },60);
+});obs.observe(document.body,hc265ObserveOptions);setInterval(()=>{if(!document.hidden)applyInstitutionLogo();},5000);
 
 /* -------- Prescripciones -------- */
 let lastServicePatient='';
@@ -46077,7 +46095,7 @@ function openAccessEditor(username){const is=platformAdvanced?.institutions||[],
 /* Branding público */
 async function applyPublicBrand(){try{const j=await post(AUTH,'publicBranding',{}),s=j.settings||{};const title=$('.topbar>div:first-child>div[style*="font-weight"]');if(title&&s.programName)title.textContent=String(s.programName)+' · Historia Clínica';if(s.programLogo){let img=$('#hc232ProgramLogoTop');if(!img){img=document.createElement('img');img.id='hc232ProgramLogoTop';img.style.cssText='width:26px;height:26px;object-fit:contain;border-radius:6px;margin-right:4px;';$('.topbar>div:first-child')?.prepend(img);}img.src=s.programLogo;}}catch(_){ }}
 
-function applyInstitutionLogo(){try{const logo=String(getInst?.()?.logoData||'');const box=document.querySelector('#adminIntern .adminLogoBox');if(!box)return;if(logo){box.innerHTML=`<img src="${logo}" alt="Logo institucional" style="max-width:100%;max-height:100%;object-fit:contain;">`;box.style.padding='10px';}else if(!box.querySelector('.logoText'))box.innerHTML='<div><div class="logoText">LOGO</div><div class="logoHint">Espacio reservado para logo institucional</div></div>'; }catch(_){ }}
+function applyInstitutionLogo(){try{const logo=String(getInst?.()?.logoData||'');const box=document.querySelector('#adminIntern .adminLogoBox');if(!box)return;if(logo){if(box.querySelector("img")?.getAttribute("src")===logo)return;box.innerHTML=`<img src="${logo}" alt="Logo institucional" style="max-width:100%;max-height:100%;object-fit:contain;">`;box.style.padding='10px';}else if(!box.querySelector('.logoText'))box.innerHTML='<div><div class="logoText">LOGO</div><div class="logoHint">Espacio reservado para logo institucional</div></div>'; }catch(_){ }}
 
 /* -------- Draggable -------- */
 function makeDraggable(win,handle){let drag=null;handle?.addEventListener('pointerdown',e=>{if(innerWidth<=760||e.target.closest('button,input'))return;const r=win.getBoundingClientRect();drag={dx:e.clientX-r.left,dy:e.clientY-r.top};handle.setPointerCapture(e.pointerId);});handle?.addEventListener('pointermove',e=>{if(!drag)return;win.style.left=Math.max(0,Math.min(innerWidth-win.offsetWidth,e.clientX-drag.dx))+'px';win.style.top=Math.max(52,Math.min(innerHeight-win.offsetHeight,e.clientY-drag.dy))+'px';win.style.right='auto';win.style.bottom='auto';});handle?.addEventListener('pointerup',()=>drag=null);}
@@ -46132,7 +46150,7 @@ document.addEventListener('dblclick',e=>{const tile=e.target.closest?.('.hc232Vi
 /* -------- Tiempo real práctico: cambios locales salen ya; pull visible sub-segundo -------- */
 function kickSync(){try{if(session&&session.role!=='superadmin'){hc215ScheduleSync?.(5);setTimeout(()=>{try{if(hc207Connected&&!hc215Syncing)hc215SyncCycle?.()}catch(_){ }},15)}}catch(_){ }}
 for(const name of ['setClinical','setPatients','setBeds','setRegistry','setAppointments','setActivity','setChats']){try{const old=window[name]||globalThis[name];if(typeof old==='function'&&!old.__hc232){const w=function(){const r=old.apply(this,arguments);kickSync();return r};w.__hc232=true;window[name]=w;try{globalThis[name]=w}catch(_){ }}}catch(_){ }}
-setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;try{if(Date.now()-Number(window.hc215LastCycleAt||0)>5000)kickSync();}catch(_){ }},5000);
+// v265: el watchdog clínico único ya gestiona reconexión y sincronización.
 setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;refreshActiveCalls(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')||$('#hc232CallLobby')?.classList.contains('show')||$('#hcSettingsModal')?.classList.contains('show'))refreshCollabDirectory(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')){if(floatMode.type==='global')refreshGlobalChat();else if(floatMode.peer==='admin'||session?.localSeed)refreshSeedConversation(floatMode.peer,false).then(()=>renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer));}},3000);
 window.addEventListener('online',()=>{kickSync();refreshCollabDirectory(true);refreshActiveCalls(false)});window.addEventListener('focus',()=>{kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)}});
 
@@ -46173,11 +46191,12 @@ body[data-hc-theme="light"] #medPres .hcServiceRxItemTop .isPaused,body[data-hc-
 (()=>{
 'use strict';window.HC_DEMO_VERSION='v249';const $=s=>document.querySelector(s);
 function pendingRequest(arr){return Array.isArray(arr)&&arr.some(r=>r&&!r.completed&&!r.deletedAt&&String(r.status||'').toLowerCase()!=='completado');}
-function rolePatientAttention(pid){try{const role=String(session?.role||'').toLowerCase(),cur=(typeof getClinical==='function'?getClinical():{})?.[pid]||{};if(role==='enfermero'&&typeof patientHasPendingNurseAlertGlobal==='function'&&patientHasPendingNurseAlertGlobal(pid))return true;if(role==='medico'&&typeof hcDoctorGetUnreadModules==='function'&&(hcDoctorGetUnreadModules(pid)||[]).length)return true;if(role==='imagenologo'&&pendingRequest(cur.imageRequests))return true;if(role==='bioquimico'&&pendingRequest(cur.labRequests))return true;if(role==='microbiologo'&&pendingRequest(cur.microRequests))return true;if(role==='kinesiologo'&&pendingRequest(cur.kinesiologiaRequests))return true;if(role==='nutricionista'&&pendingRequest(cur.nutritionRequests))return true;if(role==='hemoterapia'&&pendingRequest(cur.hemotherapyRequests))return true;}catch(_){ }return false;}
-function censoItemPid(el){try{if(el?.dataset?.bedId){const a=(getRegistry?.()||[]).find(x=>x&&x.active!==false&&String(x.bedId||'')===String(el.dataset.bedId));return String(a?.patientId||'');}return typeof hcDoctorPatientIdFromCensoItem==='function'?String(hcDoctorPatientIdFromCensoItem(el)||''):'';}catch(_){return ''}}
-function updateMobileCensoAlert(){const b=$('#hcMobileCensoBtn');if(!b)return;let count=0;const seen=new Set(),sel=String((typeof selectedPatientId!=='undefined'?selectedPatientId:'')||'');document.querySelectorAll('#medCenso .censoItem:not(.empty)').forEach(el=>{const pid=censoItemPid(el);if(!pid||pid===sel||seen.has(pid))return;const dom=el.matches('.hcNursePatientAlert,.doctorPatientUnreadItem,.hcImagePatientAlert')||!!el.querySelector('.censoNurseBlink');if(dom||rolePatientAttention(pid)){seen.add(pid);count++;}});b.classList.toggle('hc233CensoAlert',count>0);let badge=b.querySelector('.hc233CensoBadge');if(!badge){badge=document.createElement('span');badge.className='hc233CensoBadge';b.appendChild(badge);}if(badge.textContent!==String(count))badge.textContent=String(count);b.title=count?`${count} paciente${count===1?'':'s'} con novedades pendientes`:'Abrir censo';}
-const censoRoot=$('#medCenso');if(censoRoot){const obs=new MutationObserver(()=>setTimeout(updateMobileCensoAlert,0));obs.observe(censoRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}setInterval(updateMobileCensoAlert,500);document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(updateMobileCensoAlert,80)});window.addEventListener('focus',()=>setTimeout(updateMobileCensoAlert,80));
-function paintPeerStates(){try{document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(tile=>{const key=tile.dataset.peer||'';let st=tile.querySelector('.hc233PeerState');if(!st){st=document.createElement('div');st.className='hc233PeerState';tile.appendChild(st);}const mine=(session?.localSeed)?`seed:${String(localStorage.getItem(LS.seedAdminInstitutionId)||session?.institutionId||'')}`:`user:${session?.username||''}`;if(key===mine){st.textContent='Este dispositivo';return;}const pc=callCtx?.peers?.get?.(key),cs=pc?.connectionState||'new';st.textContent=cs==='connected'?'Conectado':cs==='failed'?'Red bloqueada / reintentando':cs==='disconnected'?'Reconectando…':'Conectando…';});}catch(_){ }}setInterval(paintPeerStates,600);
+function rolePatientAttention(pid,context=null){try{const role=String(session?.role||'').toLowerCase(),cur=(context?.clinical || (typeof getClinical==='function'?getClinical():{}))?.[pid]||{};if(role==='enfermero'&&typeof patientHasPendingNurseAlertGlobal==='function'&&patientHasPendingNurseAlertGlobal(pid,context?.clinical||null,false))return true;if(role==='medico'&&typeof hcDoctorGetUnreadModules==='function'&&(hcDoctorGetUnreadModules(pid,context)||[]).length)return true;if(role==='imagenologo'&&pendingRequest(cur.imageRequests))return true;if(role==='bioquimico'&&pendingRequest(cur.labRequests))return true;if(role==='microbiologo'&&pendingRequest(cur.microRequests))return true;if(role==='kinesiologo'&&pendingRequest(cur.kinesiologiaRequests))return true;if(role==='nutricionista'&&pendingRequest(cur.nutritionRequests))return true;if(role==='hemoterapia'&&pendingRequest(cur.hemotherapyRequests))return true;}catch(_){ }return false;}
+function censoItemPid(el,registry=null){try{if(el?.dataset?.bedId){const a=(registry||getRegistry?.()||[]).find(x=>x&&x.active!==false&&String(x.bedId||'')===String(el.dataset.bedId));return String(a?.patientId||'');}return typeof hcDoctorPatientIdFromCensoItem==='function'?String(hcDoctorPatientIdFromCensoItem(el)||''):'';}catch(_){return ''}}
+let hc265CensoLastRun=0;
+function updateMobileCensoAlert(){if(document.hidden || Date.now()-hc265CensoLastRun<1800)return;hc265CensoLastRun=Date.now();const b=$('#hcMobileCensoBtn');if(!b)return;const context={clinical:getClinical(),activity:getActivity(),reads:hcDoctorLoadAlertReads()},registry=getRegistry();let count=0;const seen=new Set(),sel=String((typeof selectedPatientId!=='undefined'?selectedPatientId:'')||'');document.querySelectorAll('#medCenso .censoItem:not(.empty)').forEach(el=>{const pid=censoItemPid(el,registry);if(!pid||pid===sel||seen.has(pid))return;const dom=el.matches('.hcNursePatientAlert,.doctorPatientUnreadItem,.hcImagePatientAlert')||!!el.querySelector('.censoNurseBlink');if(dom||rolePatientAttention(pid,context)){seen.add(pid);count++;}});b.classList.toggle('hc233CensoAlert',count>0);let badge=b.querySelector('.hc233CensoBadge');if(!badge){badge=document.createElement('span');badge.className='hc233CensoBadge';b.appendChild(badge);}if(badge.textContent!==String(count))badge.textContent=String(count);b.title=count?`${count} paciente${count===1?'':'s'} con novedades pendientes`:'Abrir censo';}
+const censoRoot=$('#medCenso');if(censoRoot){const obs=new MutationObserver(()=>setTimeout(updateMobileCensoAlert,0));obs.observe(censoRoot,{subtree:true,childList:true,attributes:true,attributeFilter:['class']});}setInterval(updateMobileCensoAlert,2000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(updateMobileCensoAlert,80)});window.addEventListener('focus',()=>setTimeout(updateMobileCensoAlert,80));
+function paintPeerStates(){if(document.hidden||!document.querySelector('#hc232CallWindow.show'))return;try{document.querySelectorAll('#hc232VideoGrid .hc232VideoTile').forEach(tile=>{const key=tile.dataset.peer||'';let st=tile.querySelector('.hc233PeerState');if(!st){st=document.createElement('div');st.className='hc233PeerState';tile.appendChild(st);}const mine=(session?.localSeed)?`seed:${String(localStorage.getItem(LS.seedAdminInstitutionId)||session?.institutionId||'')}`:`user:${session?.username||''}`;if(key===mine){st.textContent='Este dispositivo';return;}const pc=callCtx?.peers?.get?.(key),cs=pc?.connectionState||'new';st.textContent=cs==='connected'?'Conectado':cs==='failed'?'Red bloqueada / reintentando':cs==='disconnected'?'Reconectando…':'Conectando…';});}catch(_){ }}setInterval(paintPeerStates,600);
 const bodyCall=$('#hc232CallWindow .hc232VideoArea');if(bodyCall&&!$('#hc233CallHint')){const h=document.createElement('div');h.id='hc233CallHint';h.className='hc233CallHint';h.textContent='Para compartir el sistema, elegí “Esta pestaña” o la ventana actual de Hospitalito en el selector del navegador.';bodyCall.appendChild(h);}
 document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200);
 })();
@@ -46726,8 +46745,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v264";
-    document.title = "HC Demo v264 · Supabase";
+    window.HC_DEMO_VERSION = "v265";
+    document.title = "HC Demo v265 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46766,7 +46785,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v264-style">
+<style id="hc-v265-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46784,8 +46803,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v264-features">
-/* v264: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v265-features">
+/* v265: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46871,7 +46890,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v264.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v265.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46888,11 +46907,11 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v264';document.title='Hospitalito v264 · Supabase';
+  window.HC_DEMO_VERSION='v265';document.title='Hospitalito v265 · Supabase';
 })();
 </script>
 
-<script id="hc-v264-request-drafts">
+<script id="hc-v265-request-drafts">
 const hc264RequestDrafts=new Map();
 function hc264RequestDraftKey(module,pid){return String(hc207Inst())+"::"+String(pid)+"::"+module;}
 function hc264ClearRequestDraft(root,module,pid){hc264RequestDrafts.delete(hc264RequestDraftKey(module,pid));root.dataset.hc264DraftReset="1";}
