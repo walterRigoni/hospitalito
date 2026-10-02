@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v265 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v266 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -7316,9 +7316,33 @@ let hcBackendLocalEditDirty = false;
 let hcBackendLastLocalEditAt = 0;
 let hcBackendDirtyClearTimer = null;
 
-// v265: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+// v266: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
 let hc264EncodedCache=null,hc264DecodedCache=null;
 function hc264Clone(value){return typeof structuredClone==="function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));}
+// v266: el desplazamiento táctil nunca equivale a elegir una fila.
+function hc266BindScrollableChoice(button,container,choose){
+  let gesture=null;
+  button.addEventListener("pointerdown",ev=>{
+    if(ev.isPrimary===false || (ev.pointerType==="mouse" && ev.button!==0))return;
+    gesture={id:ev.pointerId,x:ev.clientX,y:ev.clientY,scroll:container.scrollTop||0,moved:false};
+    if(ev.pointerType==="mouse")ev.preventDefault();
+  });
+  button.addEventListener("pointermove",ev=>{
+    if(gesture && gesture.id===ev.pointerId && Math.hypot(ev.clientX-gesture.x,ev.clientY-gesture.y)>8)gesture.moved=true;
+  },{passive:true});
+  button.addEventListener("pointercancel",()=>{if(gesture)gesture.moved=true;},{passive:true});
+  button.addEventListener("pointerup",ev=>{
+    if(gesture && (Math.hypot(ev.clientX-gesture.x,ev.clientY-gesture.y)>8 || Math.abs((container.scrollTop||0)-gesture.scroll)>2))gesture.moved=true;
+  },{passive:true});
+  button.addEventListener("keydown",ev=>{if(ev.key==="Enter"||ev.key===" ")gesture=null;});
+  button.addEventListener("click",ev=>{
+    ev.preventDefault();ev.stopPropagation();
+    const cancelled=gesture && (gesture.moved || Math.abs((container.scrollTop||0)-gesture.scroll)>2);
+    gesture=null;
+    if(!cancelled)choose();
+  });
+}
+
 function hc263PackJSON(value){
   const json=JSON.stringify(value);
   if(hc264EncodedCache?.json===json)return hc264EncodedCache.packed;
@@ -18654,7 +18678,7 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
-// v265: suspensión independiente del formulario de cálculo y del paciente anterior.
+// v266: suspensión independiente del formulario de cálculo y del paciente anterior.
 function hcV262BindSuspension(root){
   if(root.hcV262SuspensionBound) return;
   root.hcV262SuspensionBound = true;
@@ -18694,9 +18718,9 @@ function hcV262BindSuspension(root){
       hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
       logAction(`Suspendió prescripción ${name}`,pid);
       // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
-      try{renderMed();}catch(renderError){console.error("v265 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      try{renderMed();}catch(renderError){console.error("v266 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
       if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
-    }catch(error){console.error("v265 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+    }catch(error){console.error("v266 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
   },true);
 }
 
@@ -20611,15 +20635,17 @@ function renderPrescripciones(){
     return profiles.find(p=>p.enabled) || profiles[0] || null;
   }
 
-  function hcProtocolChoiceValue(drugId, profileId=""){
-    const d=String(drugId||""); const p=String(profileId||"");
-    return p ? `${d}@@hcproto@@${p}` : d;
+  function hcProtocolChoiceValue(drugId, profileId="", presentationId=""){
+    const d=String(drugId||""); const p=String(profileId||"");const presentation=String(presentationId||"");
+    const base=p ? `${d}@@hcproto@@${p}` : d;
+    return presentation ? `${base}@@hcpres@@${encodeURIComponent(presentation)}` : base;
   }
   function hcParseProtocolChoiceValue(value){
-    const raw=String(value||"");
-    const sep="@@hcproto@@";
-    const pos=raw.indexOf(sep);
-    return pos>=0 ? {drugId:raw.slice(0,pos), profileId:raw.slice(pos+sep.length)} : {drugId:raw, profileId:""};
+    const input=String(value||""),presentationPos=input.indexOf("@@hcpres@@");
+    const raw=presentationPos>=0?input.slice(0,presentationPos):input;
+    let presentationId="";try{presentationId=presentationPos>=0?decodeURIComponent(input.slice(presentationPos+10)):"";}catch(_){}
+    const sep="@@hcproto@@";const pos=raw.indexOf(sep);
+    return {drugId:pos>=0?raw.slice(0,pos):raw,profileId:pos>=0?raw.slice(pos+sep.length):"",presentationId};
   }
   function hcProtocolChoiceLabel(drug, protocol=null, manual=false){
     const base=pharmacyDrugDisplayName(drug);
@@ -20632,9 +20658,13 @@ function renderPrescripciones(){
     INFUSION_DRUGS.filter(d=>d&&d.enabled!==false).forEach(drug=>{
       const profiles=hcProtocolProfilesForDrug(drug).filter(p=>p.enabled);
       const baseSearch=`${pharmacyDrugSearchText(drug)} ${(profiles||[]).map(p=>hcProtocolChoiceLabel(drug,p,false)).join(" ")}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
-      if(q && !baseSearch.includes(q)) return;
-      // La droga aparece una sola vez. Sus vías y modalidades se eligen después.
-      rows.push({drug, protocol:null, value:drug.id, label:pharmacyDrugDisplayName(drug), manual:true});
+      if(q && !q.split(" ").every(token=>baseSearch.includes(token))) return;
+      (drug.presentaciones||[]).forEach(presentation=>{
+        const label=`${drug.nombre} — ${presentation.label || "Presentación"}`;
+        const rowSearch=(`${drug.nombre} ${presentation.label||""}`).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g," ").trim();
+        if(q && !q.split(" ").every(token=>rowSearch.includes(token)))return;
+        rows.push({drug,presentation,protocol:null,value:hcProtocolChoiceValue(drug.id,"",presentation.id),label,manual:true});
+      });
     });
     return rows.sort((a,b)=>String(a.label||"").localeCompare(String(b.label||""),"es",{sensitivity:"base"}));
   }
@@ -24731,7 +24761,7 @@ function patientHasPendingNurseAlert(patientId){
   const currentPlanHour = root.dataset.prPlanHour || currentGridAnchor.key || "06";
   const currentRequiresScheduledGrid = !!currentDrug && (!currentIVMode || currentBolo || (currentProgramada && !currentAmiodarone));
   const currentDrugSearch = root.dataset.prDrugSearch || "";
-  const currentChoiceValue = currentDrug ? hcProtocolChoiceValue(currentDrug.id, selectedProtocolProfileId) : "";
+  const currentChoiceValue = currentDrug ? hcProtocolChoiceValue(currentDrug.id, selectedProtocolProfileId, currentPresentation?.id || "") : "";
   let prescriptionDrugOptions = hcPrescriptionChoiceRows(currentDrugSearch);
   if(currentDrug && !prescriptionDrugOptions.some(x=>x.value===currentChoiceValue)){
     prescriptionDrugOptions.unshift({drug:currentDrug,protocol:currentProtocol,value:currentChoiceValue,label:currentProtocol?hcProtocolChoiceLabel(currentDrug,currentProtocol,false):hcProtocolChoiceLabel(currentDrug,null,true),manual:!currentProtocol});
@@ -24803,12 +24833,7 @@ function patientHasPendingNurseAlert(patientId){
             <div id="prDrugSearchHint" class="muted" style="font-size:10px; margin-top:2px;">${escHTML(prescriptionDrugSearchHint)}</div>
             ${currentDrug && currentProtocol?.enabled ? `<div style="font-size:9.5px;margin-top:2px;color:#9ae6b4;font-weight:800;">${escHTML(currentProtocol.profileName||"Protocolo")} • ${escHTML(currentProtocol.via||"")}${currentProtocol.evMode?` • ${escHTML(evAdministrationModeLabel(currentProtocol.evMode))}`:""} • mín ${escHTML(formatDoseValue(currentProtocolEval?.minDose ?? currentProtocol.minDose))} • media ${escHTML(formatDoseValue(currentProtocolEval?.mediaDose ?? currentProtocol.mediaDose))} • máx ${escHTML(formatDoseValue(currentProtocolEval?.maxDose ?? currentProtocol.maxDose))} ${escHTML(currentProtocol.doseUnit || currentDrug.unidadLabel || "")} • inicia ${escHTML(hcProtocolDoseLevelLabel(currentProtocolEval?.startDoseLevel || currentProtocol.startDoseLevel))}</div>` : (currentDrug ? `<div style="font-size:9.5px;margin-top:2px;color:#fbd38d;">Prescripción manual • tocá Protocolo para configurar modalidades rápidas</div>` : ``)}
           </div>
-          <div class="field">
-            <label>Presentación (lista farmacia)</label>
-            <select id="prPresentationSel">
-              ${currentDrug ? currentDrug.presentaciones.map(p => `<option value="${escHTML(p.id)}" ${currentPresentation && p.id===currentPresentation.id?"selected":""}>${escHTML(p.label)}</option>`).join("") : `<option value="">—</option>`}
-            </select>
-          </div>
+          <input type="hidden" id="prPresentationSel" value="${escHTML(currentPresentation?.id || "")}">
           <div class="field">
             <label>Vía</label>
             <select id="prViaSel">
@@ -25807,7 +25832,7 @@ function patientHasPendingNurseAlert(patientId){
 
     function rebuildPrescriptionDrugSelect(query){
       if(!drugSel) return;
-      const selected = hcProtocolChoiceValue(root.dataset.prDrug || "", root.dataset.prProtocolProfile || "");
+      const selected = hcProtocolChoiceValue(root.dataset.prDrug || "", root.dataset.prProtocolProfile || "",root.dataset.prPresentation||"");
       let matches = hcPrescriptionChoiceRows(query);
       if(selected && !matches.some(x=>x.value===selected)){
         const d=getDrugMeta(root.dataset.prDrug||"");
@@ -25895,7 +25920,7 @@ function patientHasPendingNurseAlert(patientId){
         if(!key || seen.has(key)) continue;
         seen.add(key);
         out.push(item.row);
-        if(out.length >= 80) break;
+
       }
       return out;
     }
@@ -25970,7 +25995,7 @@ function patientHasPendingNurseAlert(patientId){
 
       box.innerHTML = rows.length
         ? rows.map((row,i)=>{
-            const presentation = String(row?.drug?.presentaciones?.[0]?.label || "");
+            const presentation = String(row?.presentation?.label || row?.drug?.presentaciones?.[0]?.label || "");
             const mode = row?.protocol?.evMode ? evAdministrationModeLabel(row.protocol.evMode) : "";
             const meta = [
               row?.drug?.categoria || "",
@@ -25995,9 +26020,7 @@ function patientHasPendingNurseAlert(patientId){
             b.style.background = j === st.active ? "#1b588f" : "transparent";
           });
         });
-        btn.addEventListener("pointerdown", ev=>{
-          ev.preventDefault();
-          ev.stopPropagation();
+        hc266BindScrollableChoice(btn,box,()=>{
           const st = window.__hcV246RxState;
           const row = st?.rows?.[Number(btn.dataset.hcV246Rx)];
           if(!row) return;
@@ -26128,13 +26151,14 @@ function patientHasPendingNurseAlert(patientId){
         }
 
         const drug = getDrugMeta(val);
-        const pres = drug.presentaciones?.[0] || null;
+        const pres = drug.presentaciones?.find(p=>String(p.id)===String(parsedChoice.presentationId)) || drug.presentaciones?.[0] || null;
         const via = normalizePrescriptionRoute(drug, pres, "");
         const ivMode = routeAllowsIVInfusion(drug, pres, via);
 
         const initialEVMode = ivMode ? defaultEVAdministrationMode(drug, pres) : "";
         const isInitialBolo = initialEVMode === "bolo";
         root.dataset.prPresentation = pres?.id || "";
+        root.dataset.prDrugSearch = `${drug.nombre} — ${pres?.label || "Presentación"}`;
         root.dataset.prVia = via;
         root.dataset.prEVMode = initialEVMode;
         root.dataset.prContinua = initialEVMode === "continua" ? "1" : "0";
@@ -26149,7 +26173,7 @@ function patientHasPendingNurseAlert(patientId){
         root.dataset.prHours = ivMode && drug.noGammas && Number(drug.rango.media || 0) > 0
           ? formatDoseValue(Number(root.dataset.prVol || pres?.volume || 500) / Number(drug.rango.media || 1))
           : "";
-        if(isAmiodaronaDrug(drug)){
+        if(isAmiodaronaDrug(drug) && ivMode){
           root.dataset.prVia = "EV";
           root.dataset.prEVMode = "programada";
           root.dataset.prContinua = "0";
@@ -27014,7 +27038,7 @@ function patientHasPendingNurseAlert(patientId){
     // los controles de las prescripciones existentes.
     try{ bindCalc(); refreshCalc(); }
     catch(error){
-      console.error("v265 formulario de prescripción",error);
+      console.error("v266 formulario de prescripción",error);
       const box=root.querySelector("#prCalcBox");
       if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
     }
@@ -37667,8 +37691,7 @@ function hcV193AttachDrugAutocomplete(input,select,api){
     }).join(""):`<div class="hcDrugSuggestionsEmpty">Sin coincidencias.</div>`;
     box.style.display="";
     box.querySelectorAll("[data-hc-drug-index]").forEach(btn=>{
-      btn.addEventListener("mousedown",e=>e.preventDefault());
-      btn.addEventListener("click",()=>choose(rows[Number(btn.dataset.hcDrugIndex)]));
+      hc266BindScrollableChoice(btn,box,()=>choose(rows[Number(btn.dataset.hcDrugIndex)]));
     });
   };
   const mark=()=>{
@@ -37696,7 +37719,7 @@ function hcV243AttachPrescriptionChoiceAutocomplete(input,select){
   const box=document.createElement("div");box.className="hcDrugSuggestions";box.style.display="none";host.appendChild(box);
   let active=-1,rows=[];const close=()=>{box.style.display="none";active=-1;};
   const choose=row=>{if(!row)return;input.value=row.label;select.value=row.value;select.dispatchEvent(new Event("change",{bubbles:true}));close();};
-  const draw=()=>{rows=hcPrescriptionChoiceRows(input.value);active=-1;box.innerHTML=rows.length?rows.map((r,i)=>`<button type="button" class="hcDrugSuggestion" data-hc-v243-choice="${i}"><span class="hcDrugSuggestionName">${escHTML(r.label)}</span><span class="hcDrugSuggestionMeta">${escHTML([r.drug?.categoria||"",r.protocol?.via||"",r.protocol?.evMode?evAdministrationModeLabel(r.protocol.evMode):""].filter(Boolean).join(" • "))}</span></button>`).join(""):`<div class="hcDrugSuggestionsEmpty">Sin coincidencias.</div>`;box.style.display="";box.querySelectorAll("[data-hc-v243-choice]").forEach(btn=>{btn.addEventListener("mousedown",e=>e.preventDefault());btn.addEventListener("click",()=>choose(rows[Number(btn.dataset.hcV243Choice)]));});};
+  const draw=()=>{rows=hcPrescriptionChoiceRows(input.value);active=-1;box.innerHTML=rows.length?rows.map((r,i)=>`<button type="button" class="hcDrugSuggestion" data-hc-v243-choice="${i}"><span class="hcDrugSuggestionName">${escHTML(r.label)}</span><span class="hcDrugSuggestionMeta">${escHTML([r.drug?.categoria||"",r.protocol?.via||"",r.protocol?.evMode?evAdministrationModeLabel(r.protocol.evMode):""].filter(Boolean).join(" • "))}</span></button>`).join(""):`<div class="hcDrugSuggestionsEmpty">Sin coincidencias.</div>`;box.style.display="";box.querySelectorAll("[data-hc-v243-choice]").forEach(btn=>{hc266BindScrollableChoice(btn,box,()=>choose(rows[Number(btn.dataset.hcV243Choice)]));});};
   const mark=()=>{box.querySelectorAll(".hcDrugSuggestion").forEach((el,i)=>el.classList.toggle("active",i===active));if(active>=0)box.querySelectorAll(".hcDrugSuggestion")[active]?.scrollIntoView({block:"nearest"});};
   input.addEventListener("focus",draw);input.addEventListener("input",draw);input.addEventListener("keydown",ev=>{if(box.style.display==="none"&&(ev.key==="ArrowDown"||ev.key==="ArrowUp"))draw();if(ev.key==="ArrowDown"){ev.preventDefault();active=Math.min(rows.length-1,active+1);mark();}else if(ev.key==="ArrowUp"){ev.preventDefault();active=Math.max(0,active-1);mark();}else if(ev.key==="Enter"&&active>=0){ev.preventDefault();choose(rows[active]);}else if(ev.key==="Escape")close();});document.addEventListener("pointerdown",ev=>{if(!host.contains(ev.target))close();});
 }
@@ -38483,16 +38506,9 @@ function hcV196RenderDrugPortal(query=""){
     </button>`;
   }).join(""):`<div class="hcV196DrugEmpty">Sin coincidencias.</div>`;
   box.querySelectorAll("[data-hc-v196-drug]").forEach(btn=>{
-    btn.addEventListener("pointerdown",ev=>{
-      ev.preventDefault();
-      ev.stopPropagation();
-      hcV196LockDropdown(box,"drug-portal");
-    });
-    btn.addEventListener("click",ev=>{
-      ev.preventDefault();
-      ev.stopPropagation();
+    hc266BindScrollableChoice(btn,box,()=>{
       const row=ctx.rows?.[Number(btn.dataset.hcV196Drug)];
-      if(row) hcV196ChooseDrug(row);
+      if(row)hcV196ChooseDrug(row);
     });
   });
   box.dataset.open="1";
@@ -44001,7 +44017,7 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
       console.info("HC v224: caché clínica heredada compactada",raw.length,"→",JSON.stringify(out).length);
     }catch(e){console.warn("v224 compactación inicial de caché:",e);}
   }
-  // v265: no ejecutar la limpieza heredada que descarta ingresos de la caché.
+  // v266: no ejecutar la limpieza heredada que descarta ingresos de la caché.
   // La compresión conserva el contenido completo en menos espacio.
   console.info("HC v225: contraste clínico restaurado, prescripciones por servicio y scroll móvil activos.");
 })();
@@ -46150,7 +46166,7 @@ document.addEventListener('dblclick',e=>{const tile=e.target.closest?.('.hc232Vi
 /* -------- Tiempo real práctico: cambios locales salen ya; pull visible sub-segundo -------- */
 function kickSync(){try{if(session&&session.role!=='superadmin'){hc215ScheduleSync?.(5);setTimeout(()=>{try{if(hc207Connected&&!hc215Syncing)hc215SyncCycle?.()}catch(_){ }},15)}}catch(_){ }}
 for(const name of ['setClinical','setPatients','setBeds','setRegistry','setAppointments','setActivity','setChats']){try{const old=window[name]||globalThis[name];if(typeof old==='function'&&!old.__hc232){const w=function(){const r=old.apply(this,arguments);kickSync();return r};w.__hc232=true;window[name]=w;try{globalThis[name]=w}catch(_){ }}}catch(_){ }}
-// v265: el watchdog clínico único ya gestiona reconexión y sincronización.
+// v266: el watchdog clínico único ya gestiona reconexión y sincronización.
 setInterval(()=>{if(!session||session.role==='superadmin'||document.hidden)return;refreshActiveCalls(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')||$('#hc232CallLobby')?.classList.contains('show')||$('#hcSettingsModal')?.classList.contains('show'))refreshCollabDirectory(false);if($('#hc232GlobalChatWindow')?.classList.contains('show')){if(floatMode.type==='global')refreshGlobalChat();else if(floatMode.peer==='admin'||session?.localSeed)refreshSeedConversation(floatMode.peer,false).then(()=>renderFloatMessages(seedConv.get(floatMode.peer)||[],'direct',window.hc231FindMember?.(floatMode.peer)?.name||floatMode.peer));}},3000);
 window.addEventListener('online',()=>{kickSync();refreshCollabDirectory(true);refreshActiveCalls(false)});window.addEventListener('focus',()=>{kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)});document.addEventListener('visibilitychange',()=>{if(!document.hidden){kickSync();refreshCollabDirectory(false);refreshActiveCalls(false)}});
 
@@ -46476,7 +46492,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
       const key=String(x.row?.value||'');
       if(!key || seen.has(key)) continue;
       seen.add(key);out.push(x.row);
-      if(out.length>=60) break;
+
     }
     return out;
   }
@@ -46533,13 +46549,13 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
     const query=showAll?'':String(input.value||'');
     rows=rankedRows(query);active=-1;
     box.innerHTML=rows.length?rows.map((r,i)=>{
-      const pres=String(r?.drug?.presentaciones?.[0]?.label||'');
+      const pres=String(r?.presentation?.label||r?.drug?.presentaciones?.[0]?.label||'');
       const meta=[r?.drug?.categoria||'',pres,r?.protocol?.via||'',r?.protocol?.evMode&&typeof evAdministrationModeLabel==='function'?evAdministrationModeLabel(r.protocol.evMode):'',r?.manual?'Manual':''].filter(Boolean).join(' • ');
       const label=String(r.label||r?.drug?.nombre||'Medicamento');
       return `<button type="button" class="hcV245RxRow" data-hc-v245-rx="${i}"><span class="hcV245RxName">${typeof escHTML==='function'?escHTML(label):label}</span>${meta?`<span class="hcV245RxMeta">${typeof escHTML==='function'?escHTML(meta):meta}</span>`:''}</button>`;
     }).join(''):'<div class="hcV245RxEmpty">No hay medicamentos disponibles en el catálogo de Farmacia de esta institución.</div>';
     box.querySelectorAll('[data-hc-v245-rx]').forEach(btn=>{
-      btn.addEventListener('pointerdown',ev=>{ev.preventDefault();ev.stopPropagation();const row=rows[Number(btn.dataset.hcV245Rx)];if(row)choose(row);});
+      hc266BindScrollableChoice(btn,box,()=>{const row=rows[Number(btn.dataset.hcV245Rx)];if(row)choose(row);});
     });
     box.dataset.open='1';
     const hint=document.getElementById('prDrugSearchHint');
@@ -46745,8 +46761,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v265";
-    document.title = "HC Demo v265 · Supabase";
+    window.HC_DEMO_VERSION = "v266";
+    document.title = "HC Demo v266 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46785,7 +46801,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v265-style">
+<style id="hc-v266-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46803,8 +46819,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v265-features">
-/* v265: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v266-features">
+/* v266: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46890,7 +46906,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v265.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v266.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46907,11 +46923,11 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v265';document.title='Hospitalito v265 · Supabase';
+  window.HC_DEMO_VERSION='v266';document.title='Hospitalito v266 · Supabase';
 })();
 </script>
 
-<script id="hc-v265-request-drafts">
+<script id="hc-v266-request-drafts">
 const hc264RequestDrafts=new Map();
 function hc264RequestDraftKey(module,pid){return String(hc207Inst())+"::"+String(pid)+"::"+module;}
 function hc264ClearRequestDraft(root,module,pid){hc264RequestDrafts.delete(hc264RequestDraftKey(module,pid));root.dataset.hc264DraftReset="1";}
@@ -46944,5 +46960,10 @@ function hc264WrapRequestRenderer(base,module,selector,fields){
 renderNUT=hc264WrapRequestRenderer(renderNUT,"nut","#medNutricion","#nutType,#nutRate,#nutVolume,#nutNote,#nutReqTiming,#nutReqDate,#nutReqAt,[data-nut-feature]");
 window.renderKINE=hc264WrapRequestRenderer(window.renderKINE,"kine","#medKinesiologia","#kineReqObs,#kineReqTiming,#kineReqDate,#kineReqAt,[data-kine-req-type]");
 </script>
+<style id="hc-v266-touch-list">
+#hcV245RxPortal,#hcV246RxPortal,#hcV196DrugPortal,.hcDrugSuggestions{overflow-y:auto!important;touch-action:pan-y!important;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;}
+.hcV245RxRow,.hcV196DrugRow,[data-hc-v246-rx],.hcDrugSuggestion{touch-action:pan-y!important;user-select:none;-webkit-user-select:none;}
+#medPres .prDrugPickRow>.field:first-child{min-width:0;}
+</style>
 </body>
 </html>
