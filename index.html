@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v261 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v262 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -18552,9 +18552,57 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
+// v262: suspensión independiente del formulario de cálculo y del paciente anterior.
+function hcV262BindSuspension(root){
+  if(root.hcV262SuspensionBound) return;
+  root.hcV262SuspensionBound = true;
+  root.addEventListener("click",function(ev){
+    const btn = ev.target.closest?.('[data-pr-action="suspend-scheduled"]');
+    if(!btn || !root.contains(btn)) return;
+    ev.preventDefault();ev.stopImmediatePropagation();
+    try{
+      const me = getCurrentUser();
+      if(me?.role !== "medico") return alert("Solo el médico puede suspender una prescripción.");
+      const pid = selectedPatientId;
+      if(!pid || String(root.dataset.rxPatientId||"") !== String(pid)) return alert("Actualizá la vista del paciente antes de suspender.");
+      const date = root.dataset.prScheduleDate;
+      if(date && date !== hcCurrentMedicationPlanDate()) return alert("Estás consultando el historial. Tocá Hoy para suspender la orden vigente.");
+      const id = btn.getAttribute("data-pr-id");
+      const live = getClinical();
+      const cur = live?.[pid];
+      const item = cur?.prescripciones?.infusionesContinuas?.find(x=>String(x.id)===String(id));
+      if(!item) return alert("La orden ya no está en el listado vigente. Actualizá la vista.");
+      if(item.deleted || item.deletedAt || item.suspendedAt || item.status === "suspendida") return;
+      const name = item.drugName || item.presentationLabel || "esta prescripción";
+      if(!confirm(`¿Suspender ${name}?`)) return;
+      const at = isoNowLocalFull();
+      Object.assign(item,{
+        active:false,editing:false,status:"suspendida",finishedAt:at,suspendedAt:at,
+        suspendedById:me.id||me.username||"",suspendedByName:me.name||me.username||"",
+        updatedAt:at,updatedById:me.id||me.username||"",updatedByName:me.name||me.username||"",
+        intermittentInfusionRunning:false,pendingHydrationChangeAlert:false,pendingPreparedChangeAlert:false,
+        pendingNurseAlert:true,pendingNurseField:"prescripción suspendida",pendingNurseAt:at,
+        nurseSeenAt:"",nurseSeenByName:""
+      });
+      hcEnsurePrescriptionDailySnapshot(pid,live);
+      setClinical(live);
+      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
+      const saved = getClinical()?.[pid]?.prescripciones?.infusionesContinuas?.find(x=>String(x.id)===String(id));
+      if(!saved?.suspendedAt || saved.active !== false) throw Error("No se pudo conservar la suspensión en este equipo.");
+      hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+      logAction(`Suspendió prescripción ${name}`,pid);
+      // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
+      try{renderMed();}catch(renderError){console.error("v262 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
+    }catch(error){console.error("v262 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+  },true);
+}
+
 function renderPrescripciones(){
   const root = $("#medPres");
   if(!root) return;
+  hcV262BindSuspension(root);
+  root.dataset.rxPatientId = String(selectedPatientId || "");
 
   const me = getCurrentUser();
   const role = me?.role || "";
@@ -26859,8 +26907,14 @@ function patientHasPendingNurseAlert(patientId){
       });
     }
 
-    bindCalc();
-    refreshCalc();
+    // Un dato incompleto del panel de nueva orden no debe dejar inertes
+    // los controles de las prescripciones existentes.
+    try{ bindCalc(); refreshCalc(); }
+    catch(error){
+      console.error("v262 formulario de prescripción",error);
+      const box=root.querySelector("#prCalcBox");
+      if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
+    }
   }
 
   root.querySelectorAll("[data-pr-action='edit-free-text']").forEach(btn => {
@@ -26960,37 +27014,6 @@ function patientHasPendingNurseAlert(patientId){
     });
   });
 
-  root.querySelectorAll("[data-pr-action='suspend-scheduled']").forEach(btn => {
-    btn.addEventListener("click", ()=>{
-      if(!isMedico || !isCurrentPlanView) return;
-      const id = btn.getAttribute("data-pr-id") || "";
-      const liveClinical = getClinical();
-      const item = liveClinical?.[pid]?.prescripciones?.infusionesContinuas?.find(x => String(x.id) === String(id));
-      if(!item) return alert("No se encontró la prescripción vigente. Actualizá la vista.");
-      const name = item.hemotherapyProduct ? item.drugName : (getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación");
-      if(!confirm(`¿Suspender ${name}?`)) return;
-      item.active = false;
-      item.editing = false;
-      item.status = "suspendida";
-      item.finishedAt = isoNowLocalFull();
-      item.suspendedAt = isoNowLocalFull();
-      item.suspendedById = me?.id || "";
-      item.suspendedByName = me?.name || me?.username || "";
-      item.pendingNurseAlert = me?.role === "medico";
-      item.pendingNurseField = me?.role === "medico" ? "prescripción suspendida" : "";
-      item.pendingNurseAt = me?.role === "medico" ? isoNowLocalFull() : "";
-      item.nurseSeenAt = "";
-      item.nurseSeenByName = "";
-      item.updatedAt = isoNowLocalFull();
-      hcEnsurePrescriptionDailySnapshot(pid, liveClinical);
-      setClinical(liveClinical);
-      window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
-      hcBackendMarkLocalSavedSoon();
-      hcBackendScheduleUrgentPush();
-      logAction(`Suspendió prescripción ${name}`, pid);
-      renderMed();
-    });
-  });
 
   root.querySelectorAll("[data-pr-action='modify']").forEach(btn => {
     btn.addEventListener("click", ()=>{
@@ -46583,8 +46606,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v261";
-    document.title = "HC Demo v261 · Supabase";
+    window.HC_DEMO_VERSION = "v262";
+    document.title = "HC Demo v262 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46623,7 +46646,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v261-style">
+<style id="hc-v262-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46641,8 +46664,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v261-features">
-/* v261: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v262-features">
+/* v262: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46728,7 +46751,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v261.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v262.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46745,7 +46768,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v261';document.title='Hospitalito v261 · Supabase';
+  window.HC_DEMO_VERSION='v262';document.title='Hospitalito v262 · Supabase';
 })();
 </script>
 </body>
