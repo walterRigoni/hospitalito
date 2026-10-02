@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v263 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>HC Demo v264 · Hemoterapia y equivalencias de infusión · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -7307,9 +7307,13 @@ let hcBackendLocalEditDirty = false;
 let hcBackendLastLocalEditAt = 0;
 let hcBackendDirtyClearTimer = null;
 
-// v263: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+// v264: compresión reversible. Se conserva el JSON completo, incluidos ingresos y snapshots.
+let hc264EncodedCache=null,hc264DecodedCache=null;
+function hc264Clone(value){return typeof structuredClone==="function" ? structuredClone(value) : JSON.parse(JSON.stringify(value));}
 function hc263PackJSON(value){
-  const input = new TextEncoder().encode(JSON.stringify(value));
+  const json=JSON.stringify(value);
+  if(hc264EncodedCache?.json===json)return hc264EncodedCache.packed;
+  const input = new TextEncoder().encode(json);
   if(!input.length) return "HC263LZW:";
   let dict=new Map(),next=256,w=String.fromCharCode(input[0]),codes=[];
   const emit=x=>codes.push(x.length===1?x.charCodeAt(0):dict.get(x));
@@ -7324,10 +7328,13 @@ function hc263PackJSON(value){
   emit(w);
   let packed="HC263LZW:";
   for(let i=0;i<codes.length;i+=8192)packed+=String.fromCharCode(...codes.slice(i,i+8192));
+  hc264EncodedCache={json,packed};
+  hc264DecodedCache={raw:packed,data:JSON.parse(json)};
   return packed;
 }
 function hc263UnpackJSON(raw){
   if(!String(raw).startsWith("HC263LZW:")) return JSON.parse(raw);
+  if(hc264DecodedCache?.raw===raw)return hc264Clone(hc264DecodedCache.data);
   const encoded=raw.slice(9);let dict=[],next=256,previous="",parts=[];
   for(let i=0;i<encoded.length;i++){
     const code=encoded.charCodeAt(i);
@@ -7341,7 +7348,9 @@ function hc263UnpackJSON(raw){
   }
   const bytesString=parts.join("");const bytes=new Uint8Array(bytesString.length);
   for(let i=0;i<bytes.length;i++)bytes[i]=bytesString.charCodeAt(i);
-  return JSON.parse(new TextDecoder().decode(bytes));
+  const data=JSON.parse(new TextDecoder().decode(bytes));
+  hc264DecodedCache={raw,data};
+  return hc264Clone(data);
 }
 
 function loadJSON(key, fallback){
@@ -11947,7 +11956,10 @@ function renderIngresoUI(){
       const status=root.querySelector("#hc263IngresoRecoveryStatus");
       const ok=await window.hc221PullPatientClinical?.(pid,true);
       if(String(selectedPatientId)!==String(pid))return;
-      if(ok){renderIngresoUI();return;}
+      if(ok){
+        if(!getClinical()?.[pid]?.ingresoFull)await window.hc264RecoverAdmissionBackup?.(pid);
+        renderIngresoUI();return;
+      }
       if(status)status.textContent="Todavía no se pudo recuperar el ingreso. Revisá la conexión y reintentá. No se guardó un ingreso vacío.";
     };
     root.querySelector("#hc263RetryIngreso")?.addEventListener("click",recover);
@@ -11981,6 +11993,7 @@ let mode = rec ? "view" : (isEnfermero ? "view" : "edit");
         <button class="btn" type="button" id="btnPrintIngresoOpen" style="${rec ? "" : "display:none;"}">Imprimir</button>
       </div>
 
+      ${!rec ? `<button type="button" class="btn" id="hc264RecoverIngreso">Recuperar ingreso del respaldo</button>` : ""}
       <div id="ingresoStatus" class="muted" style="font-size:12px; opacity:.85; margin-bottom:10px;"></div>
 
       <div id="ingresoFormWrap" style="display:none;"></div>
@@ -12014,6 +12027,15 @@ let mode = rec ? "view" : (isEnfermero ? "view" : "edit");
 
 
 
+  root.querySelector("#hc264RecoverIngreso")?.addEventListener("click",async()=>{
+    const status=root.querySelector("#ingresoStatus");
+    if(status)status.textContent="Buscando el texto original en el servidor y en el respaldo de este equipo…";
+    await window.hc221PullPatientClinical?.(pid,true);
+    const found=!!getClinical()?.[pid]?.ingresoFull || await window.hc264RecoverAdmissionBackup?.(pid);
+    if(String(selectedPatientId)!==String(pid))return;
+    if(found){renderIngresoUI();return;}
+    if(status)status.textContent="No se encontró el texto original en el servidor ni en el respaldo disponible en este equipo. Conservá los otros equipos: puede seguir guardado allí. No se reemplazó ningún ingreso.";
+  });
   const elStatus   = $("#ingresoStatus");
   const wrapForm   = $("#ingresoFormWrap");
   const wrapPretty = $("#ingresoPrettyWrap");
@@ -12225,7 +12247,7 @@ autoGrowTA($("#in_plan"));
       }else{
         btnSaveNew.style.display = "";
         btnSaveEd.style.display  = "none";
-        elStatus.textContent = "Nuevo ingreso.";
+        elStatus.textContent = "No se encontró el ingreso en la consulta actual. Si ya estaba guardado, intentá recuperar el respaldo antes de cargar otro.";
         renderForm({});
       }
     }
@@ -17808,6 +17830,18 @@ function renderIMG(){
   root.querySelectorAll("[data-img-url]").forEach(btn=>btn.addEventListener("click", ()=>{ const u=hcImageSafeUrl(btn.dataset.imgUrl); if(u) window.open(u,"_blank","noopener"); }));
 }
 
+function hc264RequestTimingHTML(prefix){
+  return `<div class="imgTimingControls"><div class="field"><label>Prioridad y programación</label><select id="${prefix}Timing"><option value="">Elegir prioridad y horario…</option><option value="urgent">Urgente</option><option value="morning">Programado · turno mañana</option><option value="afternoon">Programado · turno tarde</option><option value="night">Programado · turno noche</option><option value="custom">Programado · fecha y hora</option></select></div><div class="field"><label>Fecha programada</label><input id="${prefix}Date" type="date" value="${isoNowLocalFull().slice(0,10)}"></div><div class="field"><label>Hora (para fecha y hora)</label><input id="${prefix}At" type="time"></div></div>`;
+}
+function hc264ReadRequestTiming(root,prefix){
+  const timing=root.querySelector(`#${prefix}Timing`)?.value||"";
+  const date=root.querySelector(`#${prefix}Date`)?.value||"";
+  const time=root.querySelector(`#${prefix}At`)?.value||"";
+  if(!timing)throw Error("Elegí la prioridad y programación de la solicitud.");
+  if(timing!=="urgent" && !date)throw Error("Indicá la fecha programada.");
+  if(timing==="custom" && !time)throw Error("Indicá la hora programada.");
+  return {priority:timing==="urgent"?"urgent":"scheduled",timing,scheduledDate:timing==="urgent"?"":date,scheduledAt:timing==="custom"?`${date}T${time}`:""};
+}
 function renderNUT(){
   const root = $("#medNutricion"); if(!root) return;
   const me = getCurrentUser(); const isMedico = me?.role === "medico"; const isNut = me?.role === "nutricionista"; const pid = selectedPatientId;
@@ -17817,8 +17851,8 @@ function renderNUT(){
   cur.nutritionEvolutions = Array.isArray(cur.nutritionEvolutions) ? cur.nutritionEvolutions : [];
   const reqs = cur.nutritionRequests.filter(x=>!x.deletedAt).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
   const evos = cur.nutritionEvolutions.filter(x=>!x.deletedAt).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
-  root.innerHTML = `<div class="labTwoCols"><div class="card moduleTinyCard"><div class="labSectionTitle">Solicitud nutricional</div>${isMedico ? `<div class="field"><label>Tipo</label><select id="nutType">${NUTRITION_TYPES.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="field" style="margin-top:8px;"><label>Características</label><select id="nutFeatures" multiple size="7">${NUTRITION_FEATURES.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="row" style="margin-top:8px;"><div class="field"><label>Velocidad bomba enteral/parenteral (ml/h)</label><input id="nutRate" type="number" min="0" step="1" placeholder="Ej: 40" /></div><div class="field"><label>Volumen/objetivo diario</label><input id="nutVolume" placeholder="Ej: 1000 ml/día" /></div></div><div class="field" style="margin-top:8px;"><label>Indicaciones / observaciones</label><textarea id="nutNote" class="ta1"></textarea></div><div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:12px;">Solo lectura.</div>`}<div style="margin-top:10px;"><div class="labSectionTitle">Solicitudes</div>${reqs.length ? reqs.map(r=>`<div class="moduleListItem"><b>${escHTML(r.type)}</b> • ${escHTML((r.features||[]).join(", ") || "Sin características")}${r.rateMlH ? ` • <b>${escHTML(r.rateMlH)} ml/h</b>` : ""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="white-space:pre-wrap; margin-top:5px;">${escHTML(r.note)}</div>` : ""}</div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes.</div>`}</div></div><div class="card moduleTinyCard"><div class="labSectionTitle">Nutrición: evolución / contenidos</div>${isNut ? `<div class="field"><label>Evolución o indicación del nutricionista</label><textarea id="nutEvoTxt" placeholder="Tolerancia, cambios de fórmula, objetivos, recomendaciones..."></textarea></div><div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutEvo" type="button">Guardar evolución</button></div>` : `<div class="muted" style="font-size:12px;">Solo el personal de Nutrición puede cargar evoluciones. El médico dispone de lectura.</div>`}<div style="margin-top:10px;">${evos.length ? evos.map(e=>`<div class="moduleListItem"><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div><div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}</div></div></div>`;
-  $("#btnSaveNutReq")?.addEventListener("click", ()=>{ const type = $("#nutType")?.value || "Vía oral"; const features = Array.from($("#nutFeatures")?.selectedOptions || []).map(o=>o.value); const rate = ($("#nutRate")?.value || "").trim(); const volume = ($("#nutVolume")?.value || "").trim(); const note = ($("#nutNote")?.value || "").trim(); const id = uid("nutreq"); const text = `${type}${features.length ? " • " + features.join(", ") : ""}${rate ? " • bomba " + rate + " ml/h" : ""}${volume ? " • " + volume : ""}${note ? " • " + note : ""}`; cur.nutritionRequests.push({ id, type, features, rateMlH: rate, volume, note, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name }); hcEnsurePresArray(cur); cur.prescripciones.infusionesContinuas.unshift(hcTextPrescriptionFromModule({prefix:"Nutrición", text, linkedId:id})); hcEnsurePrescriptionDailySnapshot(pid, cl); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó nutrición para ${buildPatientDisplayName(p)}`, pid); renderNUT(); });
+  root.innerHTML = `<div class="labTwoCols"><div class="card moduleTinyCard"><div class="labSectionTitle">Solicitud nutricional</div>${isMedico ? `<div class="field"><label>Tipo</label><select id="nutType">${NUTRITION_TYPES.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="field" style="margin-top:8px;"><label>Características</label><div class="imgStudyOptions">${NUTRITION_FEATURES.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-nut-feature value="${hcEscAttr(x)}"><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="row" style="margin-top:8px;"><div class="field"><label>Velocidad bomba enteral/parenteral (ml/h)</label><input id="nutRate" type="number" min="0" step="1" placeholder="Ej: 40" /></div><div class="field"><label>Volumen/objetivo diario</label><input id="nutVolume" placeholder="Ej: 1000 ml/día" /></div></div><div class="field" style="margin-top:8px;"><label>Indicaciones / observaciones</label><textarea id="nutNote" class="ta1" placeholder="Motivo clínico y objetivos nutricionales"></textarea></div>${hc264RequestTimingHTML("nutReq")}<div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:12px;">Solo lectura.</div>`}<div style="margin-top:10px;"><div class="labSectionTitle">Solicitudes</div>${reqs.length ? reqs.map(r=>`<div class="moduleListItem imgRequestCard ${hcImageTimingClass(r)}"><span class="imgPriorityBadge ${hcImageTimingClass(r)}">${escHTML(hcImageTimingLabel(r))}</span><br><b>${escHTML(r.type)}</b> • ${escHTML((r.features||[]).join(", ") || "Sin características")}${r.rateMlH ? ` • <b>${escHTML(r.rateMlH)} ml/h</b>` : ""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="white-space:pre-wrap; margin-top:5px;">${escHTML(r.note)}</div>` : ""}</div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes.</div>`}</div></div><div class="card moduleTinyCard"><div class="labSectionTitle">Nutrición: evolución / contenidos</div>${isNut ? `<div class="field"><label>Evolución o indicación del nutricionista</label><textarea id="nutEvoTxt" placeholder="Tolerancia, cambios de fórmula, objetivos, recomendaciones..."></textarea></div><div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutEvo" type="button">Guardar evolución</button></div>` : `<div class="muted" style="font-size:12px;">Solo el personal de Nutrición puede cargar evoluciones. El médico dispone de lectura.</div>`}<div style="margin-top:10px;">${evos.length ? evos.map(e=>`<div class="moduleListItem"><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div><div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}</div></div></div>`;
+  $("#btnSaveNutReq")?.addEventListener("click", ()=>{ if(!isMedico)return; let requestTiming;try{requestTiming=hc264ReadRequestTiming(root,"nutReq");}catch(error){return alert(error.message);} const latest=hcEnsureClinicalPatient(pid); const cl=latest.cl,cur=latest.cur;cur.nutritionRequests ||= []; const type = $("#nutType")?.value || "Vía oral"; const features = Array.from(root.querySelectorAll("[data-nut-feature]:checked")).map(o=>o.value); const rate = ($("#nutRate")?.value || "").trim(); const volume = ($("#nutVolume")?.value || "").trim(); const note = ($("#nutNote")?.value || "").trim(); const id = uid("nutreq"); const text = `${type}${features.length ? " • " + features.join(", ") : ""}${rate ? " • bomba " + rate + " ml/h" : ""}${volume ? " • " + volume : ""}${note ? " • " + note : ""}`; cur.nutritionRequests.push({ id, type, features, ...requestTiming, rateMlH: rate, volume, note, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name }); hcEnsurePresArray(cur); cur.prescripciones.infusionesContinuas.unshift(hcTextPrescriptionFromModule({prefix:"Nutrición", text, linkedId:id})); hcEnsurePrescriptionDailySnapshot(pid, cl); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó nutrición para ${buildPatientDisplayName(p)}`, pid); hc264ClearRequestDraft(root,"nut",pid); renderNUT(); });
   $("#btnSaveNutEvo")?.addEventListener("click", ()=>{ if(!isNut) return alert("Solo el personal de Nutrición puede cargar evoluciones."); const text = ($("#nutEvoTxt")?.value || "").trim(); if(!text) return alert("Escribí una evolución."); cur.nutritionEvolutions.push({id:uid("nutevo"), text, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name}); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`guardó evolución de Nutrición de ${buildPatientDisplayName(p)}`, pid); renderNUT(); });
 }
 
@@ -18611,7 +18645,7 @@ function getPrintDocForAdminCenso(){
   return buildPrintShellNoPatient("Censo (Administración)", body);
 }
 
-// v263: suspensión independiente del formulario de cálculo y del paciente anterior.
+// v264: suspensión independiente del formulario de cálculo y del paciente anterior.
 function hcV262BindSuspension(root){
   if(root.hcV262SuspensionBound) return;
   root.hcV262SuspensionBound = true;
@@ -18651,9 +18685,9 @@ function hcV262BindSuspension(root){
       hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
       logAction(`Suspendió prescripción ${name}`,pid);
       // El guardado ya se realizó. Un error de visualización no debe ocultarlo.
-      try{renderMed();}catch(renderError){console.error("v263 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
+      try{renderMed();}catch(renderError){console.error("v264 render posterior a suspensión",renderError);btn.disabled=true;btn.textContent="Suspendida";}
       if(typeof toast === "function") toast("Prescripción suspendida. Sincronización solicitada.");
-    }catch(error){console.error("v263 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
+    }catch(error){console.error("v264 suspensión",error);alert(`No se pudo completar la suspensión: ${error.message || error}.`);}
   },true);
 }
 
@@ -24700,6 +24734,7 @@ function patientHasPendingNurseAlert(patientId){
   const currentRenalRegimenId = root.dataset.prRenalRegimenId || (currentRenalProfile?.regimens?.length===1 ? currentRenalProfile.regimens[0].id : "");
 
   const modeChoices = [];
+  const unconfiguredModeChoices = [];
   if(currentDrug && currentPresentation){
     const profiles = hcProtocolProfilesForDrug(currentDrug).filter(p => p.enabled && (!p.presentationId || p.presentationId === currentPresentation.id));
     allowedRoutesForPrescription(currentDrug,currentPresentation).forEach(via=>{
@@ -24715,7 +24750,7 @@ function patientHasPendingNurseAlert(patientId){
         }else if(isHeparinaSodicaPresentation(currentDrug,currentPresentation) && via === "EV" && evMode === "continua"){
           modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-built-in="heparina-continua">Infusión continua<br><small>Protocolo de heparina configurado</small></button><button type="button" class="btn small" data-pr-configure-mode="1" data-pr-mode-via="EV" data-pr-mode-ev="continua" data-pr-mode-label="Infusión continua" title="Configurar otra modalidad">⚙</button></div>`);
         }else{
-          modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small" data-pr-configure-mode="1" data-pr-mode-via="${escHTML(via)}" data-pr-mode-ev="${escHTML(evMode)}" data-pr-mode-label="${escHTML(label)}">${escHTML(label)}<br><small>Configurar protocolo</small></button></div>`);
+          unconfiguredModeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small" data-pr-configure-mode="1" data-pr-mode-via="${escHTML(via)}" data-pr-mode-ev="${escHTML(evMode)}" data-pr-mode-label="${escHTML(label)}">${escHTML(label)}<br><small>Configurar protocolo</small></button></div>`);
         }
       });
     });
@@ -24781,7 +24816,7 @@ function patientHasPendingNurseAlert(patientId){
           </div>
         </div>
 
-        ${modePending ? `<div class="hcRxModeChooser"><div class="hcRxModeChooserTitle">${currentDrug ? `Elegí cómo administrar ${escHTML(currentDrug.nombre)}` : "Buscá o elegí una droga"}</div>${currentDrug ? `<div class="hcRxModeChoices">${modeChoices.join("")}</div><div style="margin-top:8px;"><button type="button" class="btn small" id="btnManualPrescription">Completar prescripción manual</button></div>` : ``}</div>` : ``}
+        ${modePending ? `<div class="hcRxModeChooser"><div class="hcRxModeChooserTitle">${currentDrug ? `Elegí cómo administrar ${escHTML(currentDrug.nombre)}` : "Buscá o elegí una droga"}</div>${currentDrug ? `<div class="hcRxModeChoices">${modeChoices.join("")}</div>${unconfiguredModeChoices.length ? `<details class="hc264OtherModes"><summary>Configurar otras opciones (${unconfiguredModeChoices.length})</summary><div class="hcRxModeChoices">${unconfiguredModeChoices.join("")}</div></details>` : ""}<div style="margin-top:8px;"><button type="button" class="btn small" id="btnManualPrescription">Completar prescripción manual</button></div>` : ``}</div>` : ``}
 
         ${currentIVMode ? `
           <div class="row prEVSecondaryRow" style="margin-top:5px;">
@@ -26970,7 +27005,7 @@ function patientHasPendingNurseAlert(patientId){
     // los controles de las prescripciones existentes.
     try{ bindCalc(); refreshCalc(); }
     catch(error){
-      console.error("v263 formulario de prescripción",error);
+      console.error("v264 formulario de prescripción",error);
       const box=root.querySelector("#prCalcBox");
       if(box) box.textContent="Revisá la droga y la presentación del formulario. Las órdenes vigentes siguen disponibles.";
     }
@@ -31674,13 +31709,14 @@ async function bootWithBackend(){
     const canEvo = hcKineCanEvolve();
 
     const reqForm = canReq ? `
-      <div class="moduleChecklist">
-        ${hcKineTypes().map(t=>`<label><input type="checkbox" value="${hcKineEsc(t)}" data-kine-req-type> ${hcKineEsc(t)}</label>`).join("")}
+      <div class="imgStudyOptions">
+        ${hcKineTypes().map(t=>`<label class="imgStudyChoice"><input type="checkbox" value="${hcKineEsc(t)}" data-kine-req-type><span>${hcKineEsc(t)}</span></label>`).join("")}
       </div>
       <div class="field" style="margin-top:8px;">
         <label>Observaciones / objetivo</label>
         <textarea id="kineReqObs" class="ta1" placeholder="Ej: kinesioterapia respiratoria, higiene bronquial, movilización, destete de ARM."></textarea>
       </div>
+      ${hc264RequestTimingHTML("kineReq")}
       <button class="btn primary small" id="btnKineReqSave" type="button" style="margin-top:8px;">Guardar solicitud</button>
     ` : `<div class="muted" style="font-size:11px; margin-bottom:8px;">Las solicitudes son realizadas por el médico.</div>`;
 
@@ -31712,7 +31748,8 @@ async function bootWithBackend(){
           ${reqForm}
           <div style="margin-top:10px;">
             ${reqs.length ? reqs.map(r=>`
-              <div class="moduleListItem">
+              <div class="moduleListItem imgRequestCard ${hcImageTimingClass(r)}">
+                <span class="imgPriorityBadge ${hcImageTimingClass(r)}">${hcKineEsc(hcImageTimingLabel(r))}</span><br>
                 <b>${hcKineEsc((r.types || []).join(", ") || "Solicitud de Kinesiología")}</b>
                 ${r.note ? `<div style="margin-top:4px; white-space:pre-wrap;">${hcKineEsc(r.note)}</div>` : ""}
                 <div class="moduleMeta">${hcKineEsc(hcKineDtm(r.createdAt))} • ${hcKineEsc(r.createdByName || "—")}</div>
@@ -31743,8 +31780,10 @@ async function bootWithBackend(){
       const types = hcKineReadChecks(root, "data-kine-req-type");
       const note = (root.querySelector("#kineReqObs")?.value || "").trim();
       if(!types.length && !note) return alert("Seleccioná al menos una prestación o escribí una observación.");
+      let requestTiming;try{requestTiming=hc264ReadRequestTiming(root,"kineReq");}catch(error){return alert(error.message);}
       const { cl, cur, pid } = hcKineGetCur();
       cur.kinesiologiaRequests.push({
+        ...requestTiming,
         id: hcKineId("kine_req"),
         types,
         note,
@@ -31753,6 +31792,7 @@ async function bootWithBackend(){
         createdByName: hcKineUserName()
       });
       if(typeof logAction === "function") logAction(`solicitó Kinesiología para ${buildPatientDisplayName(findPatient(pid))}`, pid);
+      hc264ClearRequestDraft(root,"kine",pid);
       hcKineSave(cl);
     });
 
@@ -40294,6 +40334,22 @@ bootWithBackend();
       return value;
     }catch(_){ return null; }
   }
+  window.hc264RecoverAdmissionBackup=async function(pid){
+    const scope=hcV203Scope();
+    const rec=await hcV203SafetyLoad(scope);
+    if(scope!==hcV203Scope())return false;
+    const current=(getRegistry()||[]).find(a=>String(a.patientId)===String(pid)&&a.active!==false);
+    const prior=(rec?.snapshot?.registry||[]).find(a=>String(a.patientId)===String(pid)&&a.active!==false);
+    if(!current?.id || String(current.id)!==String(prior?.id))return false;
+    const saved=rec?.snapshot?.clinical?.[pid]?.ingresoFull;
+    if(!saved || (!saved.prettyText && !saved.data))return false;
+    const clinical=getClinical();
+    if(clinical?.[pid]?.ingresoFull)return true;
+    clinical[pid] ||= {};clinical[pid].ingresoFull=saved;
+    setClinical(clinical);
+    window.hc224MarkClinicalFieldDirty?.(pid,"ingresoFull");
+    return !!getClinical()?.[pid]?.ingresoFull;
+  };
   async function hcV203RecoverWholeMissingModules(){
     const scope=hcV203Scope();
     if(!scope) return false;
@@ -41127,6 +41183,7 @@ bootWithBackend();
       }
 
       const raw=backendKey==="clinical" ? hc263PackJSON(next) : JSON.stringify(next);
+      if(localStorage.getItem(key)===raw)return true;
       let ok=false;
       try{
         localStorage.setItem(key,raw);
@@ -42243,7 +42300,7 @@ async function hc221PullPatientClinical(pid,force=false){
   pid=String(pid||"").trim();
   if(!pid||!hc207Connected)return false;
   const now=Date.now(),last=Number(hc221PatientLastPull.get(pid)||0);
-  if(!force&&now-last<2200)return false;
+  if(now-last<(force?1200:20000))return false;
   if(hc221PatientPulling.has(pid))return false;
   hc221PatientPulling.add(pid);
   try{
@@ -42289,7 +42346,7 @@ window.__hcV221PatientRefresh=setInterval(()=>{
     const pid=String(typeof selectedPatientId!=="undefined"?selectedPatientId:"").trim();
     if(pid)hc221PullPatientClinical(pid,false);
   }catch(_){ }
-},900);
+},5000);
 
 window.addEventListener("focus",()=>setTimeout(()=>{
   try{
@@ -42309,7 +42366,7 @@ document.addEventListener("visibilitychange",()=>{
 
 function hc215NextDelay(){
   if(document.hidden)return 2500;
-  return Date.now()<hc214HotUntil?280:750;
+  return Date.now()<hc214HotUntil?1000:5000;
 }
 function hc215ScheduleSync(ms=null){
   clearTimeout(hc207PushTimer);clearTimeout(hc207PollTimer);
@@ -43935,7 +43992,7 @@ body.hcMobilePortrait #medPanel .hcServiceRxView{min-width:0 !important;}
       console.info("HC v224: caché clínica heredada compactada",raw.length,"→",JSON.stringify(out).length);
     }catch(e){console.warn("v224 compactación inicial de caché:",e);}
   }
-  // v263: no ejecutar la limpieza heredada que descarta ingresos de la caché.
+  // v264: no ejecutar la limpieza heredada que descarta ingresos de la caché.
   // La compresión conserva el contenido completo en menos espacio.
   console.info("HC v225: contraste clínico restaurado, prescripciones por servicio y scroll móvil activos.");
 })();
@@ -46669,8 +46726,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v263";
-    document.title = "HC Demo v263 · Supabase";
+    window.HC_DEMO_VERSION = "v264";
+    document.title = "HC Demo v264 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46709,7 +46766,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   setTimeout(decorate,100);
 })();
 </script>
-<style id="hc-v263-style">
+<style id="hc-v264-style">
 #medPres .hcRxMedicationSchedule{display:flex;gap:8px;align-items:center;justify-content:center;overflow-x:auto;min-width:0;text-align:center;}
 #medPres .hc260PlanDate{font-size:9px;flex:0 0 auto;opacity:.8;}
 #medPres .hc260Dose{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding:2px 5px;border:1px solid var(--hc-theme-line,#315879);border-radius:4px;font-size:11px;white-space:nowrap;}
@@ -46727,8 +46784,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 #hc260Anesthesia h4{margin:16px 0 6px;}
 @media(max-width:850px){#medPres .hcRxMedicationGrid{grid-template-columns:1fr;}#medPres .hcRxMedicationSchedule{justify-content:flex-start;}#hc260Anesthesia .hc260Row{grid-template-columns:1fr;}}
 </style>
-<script id="hc-v263-features">
-/* v263: deterministic display and consumption calculations; these helpers do not write clinical data. */
+<script id="hc-v264-features">
+/* v264: deterministic display and consumption calculations; these helpers do not write clinical data. */
 function hcV260CalendarMedicationSlots(item,date){
   return [...hcMedicationSlotsForDate(item,hcDateKeyAddDays(date,-1)),...hcMedicationSlotsForDate(item,date)]
     .filter(slot=>String(slot.at).slice(0,10)===date)
@@ -46814,7 +46871,7 @@ function hcV260SaveAnesthesia(pid,data){
 }
 (()=>{
   const $=s=>document.querySelector(s),esc=escHTML;
-  const draftKey=pid=>'hc.v263.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
+  const draftKey=pid=>'hc.v264.anesthesia.'+String(typeof hcBackendCurrentScope==='function'?hcBackendCurrentScope():'')+'.'+String(getCurrentUser()?.username||'')+'.'+pid;
   function read(){const box=$('#hc260Anesthesia'),d={};box.querySelectorAll('[data-an-field]').forEach(x=>d[x.dataset.anField]=x.type==='checkbox'?x.checked:x.value);for(const k of Object.keys(HC260_AN_GROUPS))d[k]=[...box.querySelectorAll(`[data-an-group="${k}"]:checked`)].map(x=>x.value);return d;}
   function persist(pid){try{localStorage.setItem(draftKey(pid),JSON.stringify(read()));}catch(_){} }
   function open(){
@@ -46831,8 +46888,42 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v263';document.title='Hospitalito v263 · Supabase';
+  window.HC_DEMO_VERSION='v264';document.title='Hospitalito v264 · Supabase';
 })();
+</script>
+
+<script id="hc-v264-request-drafts">
+const hc264RequestDrafts=new Map();
+function hc264RequestDraftKey(module,pid){return String(hc207Inst())+"::"+String(pid)+"::"+module;}
+function hc264ClearRequestDraft(root,module,pid){hc264RequestDrafts.delete(hc264RequestDraftKey(module,pid));root.dataset.hc264DraftReset="1";}
+function hc264WrapRequestRenderer(base,module,selector,fields){
+  return function(){
+    const root=document.querySelector(selector),pid=String(selectedPatientId||"");
+    if(root){
+      const previous=root.dataset.hc264DraftKey;
+      if(previous && root.dataset.hc264DraftReset!=="1"){
+        const values=Array.from(root.querySelectorAll(fields)).map(el=>({id:el.id||"",value:el.value,checked:el.checked,type:el.type,attr:el.hasAttribute("data-nut-feature")?"data-nut-feature":el.hasAttribute("data-kine-req-type")?"data-kine-req-type":""}));
+        if(values.length)hc264RequestDrafts.set(previous,values);
+      }
+      root.dataset.hc264DraftReset="";
+    }
+    const result=base.apply(this,arguments);
+    if(root){
+      const key=hc264RequestDraftKey(module,pid);root.dataset.hc264DraftKey=key;
+      (hc264RequestDrafts.get(key)||[]).forEach(value=>{
+        const els=value.id?[root.querySelector("#"+value.id)]:Array.from(root.querySelectorAll("["+value.attr+"]")).filter(el=>el.value===value.value);
+        els.filter(Boolean).forEach(el=>{if(value.type==="checkbox"||value.type==="radio")el.checked=value.checked;else el.value=value.value;});
+      });
+      const prefix=module==="nut"?"nutReq":"kineReq";
+      const timing=root.querySelector("#"+prefix+"Timing"),date=root.querySelector("#"+prefix+"Date"),time=root.querySelector("#"+prefix+"At");
+      const update=()=>{if(date)date.closest(".field").hidden=!timing?.value||timing.value==="urgent";if(time)time.closest(".field").hidden=timing?.value!=="custom";};
+      timing?.addEventListener("change",update);update();
+    }
+    return result;
+  };
+}
+renderNUT=hc264WrapRequestRenderer(renderNUT,"nut","#medNutricion","#nutType,#nutRate,#nutVolume,#nutNote,#nutReqTiming,#nutReqDate,#nutReqAt,[data-nut-feature]");
+window.renderKINE=hc264WrapRequestRenderer(window.renderKINE,"kine","#medKinesiologia","#kineReqObs,#kineReqTiming,#kineReqDate,#kineReqAt,[data-kine-req-type]");
 </script>
 </body>
 </html>
