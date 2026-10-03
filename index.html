@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>HC Demo v269 · Hemoterapia y equivalencias de infusión · Supabase</title>
+<title>Hospitalito v270 · Historia clínica · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -6256,6 +6256,14 @@ html::-webkit-scrollbar-corner{
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <button class="btn small" id="btnPrintMedCenso" type="button">Imprimir censo</button>
     </div>
+    <form id="hc270PatientSearch" class="hc270Search" role="search">
+      <label for="hc270PatientQuery"><b>Buscar paciente</b></label>
+      <input id="hc270PatientQuery" type="search" placeholder="DNI o apellido y nombre" autocomplete="off" />
+      <label class="hc270Check"><input id="hc270OtherInstitutions" type="checkbox" checked /> Incluir otras instituciones con acceso</label>
+      <button class="btn small" type="submit">Buscar historia clínica</button>
+      <div id="hc270SearchStatus" class="muted" role="status" aria-live="polite"></div>
+      <div id="hc270SearchResults"></div>
+    </form>
   </div>
 
   <div id="medPanel" class="card">
@@ -6264,6 +6272,7 @@ html::-webkit-scrollbar-corner{
 
     <div class="tabs medModuleTabs" style="margin-top:10px;">
       <button class="tab active" data-medtab="ingreso" type="button">Ingreso</button>
+      <button class="tab" data-medtab="historia" type="button">Historia</button>
       <button class="tab" data-medtab="evolucion" type="button">Evolución</button>
       <button class="tab" data-medtab="prescripciones" type="button">Prescripciones</button>
       <button class="tab" data-medtab="sv" type="button">Signos vitales</button>
@@ -6285,6 +6294,7 @@ html::-webkit-scrollbar-corner{
     <h3 class="panelTitle" id="medPanelTitle">Ingreso</h3>
 
     <!-- Contenidos por tab -->
+    <div id="medHistoria" style="display:none;"></div>
     <div id="medIngreso">
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
         <button class="btn" type="button" id="btnNuevoIngreso">Nuevo ingreso</button>
@@ -7474,7 +7484,7 @@ function getChats(){ return loadJSON(LS.chats, {}); }
 function setChats(v){ saveJSON(LS.chats, v); }
 
 function getAppointments(){ return loadJSON(LS.appointments, []); }
-function setAppointments(v){ saveJSON(LS.appointments, v); }
+function setAppointments(v){ if(typeof hc270StampNewRecords==="function") hc270StampNewRecords(v,getAppointments()); saveJSON(LS.appointments, v); }
 function getDoctorSchedules(){ return loadJSON(LS.doctorSchedules, {}); }
 function setDoctorSchedules(v){ saveJSON(LS.doctorSchedules, v); }
 
@@ -11077,6 +11087,7 @@ function selectConsultorioAppointment(apptId){
 }
 
 function renderPatientHeader(){
+  if(medTab==="historia" && typeof hc270HistoryHeader==="function" && hc270HistoryHeader()) return;
   const me = getCurrentUser();
 if((me?.role === "bioquimico" || me?.role === "imagenologo") && !selectedPatientId){
   const hdr = $("#pacHdrBar");
@@ -11725,6 +11736,7 @@ function renderMedCenso(){
 function renderMedPanel(){
   const titleMap = {
     ingreso:"Ingreso",
+    historia:"Historia clínica",
     evolucion:"Evolución",
     prescripciones:"Prescripciones",
     sv:"Signos vitales",
@@ -11744,6 +11756,7 @@ function renderMedPanel(){
 
   const show = (id, on)=>{ const el=$(id); if(el) el.style.display = on ? "" : "none"; };
   show("#medIngreso", medTab==="ingreso");
+  show("#medHistoria", medTab==="historia");
   show("#medEvol",   medTab==="evolucion");
   show("#medPres",   medTab==="prescripciones");
   show("#medSV",     medTab==="sv");
@@ -11772,26 +11785,31 @@ const isKinesiologo = me?.role === "kinesiologo";
 
 document.querySelectorAll("[data-medtab]").forEach(btn=>{
   const t = btn.dataset.medtab;
+  btn.classList.toggle("active", t===medTab);
+  if(typeof hc270HistoryOnly==="function" && hc270HistoryOnly()){
+    btn.style.display = t==="historia" ? "" : "none";
+    return;
+  }
 
   if(isBioq){
-    const allowed = ["laboratorio", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "laboratorio", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isMicrobio){
-    const allowed = ["micro", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "micro", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isFarm){
-    const allowed = ["prescripciones", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "prescripciones", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isImagenologo){
     btn.style.display = "";
   }else if(isNutricionista){
-    const allowed = ["nutricion", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "nutricion", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isHemoterapia){
-    const allowed = ["hemoterapia", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "hemoterapia", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isKinesiologo){
-    const allowed = ["kinesiologia", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["historia", "kinesiologia", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(me?.role === "enfermero"){
     btn.style.display = (t === "consultorios") ? "none" : "";
@@ -28738,6 +28756,7 @@ function renderMonitoring(){
    Med render + Admin Arch search
 ========================================================= */
 function renderMed(){
+  if(typeof hc270CheckScope==="function") hc270CheckScope();
   const user = getCurrentUser();
 const isEnfermero = user?.role === "enfermero";
 const isBioq = user?.role === "bioquimico";
@@ -28747,22 +28766,22 @@ const isNutricionista = user?.role === "nutricionista";
 const isHemoterapia = user?.role === "hemoterapia";
 const isKinesiologo = user?.role === "kinesiologo";
 
-if(isBioq && medTab !== "laboratorio" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isBioq && medTab !== "historia" && medTab !== "laboratorio" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "laboratorio";
 }
-if(isMicrobio && medTab !== "micro" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isMicrobio && medTab !== "historia" && medTab !== "micro" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "micro";
 }
-if(isImagenologo && !selectedPatientId && medTab !== "imagenes"){
+if(isImagenologo && !selectedPatientId && medTab !== "historia" && medTab !== "imagenes"){
   medTab = "imagenes";
 }
-if(isNutricionista && medTab !== "nutricion" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isNutricionista && medTab !== "historia" && medTab !== "nutricion" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "nutricion";
 }
-if(isHemoterapia && medTab !== "hemoterapia" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isHemoterapia && medTab !== "historia" && medTab !== "hemoterapia" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "hemoterapia";
 }
-if(isKinesiologo && medTab !== "kinesiologia" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isKinesiologo && medTab !== "historia" && medTab !== "kinesiologia" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "kinesiologia";
 }
   const prevFilter = ($("#medAreaFilter")?.value || localStorage.getItem(LS.medAreaFilter) || "Todo");
@@ -28776,6 +28795,7 @@ if(isKinesiologo && medTab !== "kinesiologia" && medTab !== "informes_enfermeria
   renderMedCenso();
   renderPatientHeader();
   renderMedPanel();
+  if(medTab === "historia" && typeof hc270RenderHistory === "function") hc270RenderHistory();
 
   // IMPORTANTÍSIMO: Ingresos previos SOLO en ingreso
   if(medTab === "ingreso"){
@@ -32573,8 +32593,8 @@ function hcV161SaveAmbulatoryEncounter(encounterId,{rerender=true}={}){
   const p=findPatient(selectedPatientId);if(!p)return;
   const me=getCurrentUser(),cl=getClinical(),pid=selectedPatientId;if(!cl[pid])cl[pid]={};
   const prevAmb=cl[pid].ambulatorio||{},data=readAmbulatoryConsultorioForm(prevAmb),consultas=prevAmb.consultas||{},key=String(encounterId||"sin_turno"),nowIso=isoNowLocalFull(),hasAntForm=!!document.getElementById("amb_ap_chips"),evoluciones=Array.isArray(prevAmb.evoluciones)?[...prevAmb.evoluciones]:[],record=getAppointments().find(x=>String(x.id||"")===String(encounterId||""))||null;
-  if(data.motivo||data.evolucion)evoluciones.push({id:uid("amb_evo"),appointmentId:encounterId||"",appointmentDate:record?.date||getConsultorioCensoDate(),appointmentTime:record?.time||"",encounterType:isGuardiaEpisode(record)?"guardia":"consultorio",motivo:data.motivo,evolucion:data.evolucion,antecedentesSnapshot:JSON.parse(JSON.stringify(data.antecedentes||{})),medHabSnapshot:data.medHab||"",createdAt:nowIso,createdBy:me?.username||"",createdByName:me?.name||me?.username||""});
-  cl[pid].ambulatorio={...prevAmb,antecedentes:data.antecedentes,medHab:data.medHab,antecedentesSavedAt:hasAntForm?nowIso:(prevAmb.antecedentesSavedAt||prevAmb.updatedAt||nowIso),antecedentesSavedBy:hasAntForm?(me?.username||""):(prevAmb.antecedentesSavedBy||prevAmb.updatedBy||""),antecedentesSavedByName:hasAntForm?(me?.name||me?.username||""):(prevAmb.antecedentesSavedByName||prevAmb.updatedByName||""),updatedAt:nowIso,updatedBy:me?.username||"",updatedByName:me?.name||me?.username||"",evoluciones,consultas:{...consultas,[key]:{...(consultas[key]||{}),appointmentId:encounterId||"",encounterType:isGuardiaEpisode(record)?"guardia":"consultorio",lastMotivo:data.motivo,lastEvolucion:data.evolucion,lastSavedAt:nowIso,lastSavedBy:me?.username||"",lastSavedByName:me?.name||me?.username||""}}};
+  if(data.motivo||data.evolucion)evoluciones.push({id:uid("amb_evo"),appointmentId:encounterId||"",appointmentDate:record?.date||getConsultorioCensoDate(),appointmentTime:record?.time||"",encounterType:isGuardiaEpisode(record)?"guardia":"consultorio",historyInstitution:record?.historyInstitution||(typeof hc270CurrentInstitution==="function"?((i)=>({id:i.id,name:i.name}))(hc270CurrentInstitution()):undefined),motivo:data.motivo,evolucion:data.evolucion,antecedentesSnapshot:JSON.parse(JSON.stringify(data.antecedentes||{})),medHabSnapshot:data.medHab||"",createdAt:nowIso,createdBy:me?.username||"",createdByName:me?.name||me?.username||""});
+  cl[pid].ambulatorio={...prevAmb,antecedentes:data.antecedentes,medHab:data.medHab,antecedentesSavedAt:hasAntForm?nowIso:(prevAmb.antecedentesSavedAt||prevAmb.updatedAt||nowIso),antecedentesSavedBy:hasAntForm?(me?.username||""):(prevAmb.antecedentesSavedBy||prevAmb.updatedBy||""),antecedentesSavedByName:hasAntForm?(me?.name||me?.username||""):(prevAmb.antecedentesSavedByName||prevAmb.updatedByName||""),updatedAt:nowIso,updatedBy:me?.username||"",updatedByName:me?.name||me?.username||"",evoluciones,consultas:{...consultas,[key]:{...(consultas[key]||{}),appointmentId:encounterId||"",encounterType:isGuardiaEpisode(record)?"guardia":"consultorio",historyInstitution:record?.historyInstitution||(typeof hc270CurrentInstitution==="function"?((i)=>({id:i.id,name:i.name}))(hc270CurrentInstitution()):undefined),lastMotivo:data.motivo,lastEvolucion:data.evolucion,lastSavedAt:nowIso,lastSavedBy:me?.username||"",lastSavedByName:me?.name||me?.username||""}}};
   setClinical(cl);setAmbAntecedentesEditing(pid,false);logAction(`${isGuardiaEpisode(record)?"Guardó historia de Guardia Central":"Guardó historia ambulatoria"} de ${buildPatientDisplayName(p)}`,pid);renderPatientHeader();
   if(rerender){if(isGuardiaEpisode(record))renderGuardiaMedicoUI(record);else renderAmbulatoryConsultorioUI(findConsultorioAppointmentForPatient(pid)||{id:encounterId});}
 }
@@ -35262,6 +35282,8 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
   });
 
   modules.prescripciones = hcV189FilterDeep(cur?.prescripciones || {},bounds);
+  modules.evoluciones = hcV189FilterDeep(cur?.evoluciones || [],bounds);
+  modules.balanceDetalles = hcV189FilterDeep(cur?.balanceDetalles || {},bounds);
   modules.epicrisisFull = archiveEntry?.epicText
     ? {
         fullText:archiveEntry.epicText,
@@ -35291,6 +35313,7 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
 
   return {
     version:1,
+    institution:typeof hc270CurrentInstitution === "function" ? {...hc270CurrentInstitution(),...(admission?.historyInstitution||{})} : {},
     capturedAt:isoNowLocalFull(),
     patient:hcV189Clone(patient),
     admission:hcV189Clone(admission || {
@@ -35862,6 +35885,7 @@ setPatients = function(value){
 
 const hcV190SetRegistryBase = setRegistry;
 setRegistry = function(value){
+  if(!hcBackendApplyingRemote && typeof hc270StampNewRecords==="function") hc270StampNewRecords(value,getRegistry());
   const result = hcV190SetRegistryBase.call(this,value);
   if(!hcBackendApplyingRemote) hcV190MarkPending("internaciones modificadas");
   return result;
@@ -45792,7 +45816,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
   function injectTopButtons(){const right=$('.topbar>div:last-child');if(!right)return;if(!$('#hc231NotifyBtn')){const b=document.createElement('button');b.className='btn small';b.id='hc231NotifyBtn';b.type='button';b.innerHTML='🔔 <span class="hc231NotifyBadge" id="hc231NotifyBadge"></span>';right.insertBefore(b,$('#btnAccount')||null);}if(session?.role==='observador'&&!$('#hc231ObserverView')){const b=document.createElement('button');b.className='btn small';b.id='hc231ObserverView';b.type='button';b.textContent='Vista gestión';right.insertBefore(b,$('#hc231NotifyBtn'));}if(session?.role==='superadmin'&&!$('#hc231PlatformTop')){const b=document.createElement('button');b.className='btn small primary';b.id='hc231PlatformTop';b.type='button';b.textContent='Plataforma';right.insertBefore(b,$('#hc231NotifyBtn'));}}
   function observerMode(){const on=session?.role==='observador';document.body.classList.toggle('hcObserver',on);injectTopButtons();}
-  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
+  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.closest('#medHistoria,#hc270PatientSearch'))return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
   document.addEventListener('click',ev=>{if(session?.role==='observador'){const b=mutatingControl(ev.target);if(b){ev.preventDefault();ev.stopImmediatePropagation();toast?.('Modo Observador: solo lectura');return;}}const add=ev.target.closest?.('#hc231AddContact');if(add){const q=String($('#hc231ContactUsername')?.value||'').trim();if(!q)return;req('addContact',{token:token(),institutionId:inst(),username:q}).then(()=>refreshContacts(true)).catch(e=>alert(e.message||e));return;}if(ev.target.closest?.('#hc231NotifyBtn,#hc231OpenNotificationsSettings')){const m=$('#hc231NotificationsModal');m.classList.add('show');m.setAttribute('aria-hidden','false');refreshNotifications(true);return;}if(ev.target.closest?.('#hc231NotificationsClose')){$('#hc231NotificationsModal')?.classList.remove('show');return;}if(ev.target.closest?.('#hc231MarkAllRead')){req('markNotificationsRead',{token:token(),institutionId:inst()}).then(()=>{localNotifs.forEach(x=>x.read_at=new Date().toISOString());return refreshNotifications(true)});return;}if(ev.target.closest?.('#hc231ObserverView')){const med=$('#appMed'),adm=$('#appAdmin'),toAdmin=med?.style.display!=='none';if(toAdmin){med.style.display='none';adm.style.display='grid';try{renderAdmin?.();}catch(_){}}else{adm.style.display='none';med.style.display='grid';try{renderMed?.();}catch(_){}}ev.target.closest('#hc231ObserverView').textContent=toAdmin?'Vista clínica':'Vista gestión';return;}if(ev.target.closest?.('#hc231InstallApp')){const pr=window.hc231InstallPrompt;if(pr){pr.prompt();pr.userChoice.finally(()=>{window.hc231InstallPrompt=null;$('#hc231InstallApp')?.remove();});}return;}if(ev.target.closest?.('#hc231PlatformTop')){showPlatform();return;}if(ev.target.closest?.('#hc231PlatformRefresh')){loadPlatform();return;}if(ev.target.closest?.('#hc231PlatformAccount')){window.hcSettingsOpen?.('account');return;}if(ev.target.closest?.('#hc231CreateInst')){createInstitution();return;}const pc=ev.target.closest?.('[data-hc231-contact]');if(pc){const u=pc.getAttribute('data-hc231-contact');req('addContact',{token:token(),institutionId:inst(),username:u}).then(()=>{toast?.('Contacto agregado');refreshContacts(false)}).catch(e=>alert(e.message||e));return;}},true);
   document.addEventListener('click',ev=>{if(ev.target.closest?.('[data-hcs-chat]')){const u=ev.target.closest('[data-hcs-chat]').getAttribute('data-hcs-chat');window.hc231ActiveChat=u;refreshConversation(u,false);}if(ev.target.closest?.('#hcsChatBack,#hcsMembersBack'))window.hc231ActiveChat='';if(ev.target.closest?.('[data-hcs-section="members"]'))setTimeout(()=>{augmentMembers();refreshContacts(true)},50);},true);
   function augmentMembers(){const list=$('#hcsMemberList');if(!list||$('#hc231ContactAdder'))return;const card=document.createElement('div');card.id='hc231ContactAdder';card.className='hcSettingsCard';card.style.marginBottom='12px';card.innerHTML='<div class="hcSettingsCardTitle">Agregar contacto por usuario</div><div class="hcSettingsCardSub">Permite conversar con un profesional de otra institución sin darle acceso a historias clínicas.</div><div class="hc231AddContact"><input id="hc231ContactUsername" placeholder="Nombre de usuario exacto"><button class="hcSettingsBtn primary" id="hc231AddContact" type="button">Agregar</button></div>';list.parentElement?.insertBefore(card,list);directory.forEach(u=>{const el=list.querySelector(`[data-hcs-member="${CSS.escape(u.username)}"]`);if(el&&!el.querySelector('.hc231ContactScope')){const sp=document.createElement('span');sp.className='hc231ContactScope';sp.textContent=u.contactScope==='institución'?'Misma institución':'Contacto';el.lastElementChild?.appendChild(sp);}})}
@@ -45981,7 +46005,7 @@ const logoutBase=window.logout||logout;window.logout=logout=function(){try{$('#h
 /* -------- Observador: interfaz realmente de lectura -------- */
 const mutWords=/(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar|cambiar|mover|alta|defunci[oó]n)/i;
 const viewWords=/(imprimir|vista|ver |volver|buscar|actualizar|hoy|fecha|protocolo|gr[aá]fico|historial|cerrar|abrir|censo)/i;
-function observerPolish(){if(session?.role!=='observador')return;document.querySelectorAll('#appMed input,#appMed textarea,#appAdmin input,#appAdmin textarea').forEach(e=>{if(e.type==='date'||e.type==='search')return;e.readOnly=true;e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed select,#appAdmin select').forEach(e=>e.classList.add('hcV232ObserverLocked'));document.querySelectorAll('#appMed button,#appAdmin button').forEach(b=>{if(b.matches('.tab,[data-medtab],[data-admin-tab],#btnMobileCensusToggle,#btnMobileCensusClose'))return;const t=(b.textContent||'').trim();if(mutWords.test(t)&&!viewWords.test(t))b.classList.add('hcV232ObserverHidden');});}
+function observerPolish(){if(session?.role!=='observador')return;document.querySelectorAll('#appMed input,#appMed textarea,#appAdmin input,#appAdmin textarea').forEach(e=>{if(e.type==='date'||e.type==='search')return;e.readOnly=true;e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed select,#appAdmin select').forEach(e=>e.classList.add('hcV232ObserverLocked'));document.querySelectorAll('#appMed button,#appAdmin button').forEach(b=>{if(b.closest('#medHistoria,#hc270PatientSearch'))return;if(b.matches('.tab,[data-medtab],[data-admin-tab],#btnMobileCensusToggle,#btnMobileCensusClose'))return;const t=(b.textContent||'').trim();if(mutWords.test(t)&&!viewWords.test(t))b.classList.add('hcV232ObserverHidden');});}
 let hc265DecorationTimer=null;
 const hc265ObserveOptions={childList:true,subtree:true};
 const obs=new MutationObserver(()=>{
@@ -46755,7 +46779,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 258;
+  const CURRENT_VERSION = 270;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -46800,7 +46824,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
 
   window.hcCheckForUpdateNow = hcV246CheckForUpdate;
   setTimeout(hcV246CheckForUpdate, 5000);
-  setInterval(hcV246CheckForUpdate, 15000);
+  setInterval(hcV246CheckForUpdate, 60000);
   document.addEventListener("visibilitychange", ()=>{
     if(!document.hidden) setTimeout(hcV246CheckForUpdate, 500);
   });
@@ -46837,8 +46861,8 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   }
 
   try{
-    window.HC_DEMO_VERSION = "v269";
-    document.title = "HC Demo v269 · Supabase";
+    window.HC_DEMO_VERSION = "v270";
+    document.title = "HC Demo v270 · Supabase";
   }catch(_){}
 })();
 </script>
@@ -46854,7 +46878,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
     if(!locked())return;
     const panel=document.getElementById("medPanel"); if(!panel)return;
     panel.querySelectorAll("button").forEach(btn=>{
-      if(btn.closest("#medImg") || btn.hasAttribute("data-medtab"))return;
+      if(btn.closest("#medImg,#medHistoria") || btn.hasAttribute("data-medtab"))return;
       const label=`${btn.textContent||""} ${btn.id||""} ${btn.getAttribute("data-pr-action")||""}`.trim();
       btn.classList.toggle("hcImageWriteControl",writeWords.test(label) && !viewWords.test(label));
     });
@@ -46869,7 +46893,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   document.addEventListener("click",ev=>{
     if(!locked())return;
     const btn=ev.target.closest?.("#medPanel button,#medPanel [data-pr-action]");
-    if(btn && !btn.closest("#medImg") && (btn.classList.contains("hcImageWriteControl") || writeWords.test(`${btn.textContent||""} ${btn.id||""} ${btn.getAttribute("data-pr-action")||""}`) && !viewWords.test(String(btn.textContent||"").trim()))){
+    if(btn && !btn.closest("#medImg,#medHistoria") && (btn.classList.contains("hcImageWriteControl") || writeWords.test(`${btn.textContent||""} ${btn.id||""} ${btn.getAttribute("data-pr-action")||""}`) && !viewWords.test(String(btn.textContent||"").trim()))){
       ev.preventDefault();ev.stopImmediatePropagation();toast?.("Imagenología: este módulo es solo de lectura.");
     }
   },true);
@@ -46999,7 +47023,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v269';document.title='Hospitalito v269 · Supabase';
+  window.HC_DEMO_VERSION='v270';document.title='Hospitalito v270 · Supabase';
 })();
 </script>
 
@@ -47041,5 +47065,528 @@ window.renderKINE=hc264WrapRequestRenderer(window.renderKINE,"kine","#medKinesio
 .hcV245RxRow,.hcV196DrugRow,[data-hc-v246-rx],.hcDrugSuggestion{touch-action:pan-y!important;user-select:none;-webkit-user-select:none;}
 #medPres .prDrugPickRow>.field:first-child{min-width:0;}
 </style>
+<style id="hc-v270-history-style">
+/* v270 · Historia y búsqueda; listados livianos, detalle bajo demanda. */
+.hc270Search{border-top:1px solid var(--hc230-line,#355777);padding-top:14px;margin-top:8px;display:grid;gap:9px;min-width:0;}
+.hc270Search input[type=search]{width:100%;min-width:0;box-sizing:border-box;}
+.hc270Check{display:flex;align-items:center;gap:7px;font-size:12px;line-height:1.4;}
+.hc270Check input{width:auto;flex:0 0 auto;}
+#hc270SearchStatus{font-size:12px;}
+#hc270SearchResults{display:grid;gap:8px;max-height:440px;overflow:auto;}
+.hc270PatientResult,.hc270Episode{width:100%;border:1px solid var(--hc230-line,#355777);border-radius:14px;background:var(--hc230-surface2,#102d49);color:var(--hc230-text,#e7f1fa);padding:13px;text-align:left;cursor:pointer;box-sizing:border-box;}
+.hc270PatientResult{display:grid;gap:4px;}
+.hc270PatientResult span,.hc270PatientResult small{font-size:12px;}
+.hc270PatientResult:hover,.hc270Episode:hover{border-color:var(--hc230-accent,#60a5fa);}
+.hc270Toolbar,.hc270Categories{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px;}
+.hc270Categories .btn{flex:1 1 140px;}
+.hc270Episode{display:flex;align-items:center;gap:12px;margin-bottom:10px;}
+.hc270Episode>span:nth-child(2){display:grid;gap:4px;flex:1;min-width:0;overflow-wrap:anywhere;}
+.hc270Episode strong{font-size:15px;}
+.hc270Episode small{font-size:12px;opacity:.85;}
+.hc270Logo{width:52px;height:52px;object-fit:contain;flex:0 0 52px;border-radius:10px;background:#fff;padding:4px;box-sizing:border-box;}
+.hc270Initial{display:flex;align-items:center;justify-content:center;background:var(--hc230-surface2,#1b4163);font-size:24px;font-weight:800;border:1px solid var(--hc230-line,#355777);}
+.hc270EpisodeHead{display:flex;align-items:center;gap:12px;margin:18px 0;overflow-wrap:anywhere;}
+.hc270EpisodeHead h3{margin:0 0 6px;}.hc270EpisodeHead div div{margin-top:4px;font-size:13px;}
+.hc270Detail{border:1px solid var(--hc230-line,#355777);border-radius:12px;margin:9px 0;background:var(--hc230-surface,#0e263e);min-width:0;}
+.hc270Detail>summary{cursor:pointer;font-weight:700;padding:13px;overflow-wrap:anywhere;}
+.hc270DetailBody{padding:0 13px 13px;}.hc270DetailBody:empty{padding:0;}
+.hc270Field{margin:9px 0;overflow-wrap:anywhere;}.hc270Field>b{display:block;font-size:12px;opacity:.82;margin-bottom:4px;}
+.hc270Text{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;line-height:1.5;margin:0;}
+.hc270Attachment{max-width:100%;max-height:650px;object-fit:contain;}
+.hc270Notice{border-left:3px solid #eab308;padding:10px 12px;font-size:13px;background:rgba(234,179,8,.08);}
+@media(max-width:600px){.hc270Categories .btn{flex-basis:40%;padding:12px 8px;}.hc270Logo{width:43px;height:43px;flex-basis:43px;}.hc270Episode{padding:11px;gap:9px;}.hc270DetailBody{padding-left:9px;padding-right:9px;}}
+
+</style>
+<script id="hc-v270-history">
+/* v270 · Historia longitudinal. Los datos de otras instituciones se consultan
+   con sesiones independientes y nunca se importan en la caché clínica editable. */
+const hc270State = {
+  scope:"", sources:new Map(), selected:null, model:null, category:"internaciones",
+  episode:null, values:new Map(), valueSeq:0, generation:0, searchGeneration:0,
+  renderedKey:"", loading:false, notice:"", searchRows:[], searchLimit:30,
+  returnPatient:null, returnTab:"ingreso", episodeLimit:50
+};
+const HC270_CATEGORIES = {internaciones:"Internaciones",consultorio:"Consultorio",guardia:"Guardia Central",laboratorio:"Laboratorio"};
+const HC270_LABELS = {
+  ingresoFull:"Ingreso",ingreso:"Ingreso anterior",ingresosPrev:"Ingresos previos",
+  evolucionesFull:"Evoluciones médicas",evoluciones:"Evoluciones anteriores",
+  prescripciones:"Prescripciones y administración",signosVitales:"Signos vitales",
+  balances:"Balances",balanceDetalles:"Detalles de balances",invasiones:"Invasiones",
+  nursingReports:"Informes de enfermería",surgicalSheets:"Fojas quirúrgicas",monitoringRecords:"Monitoreos",
+  labRequests:"Solicitudes de laboratorio",labResults:"Resultados de laboratorio",
+  microRequests:"Solicitudes de microbiología",microResults:"Resultados de microbiología",
+  imageRequests:"Solicitudes de estudios / imágenes",imageResults:"Informes y archivos de estudios / imágenes",
+  nutritionRequests:"Solicitudes de nutrición",nutritionEvolutions:"Evoluciones de nutrición",
+  hemotherapyRequests:"Solicitudes de hemoterapia",hemotherapyEvolutions:"Evoluciones de hemoterapia",
+  kinesiologiaRequests:"Solicitudes de kinesiología",kinesiologiaEvolutions:"Evoluciones de kinesiología",
+  epicrisisFull:"Epicrisis",otros:"Otros registros clínicos",ambulatorio:"Historia ambulatoria",
+  atencion:"Atención y conducta",consulta:"Registro de la consulta",recetasExternas:"Recetas externas",
+  antecedentesSnapshot:"Antecedentes al momento de la atención",medHabSnapshot:"Medicación habitual al momento de la atención",
+  motivo:"Motivo",evolucion:"Evolución",destination:"Destino",destinationDetail:"Conducta / detalle del destino",
+  lastMotivo:"Motivo",lastEvolucion:"Evolución",lastSavedAt:"Fecha de registro",lastSavedByName:"Profesional",
+  admission:"Datos de la internación",patient:"Datos del paciente",unassigned:"Registros sin fecha o atención identificable"
+};
+function hc270Esc(v){return String(v??"").replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function hc270Norm(v){return String(v||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();}
+function hc270Dni(v){return String(v||"").replace(/\D/g,"");}
+function hc270Array(v){return Array.isArray(v)?v:[];}
+function hc270Empty(v){return v==null||v===""||(Array.isArray(v)?!v.length:typeof v==="object"?!Object.keys(v).length:false);}
+function hc270Deleted(v){return !!(v?.deleted||v?.deletedAt||v?.status==="deleted");}
+function hc270Name(p){return String(p?.name||[p?.lastName,p?.firstNames||p?.firstName].filter(Boolean).join(", ")||"Paciente sin nombre");}
+function hc270Date(v){
+  const s=String(v||""),m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})/);
+  if(/(?:Z|[+-]\d{2}:?\d{2})$/.test(s)&&Number.isFinite(hc270Time(s)))return new Date(s).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  if(m)return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
+  const d=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return d?`${d[3]}/${d[2]}/${d[1]}`:s||"Fecha no registrada";
+}
+function hc270Time(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:NaN;}
+function hc270RecordDate(r){return r?.dateTime||r?.reportedAt||r?.requestedAt||r?.startedAt||r?.startAt||r?.procedureAt||r?.createdAt||r?.savedAt||r?.lastSavedAt||r?.date||r?.updatedAt||"";}
+function hc270SafeURL(v,image=false){
+  const s=String(v||"").trim();
+  if(/^https:\/\//i.test(s)||/^http:\/\/(localhost|127\.0\.0\.1)([:/]|$)/i.test(s))return s;
+  if(image&&/^data:image\/(png|jpe?g|webp|gif|svg\+xml);base64,/i.test(s))return s;
+  if(!image&&/^data:(application\/(pdf|octet-stream|msword|zip|vnd\.ms-(excel|powerpoint)|vnd\.openxmlformats-officedocument\.[\w.+-]+)|text\/(plain|csv)|image\/(png|jpe?g|webp|gif)|audio\/[\w.+-]+|video\/[\w.+-]+);base64,/i.test(s))return s;
+  return "";
+}
+function hc270Institution(inst={},fallback={}){
+  return {id:String(inst.id||inst.institutionId||inst.backendRegistryId||fallback.id||""),
+    name:String(inst.displayName||inst.display_name||inst.line1||inst.name||inst.backendRegistryName||fallback.name||"Institución no registrada"),
+    logoData:hc270SafeURL(inst.logoData||inst.logo_data||inst.logo||inst.logoUrl||fallback.logoData,true)};
+}
+function hc270CurrentInstitution(){
+  return hc270Institution(getInst(),{id:hc207Inst(),name:localStorage.getItem(LS.backendRegistryName)||"Institución actual"});
+}
+function hc270StampNewRecords(rows,previous){
+  const ids=new Set(hc270Array(previous).map(x=>String(x?.id||"")));let institution;
+  hc270Array(rows).forEach(r=>{if(r&&!r.historyInstitution&&!ids.has(String(r.id||""))){
+    institution ||= hc270CurrentInstitution();r.historyInstitution={id:institution.id,name:institution.name};
+  }});
+}
+function hc270Scope(){return [session?.username||"",hc207Inst(),hc207GlobalToken()].join("|");}
+function hc270CheckScope(){
+  const key=hc270Scope();if(hc270State.scope===key)return;
+  hc270State.scope=key;hc270State.sources.clear();hc270State.selected=null;hc270State.model=null;
+  hc270State.renderedKey="";hc270State.generation++;hc270State.searchGeneration++;
+  hc270State.values.clear();hc270State.searchRows=[];
+  hc270State.notice="";hc270State.loading=false;
+  const results=document.getElementById("hc270SearchResults");if(results)results.innerHTML="";
+  const panel=document.getElementById('medHistoria');if(panel)panel.innerHTML='';
+}
+function hc270LocalSource(includeClinical=false){
+  if(hcBackendConfigured()&&!hcBackendScopeValidated)throw Error("Esperá a que termine de validarse el censo institucional.");
+  const id=String(hc207Inst()||"local"),prev=hc270State.sources.get(id);
+  const src={id,local:true,institution:hc270CurrentInstitution(),patients:getPatients(),registry:getRegistry(),
+    archive:getArchive(),appointments:getAppointments(),clinical:includeClinical?getClinical():(prev?.clinical||{})};
+  hc270State.sources.set(id,src);return src;
+}
+function hc270PatientIndex(sources){
+  const index=new Map();
+  for(const src of sources){
+    const knownPatients=new Map(hc270Array(src.patients).map(p=>[String(p.id),p]));
+    const records=[...hc270Array(src.patients),...hc270Array(src.archive).map(a=>({...a.historySnapshot?.patient,id:a.patientId||a.historySnapshot?.patient?.id||`archive:${a.id}`,dni:a.dni||a.historySnapshot?.patient?.dni,name:a.name||hc270Name(a.historySnapshot?.patient)})),
+      ...hc270Array(src.appointments).filter(a=>a.patientId||a.dni).map(a=>({id:a.patientId||`appointment:${a.id}`,dni:a.dni,name:a.patientName||a.name||[a.lastName,a.firstNames].filter(Boolean).join(", ")}))];
+    for(const record of records){
+      if(!record||hc270Deleted(record))continue;
+      const known=knownPatients.get(String(record.id||'')),p={...known,...record};
+      if(!p.dni&&known?.dni)p.dni=known.dni;
+      if((!p.name||p.name==='Paciente sin nombre')&&known)p.name=hc270Name(known);
+      const dni=hc270Dni(p.dni),id=String(p.id||"");if(!dni&&!id)continue;
+      const key=dni?`dni:${dni}`:`patient:${src.id}:${id}`;
+      let entry=index.get(key);if(!entry){entry={key,dni,patient:p,refs:[],searchNames:new Set(),institutions:new Set()};index.set(key,entry);}
+      entry.searchNames.add(hc270Norm(hc270Name(p)));entry.institutions.add(src.institution.name);
+      if(!entry.refs.some(r=>r.sourceId===src.id&&r.patientId===id))entry.refs.push({sourceId:src.id,patientId:id});
+      if((!entry.patient.lastName&&p.lastName)||hc270Name(entry.patient)==="Paciente sin nombre")entry.patient=p;
+    }
+  }
+  return [...index.values()].map(p=>({...p,searchText:[...p.searchNames].join(" ")}));
+}
+function hc270SearchIndex(index,query){
+  const normalized=hc270Norm(query),tokens=normalized.split(" ").filter(Boolean),numeric=/^[\d\s.\-]+$/.test(String(query).trim());
+  if(!tokens.length)return [];
+  const dni=hc270Dni(query);
+  return index.filter(p=>numeric?p.dni.includes(dni)&&!!dni:tokens.every(t=>p.searchText.includes(t)))
+    .sort((a,b)=>(b.dni===dni?1:0)-(a.dni===dni?1:0)||hc270Name(a.patient).localeCompare(hc270Name(b.patient),"es"));
+}
+function hc270Matches(record,identity,src){
+  const id=String(record?.patientId||record?.patient?.id||record?.historySnapshot?.patient?.id||"");
+  const ownDni=hc270Dni(record?.dni||record?.patient?.dni||record?.historySnapshot?.patient?.dni||src.patients?.find(p=>String(p.id)===id)?.dni);
+  if(identity.dni&&ownDni)return ownDni===identity.dni;
+  return !!id&&identity.refs.some(r=>r.sourceId===src.id&&r.patientId===id);
+}
+function hc270EpisodeInstitution(record,src){
+  const stored=record?.historyInstitution||record?.historySnapshot?.institution||record?.institution;
+  if(!stored)return src.institution;
+  const same=!stored.id||String(stored.id)===src.institution.id||String(stored.id)===src.id;
+  return hc270Institution(stored,{id:src.institution.id,name:src.institution.name,logoData:same?src.institution.logoData:""});
+}
+function hc270Slice(value,episode,{includeUndated=false}={}){
+  // Filtrar registros completos; no recortar sus campos internos ni adjuntos.
+  const start=hc270Time(episode.date),end=hc270Time(episode.end);
+  function matches(r){
+    if(hc270Deleted(r))return false;
+    if(r&&typeof r==="object"){
+      if(r.appointmentId)return episode.type!=="internaciones"&&String(r.appointmentId)===String(episode.record.id);
+      if(r.admissionId)return episode.type==="internaciones"&&String(r.admissionId)===String(episode.record.id);
+    }
+    if(episode.requireLink)return false;
+    const at=hc270Time(hc270RecordDate(r));
+    if(!Number.isFinite(at))return includeUndated;
+    // Sin ingreso registrado no se adjudica una historia completa por suposición.
+    if(!Number.isFinite(start))return false;
+    const until=Number.isFinite(end)?end:Infinity;
+    const finished=hc270Time(r?.endedAt||r?.endAt||r?.finishedAt);
+    return at<=until&&(Number.isFinite(finished)?finished:at)>=start;
+  }
+  if(Array.isArray(value))return value.filter(matches);
+  if(value&&typeof value==="object"){
+    if(hc270RecordDate(value)||value.admissionId||value.appointmentId)return matches(value)?value:null;
+    const out={};for(const [k,v] of Object.entries(value)){const filtered=hc270Slice(v,episode,{includeUndated});if(!hc270Empty(filtered))out[k]=filtered;}return out;
+  }
+  return includeUndated?value:null;
+}
+function hc270Undated(value){
+  if(value&&typeof value==='object'){
+    if(hc270Deleted(value)||value.appointmentId||value.admissionId||Number.isFinite(hc270Time(hc270RecordDate(value))))return null;
+    if(Array.isArray(value))return value.map(hc270Undated).filter(v=>!hc270Empty(v));
+    // Un registro sin fecha se conserva íntegro. Un contenedor de otros registros
+    // se recorre para separar los que sí tienen fecha o un vínculo explícito.
+    if(value.id)return value;
+    const out={};for(const [k,v] of Object.entries(value)){const next=hc270Undated(v);if(!hc270Empty(next))out[k]=next;}return out;
+  }
+  return value;
+}
+function hc270BuildModel(identity,sources){
+  const model={internaciones:[],consultorio:[],guardia:[],laboratorio:[],unassigned:[]};
+  for(const src of sources){
+    const archives=hc270Array(src.archive).filter(a=>!hc270Deleted(a)&&hc270Matches(a,identity,src));
+    const regs=hc270Array(src.registry).filter(a=>!hc270Deleted(a)&&hc270Matches(a,identity,src));
+    const seen=new Set(),admissions=[];
+    for(const adm of regs){
+      const archive=archives.find(a=>a.admissionId&&String(a.admissionId)===String(adm.id))||archives.find(a=>!a.admissionId&&String(a.patientId)===String(adm.patientId)&&String(a.date||a.closedAt)===String(adm.closedAt));
+      if(archive)seen.add(archive);
+      admissions.push({record:adm,archive});
+    }
+    archives.filter(a=>!seen.has(a)).forEach(a=>admissions.push({record:a.historySnapshot?.admission||{id:a.admissionId||a.id,patientId:a.patientId,admDateTime:a.admissionAt||a.admDateTime||"",closedAt:a.date||a.closedAt,active:false,dx:a.dx},archive:a}));
+    for(const {record,archive} of admissions){
+      const snapshot=archive?.historySnapshot,closed=record.active===false||!!archive;
+      const episode={key:`${src.id}:admission:${record.id||archive?.id}`,type:"internaciones",sourceId:src.id,
+        record,archive,institution:hc270EpisodeInstitution(archive?.historySnapshot?.institution?archive:record,src),
+        date:record.admDateTime||snapshot?.admission?.admDateTime||"",end:record.closedAt||archive?.date||archive?.closedAt||"",
+        title:closed?(archive?.destination||record.closeType||"Internación finalizada"):"Internación actual",reason:record.dx||archive?.dx||"",snapshot,closed};
+      if(!episode.end&&closed)episode.end=src.registry?.filter(a=>String(a.patientId)===String(record.patientId)&&hc270Time(a.admDateTime)>hc270Time(episode.date)).sort((a,b)=>hc270Time(a.admDateTime)-hc270Time(b.admDateTime))[0]?.admDateTime||"";
+      if(!model.internaciones.some(e=>e.key===episode.key))model.internaciones.push(episode);
+    }
+    const appts=hc270Array(src.appointments).filter(a=>!hc270Deleted(a)&&hc270Matches(a,identity,src)&&a.status!=="cancelado");
+    const episodes=new Map();
+    for(const a of appts){
+      const amb=src.clinical?.[a.patientId]?.ambulatorio||{},notes=hc270Array(amb.evoluciones).filter(e=>String(e.appointmentId||"")===String(a.id));
+      const consult=amb.consultas?.[a.id],isGuard=a.encounterType==="guardia"||a.kind==="guardia"||a.guardia===true;
+      if(!isGuard&&!notes.length&&!consult&&!['atendido','finalizado'].includes(String(a.status)))continue;
+      const type=isGuard?"guardia":"consultorio";
+      const episode={key:`${src.id}:encounter:${a.id}`,type,sourceId:src.id,record:a,institution:hc270EpisodeInstitution(a,src),
+        date:a.arrivalAt||[a.date,a.time||"00:00"].filter(Boolean).join("T"),end:a.finalizedAt||a.decisionAt||"",
+        title:isGuard?"Atención de Guardia Central":"Consulta",reason:a.reason||consult?.lastMotivo||"",notes,consult};
+      episodes.set(String(a.id),episode);model[type].push(episode);
+    }
+    // Una evolución guardada sigue disponible aunque su turno ya no esté en agenda.
+      const refs=identity.refs.filter(r=>r.sourceId===src.id);
+    for(const ref of refs){
+      const cur=src.clinical?.[ref.patientId]||{},amb=cur.ambulatorio||{};
+      const groups=new Map();
+      for(const e of hc270Array(amb.evoluciones)){
+        if(hc270Deleted(e))continue;const id=String(e.appointmentId||`sin-turno:${e.id||e.createdAt}`);
+        if(!groups.has(id))groups.set(id,[]);groups.get(id).push(e);
+      }
+      for(const [id,consult] of Object.entries(amb.consultas||{})){
+        if(!groups.has(id)&&!hc270Deleted(consult)&&!hc270Empty(consult))groups.set(id,[]);
+      }
+      for(const [id,notes] of groups){
+        if(episodes.has(id))continue;
+        const c=amb.consultas?.[id],first=notes[0]||c||{},type=first.encounterType==="guardia"?"guardia":"consultorio";
+        const a={id,patientId:ref.patientId,encounterType:type};
+        const ep={key:`${src.id}:encounter:${id}`,type,sourceId:src.id,record:a,institution:hc270EpisodeInstitution(first,src),
+          date:first.appointmentDate?`${first.appointmentDate}T${first.appointmentTime||"00:00"}`:hc270RecordDate(first),
+          end:"",title:type==="guardia"?"Atención de Guardia Central":"Consulta",reason:first.motivo||c?.lastMotivo||"",notes,consult:c};
+        episodes.set(id,ep);model[type].push(ep);
+      }
+      const loose={};
+      for(const [k,v] of Object.entries(cur)){
+        if(k==="ambulatorio"||k==="historyInstitution"||hc270Empty(v))continue;
+        const records=hc270Undated(v);if(!hc270Empty(records))loose[k]=records;
+      }
+      if(!hc270Empty(loose))model.unassigned.push({sourceId:src.id,institution:src.institution,modules:loose});
+    }
+    // Laboratorios del registro vivo y de las copias cerradas; sin duplicar IDs.
+    const labMap=new Map();
+    function addLabs(rows,kind,origin){for(const r of hc270Array(rows)){
+      if(hc270Deleted(r))continue;
+      const fingerprint=r.id||JSON.stringify(r),key=`${src.id}:${kind}:${fingerprint}`;
+      if(labMap.has(key))continue;
+      labMap.set(key,{key,type:"laboratorio",sourceId:src.id,record:r,kind,origin,institution:origin?.institution||src.institution,
+        date:hc270RecordDate(r),title:kind==="labResults"?"Resultado de laboratorio":"Solicitud de laboratorio",reason:r.study||r.name||r.panelName||r.text||""});
+    }}
+    for(const ep of model.internaciones.filter(e=>e.sourceId===src.id)){
+      if(ep.snapshot?.modules){addLabs(ep.snapshot.modules.labRequests,"labRequests",ep);addLabs(ep.snapshot.modules.labResults,"labResults",ep);}
+    }
+    for(const ref of refs){const cur=src.clinical?.[ref.patientId]||{};addLabs(cur.labRequests,"labRequests",null);addLabs(cur.labResults,"labResults",null);}
+    model.laboratorio.push(...labMap.values());
+  }
+  for(const key of Object.keys(HC270_CATEGORIES))model[key].sort((a,b)=>(hc270Time(b.date)||0)-(hc270Time(a.date)||0));
+  return model;
+}
+function hc270EpisodeModules(ep,src){
+  const cur=src.clinical?.[ep.record.patientId]||{};
+  if(ep.type==="laboratorio")return {[ep.kind]:[ep.record]};
+  if(ep.type==="internaciones"){
+    if(ep.snapshot?.modules)return {admission:ep.record,...ep.snapshot.modules};
+    const out={admission:ep.record},known=new Set(['ambulatorio','ingresosPrev','historyInstitution']);
+    for(const [key,value] of Object.entries(cur)){
+      if(known.has(key)||hc270Empty(value))continue;
+      const slice=hc270Slice(value,ep);if(!hc270Empty(slice))out[key]=slice;
+    }
+    const ingresos=[cur.ingresoFull,...hc270Array(cur.ingresosPrev)].filter(x=>x&&!hc270Deleted(x));
+    const matching=ingresos.find(i=>i.admissionId&&String(i.admissionId)===String(ep.record.id))||ingresos.find(i=>!hc270Empty(hc270Slice(i,ep)));
+    if(matching)out.ingresoFull=matching;
+    if(ep.archive?.epicText)out.epicrisisFull={fullText:ep.archive.epicText,author:ep.archive.epicAuthorName};
+    return out;
+  }
+  const out={atencion:ep.record};
+  if(ep.notes?.length)out.evolucionesFull=ep.notes;
+  if(ep.consult)out.consulta=ep.consult;
+  const amb=cur.ambulatorio||{};
+  const rx=hc270Array(amb.recetasExternas).filter(r=>String(r.appointmentId||"")===String(ep.record.id)&&!hc270Deleted(r));if(rx.length)out.recetasExternas=rx;
+  // Cualquier otro campo del episodio: vinculado por ID, o fechado dentro de la atención.
+  const bound={...ep,requireLink:!ep.end};
+  for(const [key,value] of Object.entries(cur)){
+    if(key==="ambulatorio"||hc270Empty(value))continue;
+    const slice=hc270Slice(value,bound);if(!hc270Empty(slice))out[key]=out[key]?hc270MergeValues(out[key],slice):slice;
+  }
+  for(const [key,value] of Object.entries(amb)){
+    if(['evoluciones','consultas','recetasExternas'].includes(key)||hc270Empty(value))continue;
+    if(Array.isArray(value)){const rows=value.filter(r=>r?.appointmentId&&String(r.appointmentId)===String(ep.record.id)&&!hc270Deleted(r));if(rows.length)out[key]=rows;}
+  }
+  return out;
+}
+function hc270MergeValues(a,b){return Array.isArray(a)&&Array.isArray(b)?[...a,...b.filter(x=>!a.some(y=>y.id&&y.id===x.id))]:b;}
+function hc270Label(key){return HC270_LABELS[key]||(typeof hcV189PrettyKey==="function"?hcV189PrettyKey(key):String(key).replace(/([a-z])([A-Z])/g,'$1 $2'));}
+function hc270Logo(inst){return inst.logoData?`<img class="hc270Logo" src="${hc270Esc(inst.logoData)}" alt="Logotipo de ${hc270Esc(inst.name)}" loading="lazy">`:`<span class="hc270Logo hc270Initial" aria-label="Institución sin logotipo">${hc270Esc(inst.name.slice(0,1).toUpperCase())}</span>`;}
+function hc270Keep(value){const token=String(++hc270State.valueSeq);hc270State.values.set(token,value);return token;}
+function hc270Summary(value){
+  const date=hc270RecordDate(value),author=value?.createdByName||value?.reportedByName||value?.author?.name||value?.lastSavedByName||"";
+  const title=value?.drugName||value?.name||value?.study||value?.label||value?.motivo||value?.type||"Registro";
+  return [date?hc270Date(date):"",title,author].filter(Boolean).join(" · ");
+}
+function hc270Deferred(value,label){return `<details class="hc270Detail" data-hc270-value="${hc270Keep(value)}"><summary>${hc270Esc(label)}</summary><div class="hc270DetailBody"></div></details>`;}
+function hc270ValueHTML(value){
+  if(value==null)return '<span class="muted">Sin datos</span>';
+  if(typeof value!=="object"){
+    if(typeof value==="boolean")return value?"Sí":"No";
+    const s=String(value),img=hc270SafeURL(s,true),link=hc270SafeURL(s);
+    if(img&&/^data:image/i.test(img))return `<a href="${hc270Esc(img)}" target="_blank" rel="noopener noreferrer"><img class="hc270Attachment" src="${hc270Esc(img)}" alt="Imagen del registro" loading="lazy"></a>`;
+    if(link)return `<a href="${hc270Esc(link)}" target="_blank" rel="noopener noreferrer" ${link.startsWith('data:')?'download="adjunto"':''}>Abrir archivo o enlace</a>`;
+    if(/^data:/i.test(s))return '<span class="muted">Archivo almacenado en formato no previsualizable</span>';
+    return `<pre class="hc270Text">${hc270Esc(s)}</pre>`;
+  }
+  if(Array.isArray(value))return hc270ArrayPage(value,0);
+  let html="";
+  const internal=new Set(['id','patientId','admissionId','appointmentId','deleted','deletedAt','historyInstitution','backendScope','backendRegistryId','deviceId','chunkIndex','chunkTotal']);
+  const entries=Object.entries(value).filter(([k,v])=>!internal.has(k)&&!hc270Empty(v));
+  // Textos completos primero; los campos estructurados también siguen accesibles.
+  entries.sort(([a],[b])=>Number(['fullText','prettyText','evolucion','resultText','report','text'].includes(b))-Number(['fullText','prettyText','evolucion','resultText','report','text'].includes(a)));
+  for(const [key,item] of entries){
+    const label=hc270Label(key);
+    html+=typeof item==="object"?hc270Deferred(item,`${label}${Array.isArray(item)?` (${item.length})`:""}`):`<div class="hc270Field"><b>${hc270Esc(label)}</b>${hc270ValueHTML(item)}</div>`;
+  }
+  return html||'<div class="muted">Sin otros datos registrados.</div>';
+}
+function hc270ArrayPage(rows,start){
+  const end=Math.min(rows.length,start+25);let html="";
+  for(let i=start;i<end;i++)html+=typeof rows[i]==="object"&&rows[i]!==null?hc270Deferred(rows[i],hc270Summary(rows[i])):`<div class="hc270Field">${hc270ValueHTML(rows[i])}</div>`;
+  if(end<rows.length)html+=`<button class="btn small" type="button" data-hc270-more="${hc270Keep({rows,start:end})}">Ver más registros (${rows.length-end})</button>`;
+  return html||'<div class="muted">Sin registros.</div>';
+}
+async function hc270RemoteSource(desc,scope){
+  const auth=await hcGlobalAccountRequest("selectInstitution",{token:hc207GlobalToken(),institutionId:desc.id});
+  if(scope!==hc270Scope())throw Error("La sesión cambió.");
+  const b=auth.backend||{},id=String(b.dataInstitutionId||b.data_institution_id||b.id||b.identificador||b.backendId||auth.institution?.dataInstitutionId||auth.institution?.data_institution_id||desc.dataInstitutionId||desc.data_institution_id||desc.id);
+  const grant=await hc207Fetch({action:"bootstrap",institutionId:String(desc.id),dataInstitutionId:id,globalToken:hc207GlobalToken()});
+  if(scope!==hc270Scope())throw Error("La sesión cambió.");
+  const dataId=String(grant.dataInstitutionId||id);
+  const core=await hc207Fetch({action:"pull",institutionId:dataId,syncToken:grant.syncToken,buckets:['patients','registry','archive','appointments','inst']});
+  if(scope!==hc270Scope())throw Error("La sesión cambió.");
+  const snap=hc207RowsToSnapshot(core.rows),inst=hc270Institution(snap.inst,{id:dataId,name:auth.institution?.displayName||auth.institution?.display_name||auth.institution?.name||desc.name,logoData:auth.institution?.logoData||auth.institution?.logo_data||desc.logoData||desc.logo_data});
+  return {...snap,id:dataId,local:false,institution:inst,grant:{token:grant.syncToken,authId:String(desc.id),at:Date.now()},desc,loadedAt:Date.now()};
+}
+async function hc270ReadClinical(src,pid){
+  if(!hc207GlobalToken())return src.clinical?.[pid]||{};
+  let institutionId=src.id,token;
+  if(src.local){
+    const grant=await hc207Fetch({action:'bootstrap',institutionId:hc220AuthInstitutionId(),dataInstitutionId:src.id,globalToken:hc207GlobalToken()});token=grant.syncToken;institutionId=grant.dataInstitutionId||src.id;
+  }else{
+    if(!src.grant||Date.now()-src.grant.at>300000){
+      const renewed=await hc270RemoteSource(src.desc,hc270Scope());Object.assign(src,renewed);
+    }
+    token=src.grant.token;
+  }
+  const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),12000);
+  try{
+    const res=await fetch(HC221_PATIENT_SYNC_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:HC207_PUBLISHABLE},
+      body:JSON.stringify({institutionId,syncToken:token,patientId:pid,fields:[]}),cache:'no-store',signal:ctl.signal});
+    const j=await res.json();if(!res.ok||!j.ok)throw Error(j.error||'No se pudo leer la historia clínica.');
+    if((j.rows||[]).length>=200)throw Error('Este paciente supera el límite del servicio de historia. No se muestra una descarga parcial.');
+    return hc207RowsToSnapshot(j.rows).clinical?.[pid]||{};
+  }finally{clearTimeout(timer);}
+}
+function hc270Status(text){const el=document.getElementById('hc270SearchStatus');if(el)el.textContent=text;}
+function hc270StoreSource(src){if(!hc270State.sources.get(src.id)?.local)hc270State.sources.set(src.id,src);}
+function hc270SearchResults(){
+  const el=document.getElementById('hc270SearchResults');if(!el)return;
+  el.innerHTML=hc270State.searchRows.slice(0,hc270State.searchLimit).map((p,i)=>`<button type="button" class="hc270PatientResult" data-hc270-patient="${i}"><b>${hc270Esc(hc270Name(p.patient))}</b><span>DNI: ${hc270Esc(p.dni||'No registrado')}</span><small>${hc270Esc([...p.institutions].join(' · '))}</small></button>`).join('')+
+    (hc270State.searchRows.length>hc270State.searchLimit?'<button type="button" class="btn small" data-hc270-more-patients>Mostrar más pacientes</button>':'');
+}
+async function hc270SearchPatients(){
+  hc270CheckScope();const input=document.getElementById('hc270PatientQuery'),query=(input?.value||'').trim();
+  const seq=++hc270State.searchGeneration,scope=hc270Scope();hc270State.searchLimit=30;
+  if(!query){hc270State.searchRows=[];hc270SearchResults();hc270Status('Escribí un documento o apellido y nombre.');return;}
+  function show(message){hc270State.searchRows=hc270SearchIndex(hc270PatientIndex(hc270State.sources.values()),query);hc270SearchResults();hc270Status(message||`${hc270State.searchRows.length} paciente(s) encontrado(s).`);}
+  try{hc270LocalSource();show();}catch(e){hc270Status(e.message);return;}
+  if(!document.getElementById('hc270OtherInstitutions')?.checked||!hc207GlobalToken()){
+    // Una búsqueda limitada a esta institución excluye las fuentes remotas previas.
+    const local=hc270State.sources.get(String(hc207Inst()||'local'));
+    hc270State.searchRows=hc270SearchIndex(hc270PatientIndex([local]),query);hc270SearchResults();hc270Status(`${hc270State.searchRows.length} paciente(s) encontrado(s).`);return;
+  }
+  const others=hc270Array(hcGlobalStoredInstitutions()).filter(d=>String(d.id)!==String(hc220AuthInstitutionId()));
+  if(!others.length)return;
+  hc270Status('Buscando en las instituciones habilitadas…');let failures=0;
+  // Dos instituciones a la vez, sin trabajo de red por cada tecla.
+  for(let i=0;i<others.length;i+=2){
+    const results=await Promise.allSettled(others.slice(i,i+2).map(d=>hc270RemoteSource(d,scope)));
+    if(seq!==hc270State.searchGeneration||scope!==hc270Scope())return;
+    results.forEach((r,n)=>{if(r.status==='fulfilled')hc270StoreSource(r.value);else{failures++;for(const [id,s] of hc270State.sources)if(!s.local&&String(s.desc?.id)===String(others[i+n].id))hc270State.sources.delete(id);}});
+    show(`Buscando… ${Math.min(i+2,others.length)}/${others.length} instituciones.`);
+  }
+  show(failures?`${hc270State.searchRows.length} paciente(s). ${failures} institución(es) no pudieron consultarse; reintentá la búsqueda.`:'');
+}
+function hc270HistoryOnly(){return hc270State.scope===hc270Scope()&&!!hc270State.selected?.fromSearch;}
+function hc270HistoryHeader(){
+  hc270CheckScope();if(!hc270HistoryOnly())return false;
+  const el=document.getElementById('pacHdrBar'),p=hc270State.selected.patient;
+  if(el)el.innerHTML=`<div class="l1">${hc270Esc(hc270Name(p))}</div><div class="l2">DNI: ${hc270Esc(p.dni||'No registrado')} · Historia clínica</div><div class="l3">Consulta de atenciones actuales y anteriores</div>`;
+  renderInstitutionHeader();return true;
+}
+function hc270SelectIdentity(entry,fromSearch){
+  if(fromSearch){if(!hc270HistoryOnly()){hc270State.returnPatient=selectedPatientId;hc270State.returnTab=medTab==='historia'?'ingreso':medTab;}selectedPatientId=null;}
+  hc270State.selected={...entry,fromSearch,includeOther:!!document.getElementById('hc270OtherInstitutions')?.checked};hc270State.model=null;hc270State.episode=null;hc270State.renderedKey='';hc270State.notice='';hc270State.episodeLimit=50;
+  hc270State.category='internaciones';medTab='historia';renderMed();
+}
+async function hc270LoadHistory(force=false){
+  const selected=hc270State.selected;if(!selected)return;
+  const scope=hc270Scope(),generation=++hc270State.generation;
+  hc270State.loading=true;hc270State.notice='';hc270Draw();
+  try{
+    const local=hc270LocalSource(true);
+    const coreFailures=[];
+    if(selected.includeOther&&hc207GlobalToken()){
+      const descriptors=hc270Array(hcGlobalStoredInstitutions()).filter(d=>String(d.id)!==String(hc220AuthInstitutionId()));
+      const allowed=new Set(descriptors.map(d=>String(d.id)));
+      for(const [id,s] of hc270State.sources)if(!s.local&&!allowed.has(String(s.desc?.id)))hc270State.sources.delete(id);
+      const needed=descriptors.filter(d=>{const cached=[...hc270State.sources.values()].find(s=>!s.local&&String(s.desc?.id)===String(d.id));return force||!cached||Date.now()-cached.loadedAt>120000;});
+      for(let i=0;i<needed.length;i+=2){
+        const batch=needed.slice(i,i+2),results=await Promise.allSettled(batch.map(d=>hc270RemoteSource(d,scope)));
+        if(generation!==hc270State.generation||scope!==hc270Scope())return;
+        results.forEach((r,n)=>{if(r.status==='fulfilled')hc270StoreSource(r.value);else{coreFailures.push(batch[n].name||'institución');for(const [id,s] of hc270State.sources)if(!s.local&&String(s.desc?.id)===String(batch[n].id))hc270State.sources.delete(id);}});
+      }
+    }
+    const sources=[...hc270State.sources.values()].filter(s=>s.local||selected.includeOther);
+    // Refrescar la identidad sin unir por nombre, ni por IDs de otra institución.
+    const identities=hc270PatientIndex(sources),identity=identities.find(p=>p.key===selected.key)||selected;
+    hc270State.selected={...identity,fromSearch:selected.fromSearch,includeOther:selected.includeOther};
+    const failures=[...coreFailures];
+    for(let i=0;i<identity.refs.length;i+=3){
+      const batch=identity.refs.slice(i,i+3).filter(r=>!r.patientId.startsWith('archive:')&&!r.patientId.startsWith('appointment:'));
+      const results=await Promise.allSettled(batch.map(async ref=>{
+        const src=hc270State.sources.get(ref.sourceId);if(!src)return;
+        const read=await hc270ReadClinical(src,ref.patientId);
+        if(generation!==hc270State.generation||scope!==hc270Scope())return;
+        // La copia local puede contener guardados todavía pendientes de sincronización.
+        const localValue=src.local?local.clinical?.[ref.patientId]||{}:{};
+        const merged=src.local&&typeof hcMergeClinicalPatientRecord==='function'?hcMergeClinicalPatientRecord(localValue,read):{...read,...localValue};
+        src.clinical[ref.patientId]=merged;
+      }));
+      if(generation!==hc270State.generation||scope!==hc270Scope())return;
+      results.forEach((r,n)=>{if(r.status==='rejected')failures.push(hc270State.sources.get(batch[n].sourceId)?.institution.name||'institución');});
+    }
+    hc270State.model=hc270BuildModel(hc270State.selected,sources);
+    hc270State.notice=failures.length?`No se pudo actualizar la historia completa de ${[...new Set(failures)].join(', ')}. Se muestran los registros disponibles; usá Actualizar historia para reintentar.`:'';
+  }catch(e){if(generation===hc270State.generation)hc270State.notice=e.message||String(e);}
+  finally{if(generation===hc270State.generation&&scope===hc270Scope()){hc270State.loading=false;hc270Draw();}}
+}
+function hc270RenderHistory(){
+  hc270CheckScope();
+  if(!hc270HistoryOnly()){
+    const pid=String(selectedPatientId||'');
+    if(!pid){document.getElementById('medHistoria').innerHTML='<div class="muted">Seleccioná un paciente del censo o usá Buscar paciente para consultar su historia.</div>';return;}
+    const key=`${hc270State.scope}|${pid}`;
+    if(hc270State.renderedKey===key&&hc270State.selected)return;
+    try{
+      hc270LocalSource();const identity=hc270PatientIndex(hc270State.sources.values()).find(p=>p.refs.some(r=>r.sourceId===String(hc207Inst()||'local')&&r.patientId===pid));
+      if(!identity)throw Error('No se encontró la ficha del paciente.');
+      hc270State.selected={...identity,fromSearch:false,includeOther:!!document.getElementById('hc270OtherInstitutions')?.checked};hc270State.model=null;hc270State.episode=null;hc270State.category='internaciones';hc270State.renderedKey=key;hc270State.episodeLimit=50;
+    }catch(e){document.getElementById('medHistoria').innerHTML=`<div class="muted">${hc270Esc(e.message)}</div>`;return;}
+    hc270LoadHistory();return;
+  }
+  if(!hc270State.model&&!hc270State.loading)hc270LoadHistory();
+  else if(!document.getElementById('hc270HistoryCategories'))hc270Draw();
+}
+function hc270Draw(){
+  if(medTab!=='historia')return;const root=document.getElementById('medHistoria');if(!root)return;
+  hc270State.values.clear();const m=hc270State.model,category=hc270State.category;
+  const ep=m?.[category]?.find(e=>e.key===hc270State.episode);
+  const toolbar=`<div class="hc270Toolbar">${hc270HistoryOnly()?'<button type="button" class="btn small" data-hc270-return>Volver al censo</button>':''}<button type="button" class="btn small" data-hc270-refresh ${hc270State.loading?'disabled':''}>Actualizar historia</button><span class="muted" role="status">${hc270State.loading?'Cargando historia…':''}</span></div>`;
+  const nav=`<div class="hc270Categories" id="hc270HistoryCategories">${Object.entries(HC270_CATEGORIES).map(([k,label])=>`<button type="button" class="btn ${category===k?'primary':''}" data-hc270-category="${k}" aria-pressed="${category===k}">${label}${m?` (${m[k].length})`:''}</button>`).join('')}</div>`;
+  let content='';
+  if(ep){
+    const src=hc270State.sources.get(ep.sourceId),modules=hc270EpisodeModules(ep,src);
+    const keys=Object.keys(modules).filter(k=>!hc270Empty(modules[k]));
+    content=`<button type="button" class="btn small" data-hc270-back>← ${HC270_CATEGORIES[category]}</button><div class="hc270EpisodeHead">${hc270Logo(ep.institution)}<div><h3>${hc270Esc(ep.title)}</h3><b>${hc270Esc(ep.institution.name)}</b><div>${hc270Esc(hc270Date(ep.date))}${ep.end?` · Finalización: ${hc270Esc(hc270Date(ep.end))}`:''}</div><div>${hc270Esc(ep.reason)}</div></div></div>`;
+    if(ep.type==='internaciones'&&ep.closed&&!ep.snapshot?.modules)content+='<p class="muted">Esta internación antigua no tiene una copia completa de cierre. Se muestran los registros que pueden vincularse con la atención.</p>';
+    content+=keys.map(k=>hc270Deferred(modules[k],`${hc270Label(k)}${Array.isArray(modules[k])?` (${modules[k].length})`:''}`)).join('')||'<p class="muted">Sin datos clínicos registrados para esta atención.</p>';
+  }else if(m){
+    content=(m[category]||[]).slice(0,hc270State.episodeLimit).map((e,i)=>`<button type="button" class="hc270Episode" data-hc270-episode="${i}">${hc270Logo(e.institution)}<span><b>${hc270Esc(hc270Date(e.date))}</b><strong>${hc270Esc(e.title)}</strong><span>${hc270Esc(e.institution.name)}</span>${e.reason?`<small>${hc270Esc(String(e.reason).slice(0,180))}</small>`:''}</span><span aria-hidden="true">›</span></button>`).join('');
+    if(m[category].length>hc270State.episodeLimit)content+='<button type="button" class="btn small" data-hc270-more-episodes>Mostrar más atenciones</button>';
+    if(!m[category].length)content=`<p class="muted">Sin registros disponibles en ${HC270_CATEGORIES[category]}.</p>`;
+    if(m.unassigned.length)content+=hc270Deferred(m.unassigned.map(x=>({institucion:x.institution.name,...x.modules})),'Registros antiguos sin fecha o atención identificable');
+  }
+  root.innerHTML=toolbar+nav+(hc270State.notice?`<p class="hc270Notice" role="status">${hc270Esc(hc270State.notice)}</p>`:'')+content;
+}
+document.getElementById('hc270PatientSearch')?.addEventListener('submit',event=>{event.preventDefault();hc270SearchPatients();});
+document.addEventListener('toggle',event=>{
+  const detail=event.target;if(!detail?.matches?.('details[data-hc270-value]')||!detail.open||detail.dataset.loaded)return;
+  const value=hc270State.values.get(detail.dataset.hc270Value);if(value===undefined)return;
+  detail.dataset.loaded='1';detail.querySelector('.hc270DetailBody').innerHTML=hc270ValueHTML(value);
+},true);
+document.addEventListener('click',event=>{
+  const target=event.target?.closest?.('[data-hc270-patient],[data-hc270-category],[data-hc270-episode],[data-hc270-refresh],[data-hc270-return],[data-hc270-back],[data-hc270-more],[data-hc270-more-patients],[data-hc270-more-episodes]');if(!target)return;
+  hc270CheckScope();
+  if(target.hasAttribute('data-hc270-patient')){const row=hc270State.searchRows[Number(target.dataset.hc270Patient)];if(row)hc270SelectIdentity(row,true);}
+  else if(target.hasAttribute('data-hc270-category')){hc270State.category=target.dataset.hc270Category;hc270State.episode=null;hc270State.episodeLimit=50;hc270Draw();}
+  else if(target.hasAttribute('data-hc270-episode')){const ep=hc270State.model?.[hc270State.category]?.[Number(target.dataset.hc270Episode)];if(ep){hc270State.episode=ep.key;hc270Draw();}}
+  else if(target.hasAttribute('data-hc270-refresh'))hc270LoadHistory(true);
+  else if(target.hasAttribute('data-hc270-back')){hc270State.episode=null;hc270Draw();}
+  else if(target.hasAttribute('data-hc270-return')){selectedPatientId=hc270State.returnPatient;medTab=hc270State.returnTab;hc270State.selected=null;hc270State.renderedKey='';hc270State.generation++;hc270State.loading=false;renderMed();}
+  else if(target.hasAttribute('data-hc270-more-patients')){hc270State.searchLimit+=30;hc270SearchResults();}
+  else if(target.hasAttribute('data-hc270-more-episodes')){hc270State.episodeLimit+=50;hc270Draw();}
+  else if(target.hasAttribute('data-hc270-more')){const data=hc270State.values.get(target.dataset.hc270More);if(data){target.insertAdjacentHTML('beforebegin',hc270ArrayPage(data.rows,data.start));target.remove();}}
+});
+// Al volver a elegir una cama/turno, dejar el contexto de consulta histórica.
+document.addEventListener('click',event=>{
+  if(event.target?.closest?.('#medCenso .censoItem')){hc270State.selected=null;hc270State.model=null;hc270State.renderedKey='';hc270State.generation++;hc270State.loading=false;}
+  if(event.target?.closest?.('[data-medtab]')&&hc270HistoryOnly()&&event.target.closest('[data-medtab]').dataset.medtab!=='historia'){
+    event.preventDefault();event.stopImmediatePropagation();
+  }
+},true);
+window.HC_DEMO_VERSION='v270';document.title='Hospitalito v270 · Supabase';
+
+</script>
 </body>
 </html>
