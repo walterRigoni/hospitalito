@@ -47335,19 +47335,18 @@ function hc270BuildModel(identity,sources){
   return model;
 }
 function hc270EpisodeModules(ep,src){
-  const cur=src.clinical?.[ep.record.patientId]||{};
+  const cur=src.clinical?.[ep.record.patientId||ep.archive?.patientId||ep.snapshot?.patient?.id]||{};
   if(ep.type==="laboratorio")return {[ep.kind]:[ep.record]};
   if(ep.type==="internaciones"){
-    if(ep.snapshot?.modules)return {admission:ep.record,...ep.snapshot.modules};
-    const out={admission:ep.record},known=new Set(['ambulatorio','ingresosPrev','historyInstitution']);
+    const out={admission:ep.record,...ep.snapshot?.modules},known=new Set(['ambulatorio','ingresosPrev','historyInstitution']);
     for(const [key,value] of Object.entries(cur)){
       if(known.has(key)||hc270Empty(value))continue;
-      const slice=hc270Slice(value,ep);if(!hc270Empty(slice))out[key]=slice;
+      const slice=hc270Slice(value,ep);if(!hc270Empty(slice))out[key]=out[key]?hc270MergeValues(out[key],slice):slice;
     }
     const ingresos=[cur.ingresoFull,...hc270Array(cur.ingresosPrev)].filter(x=>x&&!hc270Deleted(x));
     const matching=ingresos.find(i=>i.admissionId&&String(i.admissionId)===String(ep.record.id))||ingresos.find(i=>!hc270Empty(hc270Slice(i,ep)));
-    if(matching)out.ingresoFull=matching;
-    if(ep.archive?.epicText)out.epicrisisFull={fullText:ep.archive.epicText,author:ep.archive.epicAuthorName};
+    if(matching&&!out.ingresoFull)out.ingresoFull=matching;
+    if(ep.archive?.epicText&&!out.epicrisisFull)out.epicrisisFull={fullText:ep.archive.epicText,author:ep.archive.epicAuthorName};
     return out;
   }
   const out={atencion:ep.record};
@@ -47367,7 +47366,17 @@ function hc270EpisodeModules(ep,src){
   }
   return out;
 }
-function hc270MergeValues(a,b){return Array.isArray(a)&&Array.isArray(b)?[...a,...b.filter(x=>!a.some(y=>y.id&&y.id===x.id))]:b;}
+function hc270MergeValues(a,b){
+  if(Array.isArray(a)&&Array.isArray(b)){
+    const key=v=>v&&typeof v==='object'&&v.id?`id:${v.id}`:JSON.stringify(v),other=new Map(b.map(v=>[key(v),v])),used=new Set();
+    const out=a.map(v=>{const k=key(v);used.add(k);return other.has(k)?hc270MergeValues(v,other.get(k)):v;});
+    return [...out,...b.filter(v=>!used.has(key(v)))];
+  }
+  if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){
+    const out={...b,...a};for(const key of Object.keys(b))if(Object.hasOwn(a,key))out[key]=hc270MergeValues(a[key],b[key]);return out;
+  }
+  return hc270Empty(a)?b:a;
+}
 function hc270Label(key){return HC270_LABELS[key]||(typeof hcV189PrettyKey==="function"?hcV189PrettyKey(key):String(key).replace(/([a-z])([A-Z])/g,'$1 $2'));}
 function hc270Logo(inst){return inst.logoData?`<img class="hc270Logo" src="${hc270Esc(inst.logoData)}" alt="Logotipo de ${hc270Esc(inst.name)}" loading="lazy">`:`<span class="hc270Logo hc270Initial" aria-label="Institución sin logotipo">${hc270Esc(inst.name.slice(0,1).toUpperCase())}</span>`;}
 function hc270Keep(value){const token=String(++hc270State.valueSeq);hc270State.values.set(token,value);return token;}
