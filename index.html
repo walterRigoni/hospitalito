@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v270 · Historia clínica · Supabase</title>
+<title>Hospitalito v271 · Historia clínica · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42648,6 +42648,18 @@ window.__hcV216Watchdog=setInterval(()=>{
 },3000);
 setTimeout(()=>hc207Poll(),120);
 console.info("HC v216: conexión automática + recuperación no destructiva del censo + sincronización dúplex activas.");
+
+/* v271 · exponer de forma controlada los helpers de sincronización que usa Historia. */
+try{
+  window.hc207Inst=hc207Inst;
+  window.hc207GlobalToken=hc207GlobalToken;
+  window.hc207Fetch=hc207Fetch;
+  window.hc207Req=hc207Req;
+  window.hc207RowsToSnapshot=hc207RowsToSnapshot;
+  window.hc220AuthInstitutionId=hc220AuthInstitutionId;
+  window.HC207_PUBLISHABLE=HC207_PUBLISHABLE;
+  window.HC221_PATIENT_SYNC_URL=HC221_PATIENT_SYNC_URL;
+}catch(e){ console.warn("v271: no se pudieron exponer helpers de Historia",e); }
 })();
 </script>
 
@@ -47023,7 +47035,7 @@ function hcV260SaveAnesthesia(pid,data){
     box.querySelector('[data-an-save]').onclick=function(){this.disabled=true;try{const rec=hcV260SaveAnesthesia(pid,read());try{localStorage.removeItem(draftKey(pid));}catch(_){}box.remove();openedEvoIndex=(getClinical()[pid].evolucionesFull||[]).findIndex(r=>r.id===rec.id);evoUIState='view';evoRender();toast('Ficha de anestesia guardada');}catch(e){box.querySelector('[data-an-message]').textContent=e.message||String(e);this.disabled=false;}};
   }
   document.addEventListener('click',ev=>{if(ev.target.closest('#btnFichaAnestesia'))open();});
-  window.HC_DEMO_VERSION='v270';document.title='Hospitalito v270 · Supabase';
+  window.HC_DEMO_VERSION='v271';document.title='Hospitalito v271 · Supabase';
 })();
 </script>
 
@@ -47594,8 +47606,95 @@ document.addEventListener('click',event=>{
     event.preventDefault();event.stopImmediatePropagation();
   }
 },true);
-window.HC_DEMO_VERSION='v270';document.title='Hospitalito v270 · Supabase';
+window.HC_DEMO_VERSION='v271';document.title='Hospitalito v271 · Supabase';
 
+</script>
+
+<script id="hc-v271-history-search-fix">
+/* v271 · La búsqueda de pacientes históricos refresca primero la institución actual
+   desde Supabase. Así también encuentra pacientes que no están internados y todavía
+   no fueron cargados en la caché local de este navegador. */
+function hc271MergeRows(remoteRows,localRows){
+  const out=new Map();
+  const put=(row,i,prefer)=>{
+    if(!row||typeof row!=="object")return;
+    const key=String(row.id||row.patientId||row.recordId||row.requestId||row.slotKey||row.key||("row:"+i+":"+JSON.stringify(row)));
+    if(!out.has(key)||prefer)out.set(key,row);
+  };
+  (Array.isArray(remoteRows)?remoteRows:[]).forEach((r,i)=>put(r,i,false));
+  (Array.isArray(localRows)?localRows:[]).forEach((r,i)=>put(r,i,true));
+  return [...out.values()];
+}
+async function hc271RefreshCurrentSearchSource(scope){
+  const local=hc270LocalSource();
+  if(typeof hcBackendConfigured==="function"&&!hcBackendConfigured())return local;
+  if(typeof hc207Req!=="function"||typeof hc207RowsToSnapshot!=="function")return local;
+  const pulled=await hc207Req("pull",{buckets:["patients","registry","archive","appointments","inst"]});
+  if(scope!==hc270Scope())throw Error("La sesión cambió.");
+  const snap=hc207RowsToSnapshot(pulled?.rows||[]);
+  const merged={
+    ...local,
+    id:local.id,
+    local:true,
+    institution:hc270Institution(snap.inst,{...local.institution,...snap.inst}),
+    patients:hc271MergeRows(snap.patients,local.patients),
+    registry:hc271MergeRows(snap.registry,local.registry),
+    archive:hc271MergeRows(snap.archive,local.archive),
+    appointments:hc271MergeRows(snap.appointments,local.appointments),
+    clinical:local.clinical||{}
+  };
+  hc270State.sources.set(String(merged.id),merged);
+  return merged;
+}
+hc270SearchPatients=async function(){
+  hc270CheckScope();
+  const input=document.getElementById("hc270PatientQuery"),query=(input?.value||"").trim();
+  const seq=++hc270State.searchGeneration,scope=hc270Scope();hc270State.searchLimit=30;
+  if(!query){hc270State.searchRows=[];hc270SearchResults();hc270Status("Escribí un documento o apellido y nombre.");return;}
+  const show=message=>{
+    hc270State.searchRows=hc270SearchIndex(hc270PatientIndex(hc270State.sources.values()),query);
+    hc270SearchResults();
+    hc270Status(message||`${hc270State.searchRows.length} paciente(s) encontrado(s).`);
+  };
+  let localError="";
+  try{
+    hc270LocalSource();
+    show("Buscando en esta institución…");
+    await hc271RefreshCurrentSearchSource(scope);
+    if(seq!==hc270State.searchGeneration||scope!==hc270Scope())return;
+    show();
+  }catch(e){
+    localError=e?.message||String(e);
+    try{hc270LocalSource();show();}catch(_){}
+  }
+  const includeOther=!!document.getElementById("hc270OtherInstitutions")?.checked;
+  if(!includeOther||typeof hc207GlobalToken!=="function"||!hc207GlobalToken()){
+    const local=hc270State.sources.get(String((typeof hc207Inst==="function"&&hc207Inst())||"local"));
+    hc270State.searchRows=local?hc270SearchIndex(hc270PatientIndex([local]),query):[];
+    hc270SearchResults();
+    hc270Status(localError?`${hc270State.searchRows.length} paciente(s). No se pudo actualizar Supabase: ${localError}`:`${hc270State.searchRows.length} paciente(s) encontrado(s).`);
+    return;
+  }
+  const others=hc270Array(hcGlobalStoredInstitutions()).filter(d=>String(d.id)!==String(hc220AuthInstitutionId()));
+  if(!others.length){show(localError?`${hc270State.searchRows.length} paciente(s). No se pudo actualizar la institución actual: ${localError}`:"");return;}
+  hc270Status("Buscando también en las instituciones habilitadas…");let failures=0;
+  for(let i=0;i<others.length;i+=2){
+    const batch=others.slice(i,i+2);
+    const results=await Promise.allSettled(batch.map(d=>hc270RemoteSource(d,scope)));
+    if(seq!==hc270State.searchGeneration||scope!==hc270Scope())return;
+    results.forEach((r,n)=>{
+      if(r.status==="fulfilled")hc270StoreSource(r.value);
+      else{
+        failures++;
+        for(const [id,s] of hc270State.sources)if(!s.local&&String(s.desc?.id)===String(batch[n]?.id))hc270State.sources.delete(id);
+      }
+    });
+    show(`Buscando… ${Math.min(i+2,others.length)}/${others.length} instituciones.`);
+  }
+  show(failures?`${hc270State.searchRows.length} paciente(s). ${failures} institución(es) no pudieron consultarse; reintentá la búsqueda.`:"");
+};
+window.HC_DEMO_VERSION="v271";
+document.title="Hospitalito v271 · Supabase";
 </script>
 </body>
 </html>
