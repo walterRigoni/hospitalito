@@ -30,7 +30,7 @@ appointments:[
   {id:'c1',patientId:'p1',date:'2026-02-02',time:'10:30',status:'atendido',doctorName:'Dra. A'},
   {id:'future',patientId:'p1',date:'2026-12-02',time:'10:30',status:'turno'},
   {id:'g1',patientId:'p1',kind:'guardia',date:'2026-02-03',time:'21:10',status:'traslado',destination:'traslado',destinationDetail:'Conducta completa',finalizedAt:'2026-02-03T23:30'}
-],clinical:{p1:{labResults:[{id:'lab1',reportedAt:'2026-01-03T10:00',rows:[{value:'10',unit:'mg'}]}],ambulatorio:{evoluciones:[
+],clinical:{p1:{imageResults:[{id:'oldImage',createdAt:'2026-01-04T10:00',report:'Informe que faltaba en la copia de cierre'}],labResults:[{id:'lab1',reportedAt:'2026-01-03T10:00',rows:[{value:'10',unit:'mg'}]}],ambulatorio:{evoluciones:[
   {id:'ce1',appointmentId:'c1',evolucion:'Consulta uno',createdAt:'2026-02-02T10:45',antecedentesSnapshot:{alergias:'A'}},
   {id:'ge1',appointmentId:'g1',encounterType:'guardia',evolucion:'Guardia uno',createdAt:'2026-02-03T21:30'},
   {id:'orphan',appointmentId:'removed',appointmentDate:'2025-05-01',appointmentTime:'14:10',evolucion:'Turno antiguo retirado',createdAt:'2025-05-01T14:15'},
@@ -62,6 +62,9 @@ assert.equal(json(`model.laboratorio.length`),1,'archived and live result dedupl
 assert.equal(json(`model.internaciones.find(e=>e.record.id==='adm1').institution.name`),'Hospital A en enero');
 assert.equal(json(`model.internaciones.find(e=>e.record.id==='adm1').institution.logoData`),'data:image/png;base64,Qg==');
 assert.equal(json(`hc270EpisodeModules(model.internaciones.find(e=>e.record.id==='adm1'),fixtures[0]).evolucionesFull[0].fullText`),'Evolución archivada');
+assert.equal(json(`hc270EpisodeModules(model.internaciones.find(e=>e.record.id==='adm1'),fixtures[0]).imageResults[0].report`),'Informe que faltaba en la copia de cierre','complement incomplete archived snapshots with records linked to that admission');
+assert.equal(json(`hc270MergeValues([{id:'a',fullText:'Copia de cierre'}],[{id:'a',fullText:'Otro texto',files:['adjunto']},{id:'b',text:'Registro omitido'}]).length`),2);
+assert.equal(json(`hc270MergeValues([{id:'a',fullText:'Copia de cierre'}],[{id:'a',fullText:'Otro texto',files:['adjunto']}])[0].fullText`),'Copia de cierre');
 assert.equal(json(`hc270EpisodeModules(model.internaciones.find(e=>e.record.id==='adm2'),fixtures[0]).evolucionesFull.length`),1,'old, deleted and undated records do not leak into current episode');
 assert.equal(json(`hc270EpisodeModules(model.internaciones.find(e=>e.record.id==='adm2'),fixtures[0]).prescripciones.infusionesContinuas[0].administrations.length`),1,'keep whole prescription including administration');
 assert.equal(json(`hc270EpisodeModules(model.internaciones.find(e=>e.record.id==='adm2'),fixtures[0]).customModule[0].text`),'Módulo futuro');
