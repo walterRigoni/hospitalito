@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v271 · Historia clínica · Supabase</title>
+<title>Hospitalito v272 · Epicrisis y Consentimientos · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -6475,7 +6475,7 @@ function buildInstHeaderHTML(){
   const l3 = escHTML(inst.line3 || "Teléfono · Email · Notas");
 
   return `
-    <div style="background:#000; color:#fff; padding:12px 14px; border-radius:0; margin-bottom:0;">
+    <div style="background:#fff; color:#111; border:1px solid #444; padding:12px 14px; border-radius:0; margin-bottom:0;">
       <div style="font-weight:900; font-size:18px;">${l1}</div>
       <div style="font-size:12px; margin-top:4px;">${l2}</div>
       <div style="font-size:12px; margin-top:2px;">${l3}</div>
@@ -6486,7 +6486,7 @@ function buildInstHeaderHTML(){
 function buildPatientHeaderHTMLForPrint(patient){
   if(!patient){
     return `
-      <div style="background:#0b4ea2; color:#fff; padding:10px 14px; margin-bottom:16px;">
+      <div style="background:#fff; color:#111; border:1px solid #777; padding:10px 14px; margin-bottom:16px;">
         <div style="font-weight:900;">Paciente no disponible</div>
       </div>
     `;
@@ -6503,7 +6503,7 @@ function buildPatientHeaderHTMLForPrint(patient){
   const cama = escHTML(info.cama || "—");
 
   return `
-    <div style="background:#0b4ea2; color:#fff; padding:10px 14px; margin-bottom:16px;">
+    <div style="background:#fff; color:#111; border:1px solid #777; padding:10px 14px; margin-bottom:16px;">
       <div style="font-weight:900; font-size:16px;">${nombre}</div>
       <div style="font-size:12px; margin-top:4px;">
         DNI: ${dni} · Edad: ${edad} · Sexo: ${sexo} · OS: ${os} · Afiliado: ${af}
@@ -6647,7 +6647,7 @@ function printMicroRequestsGeneral(areaFilter = "Todo"){
 
   const bodyHTML = `
     ${buildInstHeaderHTML()}
-    <div style="background:#0b4ea2; color:#fff; padding:10px 14px; margin-bottom:16px;">
+    <div style="background:#fff; color:#111; border:1px solid #777; padding:10px 14px; margin-bottom:16px;">
       <div style="font-weight:900; font-size:16px;">Solicitudes generales de microbiología</div>
       <div style="font-size:12px; margin-top:4px;">
         Servicio: ${escHTML(areaFilter || "Todo")}
@@ -6762,7 +6762,7 @@ function printLabRequestsGeneral(areaFilter = "Todo"){
 
   const bodyHTML = `
     ${buildInstHeaderHTML()}
-    <div style="background:#0b4ea2; color:#fff; padding:10px 14px; margin-bottom:16px;">
+    <div style="background:#fff; color:#111; border:1px solid #777; padding:10px 14px; margin-bottom:16px;">
       <div style="font-weight:900; font-size:16px;">Solicitudes generales de laboratorio</div>
       <div style="font-size:12px; margin-top:4px;">
         Servicio: ${escHTML(areaFilter || "Todo")}
@@ -8191,6 +8191,8 @@ function hcCompactClinicalForStorage(clinical, level = 0){
     n.labResults = hcCompactRecordArrayForStorage(r.labResults, 300, "asc");
     n.microRequests = hcCompactRecordArrayForStorage(r.microRequests, 200, "asc");
     n.microResults = hcCompactRecordArrayForStorage(r.microResults, 200, "asc");
+    n.consentimientos = hcCompactRecordArrayForStorage(r.consentimientos, 120, "asc");
+    n.epicrisisTransfers = hcCompactRecordArrayForStorage(r.epicrisisTransfers, 120, "asc");
 
     if(r.prescripciones && typeof r.prescripciones === "object"){
       n.prescripciones = {
@@ -9067,7 +9069,9 @@ function hcMergeClinicalPatientRecord(localRecord, remoteRecord){
     "labRequests",
     "labResults",
     "microRequests",
-    "microResults"
+    "microResults",
+    "consentimientos",
+    "epicrisisTransfers"
   ];
 
   const objectKeys = [
@@ -18278,7 +18282,7 @@ function buildPrintShell(bodyTitle, bodyHTML){
   .box{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; }
   .line{ margin:6px 0; white-space:pre-wrap; }
   ${hcPrintSignatureStyles()}
-  @media print{ @page{ margin: 10mm; } .page{ padding:0; } }
+  @media print{ @page{ margin: 10mm; } .page{ padding:0; } .inst,.pac{background:#fff!important;color:#111!important;border:1px solid #444;} }
 </style></head>
 <body><div class="page">
   ${buildPatientHeaderHTML()}
@@ -18305,7 +18309,7 @@ function buildPrintShellNoPatient(bodyTitle, bodyHTML){
   .docTitle{ margin: 12px 0 8px 0; font-weight:900; font-size:14px; border-bottom:1px solid #ddd; padding-bottom:6px; }
   .box{ border:1px solid #ddd; border-radius:10px; padding:10px 12px; }
   ${hcPrintSignatureStyles()}
-  @media print{ @page{ margin: 10mm; } .page{ padding:0; } }
+  @media print{ @page{ margin: 10mm; } .page{ padding:0; } .inst,.pac{background:#fff!important;color:#111!important;border:1px solid #444;} }
 </style></head>
 <body><div class="page">
   <div class="inst">
@@ -35283,6 +35287,12 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
 
   modules.prescripciones = hcV189FilterDeep(cur?.prescripciones || {},bounds);
   modules.evoluciones = hcV189FilterDeep(cur?.evoluciones || [],bounds);
+  modules.consentimientos = (Array.isArray(cur?.consentimientos) ? cur.consentimientos : [])
+    .filter(c=>String(c?.admissionId || "") === String(admission?.id || archiveEntry?.admissionId || ""))
+    .map(c=>hcV189Clone(c));
+  modules.epicrisisTransfers = (Array.isArray(cur?.epicrisisTransfers) ? cur.epicrisisTransfers : [])
+    .filter(t=>String(t?.admissionId || "") === String(admission?.id || archiveEntry?.admissionId || ""))
+    .map(t=>hcV189Clone(t));
   modules.balanceDetalles = hcV189FilterDeep(cur?.balanceDetalles || {},bounds);
   modules.epicrisisFull = archiveEntry?.epicText
     ? {
@@ -35301,7 +35311,7 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
     "nursingReports","surgicalSheets","monitoringRecords","labRequests","labResults",
     "microRequests","microResults","imageRequests","imageResults","nutritionRequests",
     "nutritionEvolutions","hemotherapyRequests","hemotherapyEvolutions",
-    "kinesiologiaRequests","kinesiologiaEvolutions","epicrisisFull","ambulatorio"
+    "kinesiologiaRequests","kinesiologiaEvolutions","epicrisisFull","consentimientos","epicrisisTransfers","ambulatorio"
   ]);
   const extras = {};
   Object.keys(cur || {}).forEach(key=>{
@@ -40923,7 +40933,8 @@ bootWithBackend();
         "imageRequests","imageResults",
         "nutritionRequests","nutritionEvolutions",
         "hemotherapyRequests","hemotherapyEvolutions",
-        "kinesiologiaRequests","kinesiologiaEvolutions"
+        "kinesiologiaRequests","kinesiologiaEvolutions",
+        "consentimientos","epicrisisTransfers"
       ];
       const objectKeys = ["ingresoFull","ingreso","epicrisisFull","ambulatorio"];
 
@@ -42390,7 +42401,7 @@ const HC221_CORE_CLINICAL_FIELDS=[
   "nutritionRequests","nutritionEvolutions",
   "hemotherapyRequests","hemotherapyEvolutions",
   "kinesiologiaRequests","kinesiologiaEvolutions",
-  "epicrisisFull"
+  "epicrisisFull","consentimientos","epicrisisTransfers"
 ];
 let hc221PatientPulling=new Set();
 let hc221PatientLastPull=new Map();
@@ -47131,7 +47142,7 @@ const HC270_LABELS = {
   nutritionRequests:"Solicitudes de nutrición",nutritionEvolutions:"Evoluciones de nutrición",
   hemotherapyRequests:"Solicitudes de hemoterapia",hemotherapyEvolutions:"Evoluciones de hemoterapia",
   kinesiologiaRequests:"Solicitudes de kinesiología",kinesiologiaEvolutions:"Evoluciones de kinesiología",
-  epicrisisFull:"Epicrisis",otros:"Otros registros clínicos",ambulatorio:"Historia ambulatoria",
+  epicrisisFull:"Epicrisis",consentimientos:"Consentimientos",epicrisisTransfers:"Epicrisis de transferencias",otros:"Otros registros clínicos",ambulatorio:"Historia ambulatoria",
   atencion:"Atención y conducta",consulta:"Registro de la consulta",recetasExternas:"Recetas externas",
   antecedentesSnapshot:"Antecedentes al momento de la atención",medHabSnapshot:"Medicación habitual al momento de la atención",
   motivo:"Motivo",evolucion:"Evolución",destination:"Destino",destinationDetail:"Conducta / detalle del destino",
@@ -47695,6 +47706,287 @@ hc270SearchPatients=async function(){
 };
 window.HC_DEMO_VERSION="v271";
 document.title="Hospitalito v271 · Supabase";
+</script>
+<script id="hc-v272-epicrisis-consentimientos">
+(function(){
+  'use strict';
+  const esc = value => escHTML(String(value ?? ''));
+  const now = () => isoNowLocalFull();
+  const date = value => dmyhmFromISODateTime(value || '') || String(value || '—');
+  const current = () => selectedPatientId ? findPatient(selectedPatientId) : null;
+  const admission = () => selectedPatientId ? getAdmissionByPatientId(selectedPatientId) : null;
+  const sync = (pid, field) => {
+    try { window.hc224MarkClinicalFieldDirty?.(pid, field); } catch (_) {}
+    hcBackendMarkLocalSavedSoon();
+    hcBackendScheduleUrgentPush();
+  };
+  const transfer = value => String(value || '').startsWith('Transferencia a Servicio ');
+  const areas = () => {
+    const configured = getBeds().map(b => String(b.area || '').trim()).filter(a => a && !/^consultorios$/i.test(a));
+    return [...new Set(['UTI','UCO','UCE','Clínica Médica',...configured])];
+  };
+  const freeBeds = (area, ownAdmission) => getBeds().filter(b =>
+    String(b.area || '').trim() === area &&
+    !getRegistry().some(a => a.active !== false && String(a.bedId) === String(b.id) && String(a.id) !== String(ownAdmission?.id || ''))
+  );
+  function epicText(d, cur){
+    const labs = Array.isArray(cur.labResults) ? cur.labResults : [];
+    const imgs = Array.isArray(cur.imageResults) ? cur.imageResults : [];
+    const labText = (d.attachedLabIds || []).map(id => {
+      const r = labs.find(x => String(x.id) === String(id));
+      return r ? `Laboratorio ${date(r.reportedAt)}: ${r.prettyText || r.resultText || (typeof buildLabResultPretty === 'function' ? buildLabResultPretty(r) : '') || ''}` : '';
+    }).filter(Boolean).join('\n');
+    const imgText = (d.attachedImageIds || []).map(id => {
+      const r = imgs.find(x => String(x.id) === String(id));
+      return r ? `${r.study || 'Estudio'} ${date(r.reportedAt)}: ${r.report || ''}` : '';
+    }).filter(Boolean).join('\n');
+    return [
+      'EPICRISIS',
+      `Fecha de ingreso: ${date(d.admissionAt)}`,
+      `Fecha de egreso: ${date(d.egressAt)}`,
+      `Destino: ${d.destination}${d.destinationDetail ? ' · ' + d.destinationDetail : ''}`,
+      '', 'DIAGNÓSTICOS', d.diagnoses || '—',
+      '', 'RESUMEN', d.summary || '—',
+      '', 'TRATAMIENTO RECIBIDO', d.treatments || '—',
+      '', 'INDICACIONES Y SUGERENCIAS', d.recommendations || '—',
+      labText ? `\nLABORATORIO ADJUNTO\n${labText}` : '',
+      imgText ? `\nESTUDIOS ADJUNTOS\n${imgText}` : ''
+    ].filter((x,i) => x !== '' || i < 2).join('\n');
+  }
+  function printClinical(title, content){
+    const inst=getInst(), p=current(), adm=admission();
+    const bed=adm ? getBeds().find(b=>String(b.id)===String(adm.bedId)) : null;
+    const header=`<div style="border:1px solid #444;padding:12px;margin-bottom:8px;color:#111;background:#fff">
+      <strong style="font-size:17px">${esc(inst.line1 || 'Institución')}</strong>
+      <div>${esc(inst.line2 || '')}</div><div>${esc(inst.line3 || '')}</div></div>
+      <div style="border:1px solid #777;padding:10px;margin-bottom:14px;color:#111;background:#fff">
+      <strong>${esc(p ? buildPatientDisplayName(p) : 'Paciente')}</strong>
+      <div>DNI: ${esc(p?.dni || '—')} · Área: ${esc(bed?.area || '—')} · Cama: ${esc(bed?.label || '—')}</div></div>`;
+    openPrintHTML(title, `${header}<div class="docTitle">${esc(title)}</div>${content}`);
+  }
+  function renderEpicrisisV272(){
+    const root = document.getElementById('medEpic');
+    if(!root) return;
+    const p = current(), adm = admission();
+    if(!p || !adm){ root.innerHTML = '<div class="muted">Seleccioná un paciente internado.</div>'; return; }
+    const pid = p.id, cl = getClinical(), cur = cl[pid] || {}, saved = cur.epicrisisFull || {};
+    const labResults = Array.isArray(cur.labResults) ? cur.labResults : [];
+    const imgResults = Array.isArray(cur.imageResults) ? cur.imageResults : [];
+    const transferHistory = Array.isArray(cur.epicrisisTransfers) ? cur.epicrisisTransfers.filter(t=>String(t.admissionId)===String(adm.id)) : [];
+    const destinations = ['Alta a domicilio',...areas().map(a => `Transferencia a Servicio ${a}`),'Traslado a otra Institución','Alta voluntaria','Defunción'];
+    if(saved.destination && !destinations.includes(saved.destination)) destinations.push(saved.destination);
+    const defaultDx = saved.diagnoses || cur.ingresoFull?.data?.diag || cur.ingreso?.dx || adm.dx || '';
+    root.innerHTML = `<div class="card hc272Epic">
+      <div class="panelTitle">Epicrisis</div>
+      <div class="hc272Grid"><div class="field"><label for="epicIngreso">1. Fecha de ingreso</label><input id="epicIngreso" type="datetime-local" value="${esc(isoToDateTimeLocalForInput(saved.admissionAt || adm.admDateTime || adm.dateTime || ''))}"></div>
+      <div class="field"><label for="epicEgreso">Fecha de egreso</label><input id="epicEgreso" type="datetime-local" value="${esc(isoToDateTimeLocalForInput(saved.egressAt || now()))}"></div></div>
+      <div class="field"><label for="epicDestino">2. Destino</label><select id="epicDestino">${destinations.map(x => `<option value="${esc(x)}" ${saved.destination === x ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+      <div class="field hc272DestinationDetail" id="hc272InstitutionWrap"><label for="epicDestinoDetalle">Institución de destino</label><input id="epicDestinoDetalle" placeholder="Nombre de la institución" value="${esc(transfer(saved.destination) ? '' : saved.destinationDetail || '')}"></div>
+      <div class="field hc272DestinationDetail" id="hc272BedWrap"><label for="epicTransferBed">Cama libre del servicio de destino</label><select id="epicTransferBed"></select><div class="muted" id="hc272BedHelp"></div></div>
+      <div class="field"><label for="epicDx">3. Diagnósticos</label><textarea id="epicDx">${esc(defaultDx)}</textarea></div>
+      <div class="field"><label for="epicSummary">4. Resumen</label><textarea id="epicSummary">${esc(saved.summary || saved.text || '')}</textarea></div>
+      <div class="field"><label for="epicTreat">5. Tratamiento recibido</label><textarea id="epicTreat">${esc(saved.treatments || '')}</textarea></div>
+      <div class="field"><label for="epicRecom">6. Indicaciones y sugerencias</label><textarea id="epicRecom">${esc(saved.recommendations || '')}</textarea></div>
+      <details><summary>Adjuntar laboratorio y estudios</summary>
+      <div class="moduleChecklist">${labResults.map(r => `<label><input type="checkbox" data-epic-lab="${esc(r.id)}" ${(saved.attachedLabIds || []).some(id => String(id) === String(r.id)) ? 'checked' : ''}> Laboratorio ${esc(date(r.reportedAt))}</label>`).join('') || '<span class="muted">Sin informes de laboratorio.</span>'}</div>
+      <div class="moduleChecklist">${imgResults.map(r => `<label><input type="checkbox" data-epic-img="${esc(r.id)}" ${(saved.attachedImageIds || []).some(id => String(id) === String(r.id)) ? 'checked' : ''}> ${esc(r.study || 'Estudio')} ${esc(date(r.reportedAt))}</label>`).join('') || '<span class="muted">Sin estudios informados.</span>'}</div></details>
+      <div class="hc272Actions"><button class="btn primary" id="btnSaveEpic" type="button">Guardar epicrisis</button><button class="btn" id="hc272PrintEpic" type="button">Imprimir epicrisis</button><button class="btn danger" id="hc272RemoveCensus" type="button">Quitar de censo</button><button class="btn" id="hc272GoConsent" type="button">Consentimiento de alta voluntaria</button></div>
+      <div id="hc272EpicStatus" role="status" aria-live="polite" class="muted"></div>
+      <div class="labSectionTitle" style="margin-top:14px">Texto formado de epicrisis</div><pre id="hc272EpicPreview" class="hc272Preview">${esc(saved.fullText || '')}</pre>
+      ${transferHistory.length ? `<details><summary>Epicrisis de transferencias previas</summary>${transferHistory.map(t=>`<pre class="hc272Preview">${esc(t.fullText || '')}</pre>`).join('')}</details>` : ''}
+    </div>`;
+    const $ = id => root.querySelector(id);
+    const status = message => { $('#hc272EpicStatus').textContent = message; };
+    const updateDestination = () => {
+      const dest = $('#epicDestino').value, isTransfer = transfer(dest);
+      $('#hc272InstitutionWrap').hidden = dest !== 'Traslado a otra Institución';
+      $('#hc272BedWrap').hidden = !isTransfer;
+      $('#hc272RemoveCensus').hidden = isTransfer;
+      $('#hc272GoConsent').hidden = dest !== 'Alta voluntaria';
+      if(!isTransfer) return;
+      const area = dest.slice('Transferencia a Servicio '.length);
+      const beds = freeBeds(area, adm);
+      const select = $('#epicTransferBed');
+      select.innerHTML = '<option value="">Elegir cama libre</option>' + beds.map(b => `<option value="${esc(b.id)}">${esc(b.label || `${b.area} ${b.bed || ''}`)}</option>`).join('');
+      if(saved.transferBedId && beds.some(b => String(b.id) === String(saved.transferBedId))) select.value = saved.transferBedId;
+      $('#hc272BedHelp').textContent = beds.length ? `${beds.length} cama(s) disponibles.` : 'No hay camas libres en este servicio.';
+    };
+    const collect = () => {
+      const destination = $('#epicDestino').value;
+      const area = transfer(destination) ? destination.slice('Transferencia a Servicio '.length) : '';
+      const bedId = transfer(destination) ? $('#epicTransferBed').value : '';
+      const bed = bedId ? getBeds().find(b => String(b.id) === String(bedId)) : null;
+      const detail = transfer(destination) ? (bed?.label || '') : destination === 'Traslado a otra Institución' ? $('#epicDestinoDetalle').value.trim() : '';
+      return {admissionId:adm.id, admissionAt:$('#epicIngreso').value, egressAt:$('#epicEgreso').value,
+        destination, destinationDetail:detail, transferArea:area, transferBedId:bedId,
+        diagnoses:$('#epicDx').value.trim(), summary:$('#epicSummary').value.trim(), text:$('#epicSummary').value.trim(),
+        treatments:$('#epicTreat').value.trim(), recommendations:$('#epicRecom').value.trim(),
+        attachedLabIds:[...root.querySelectorAll('[data-epic-lab]:checked')].map(x => x.dataset.epicLab),
+        attachedImageIds:[...root.querySelectorAll('[data-epic-img]:checked')].map(x => x.dataset.epicImg),
+        author:{id:session?.username || '',name:session?.name || session?.username || ''}, updatedAt:now()};
+    };
+    const validate = d => {
+      if(!d.admissionAt || !d.egressAt){ status('Completá las fechas de ingreso y egreso.'); return false; }
+      if(new Date(d.egressAt) < new Date(d.admissionAt)){ status('El egreso no puede ser anterior al ingreso.'); return false; }
+      if(d.destination === 'Traslado a otra Institución' && !d.destinationDetail){ status('Ingresá el nombre de la institución de destino.'); return false; }
+      if(transfer(d.destination)){
+        if(!d.transferBedId){ status('Elegí una cama libre para la transferencia.'); return false; }
+        const bed = getBeds().find(b => String(b.id) === String(d.transferBedId));
+        if(!bed || String(bed.area || '').trim() !== d.transferArea || !freeBeds(d.transferArea, adm).some(b => String(b.id) === String(bed.id))){ status('La cama ya no está libre. Elegí otra.'); updateDestination(); return false; }
+      }
+      return true;
+    };
+    const build = () => {
+      const d = collect(); d.fullText = epicText(d, getClinical()[pid] || {});
+      $('#hc272EpicPreview').textContent = d.fullText;
+      return d;
+    };
+    const save = () => {
+      const d = build(); if(!validate(d)) return null;
+      const registry = getRegistry(), active = registry.find(x => String(x.id) === String(adm.id) && x.active !== false);
+      if(!active){ status('La internación ya no está activa. Recargá el censo.'); return null; }
+      let moved=false;
+      if(transfer(d.destination)){
+        moved = String(active.bedId) !== String(d.transferBedId);
+        active.bedId = d.transferBedId; active.updatedAt = now();
+        if(moved){ active.lastTransferAt = now(); active.lastTransferTo = d.transferArea; }
+        setRegistry(registry);
+      }
+      const clinical = getClinical(), record = clinical[pid] || {};
+      record.epicrisisFull = d;
+      if(transfer(d.destination)){
+        const transfers=Array.isArray(record.epicrisisTransfers) ? record.epicrisisTransfers : [];
+        const previous=transfers[transfers.length-1];
+        const sameTransfer=!moved && String(previous?.admissionId)===String(adm.id) && String(previous?.transferBedId)===String(d.transferBedId);
+        const item={...d,id:sameTransfer ? previous.id : uid('transfer'),createdAt:sameTransfer ? previous.createdAt : now()};
+        if(sameTransfer) transfers[transfers.length-1]=item; else transfers.push(item);
+        record.epicrisisTransfers=transfers;
+      }
+      clinical[pid] = record; setClinical(clinical); sync(pid,'epicrisisFull');
+      if(transfer(d.destination)) sync(pid,'epicrisisTransfers');
+      logAction(`${transfer(d.destination) ? 'transfirió' : 'guardó epicrisis de'} ${buildPatientDisplayName(p)}`,pid);
+      status(transfer(d.destination) ? 'Epicrisis guardada. Censo actualizado con la cama elegida.' : 'Epicrisis guardada. Ya podés imprimirla o quitar al paciente del censo.');
+      toast(transfer(d.destination) ? 'Transferencia guardada' : 'Epicrisis guardada');
+      if(transfer(d.destination)) renderMed();
+      return d;
+    };
+    $('#epicDestino').addEventListener('change',updateDestination);
+    $('#btnSaveEpic').addEventListener('click',save);
+    $('#hc272PrintEpic').addEventListener('click',() => printClinical('Epicrisis',`<div class="box"><div class="pre">${esc(build().fullText)}</div></div>`));
+    $('#hc272GoConsent').addEventListener('click',() => { medTab='consentimientos'; renderMed(); });
+    $('#hc272RemoveCensus').addEventListener('click',() => {
+      const d = collect(); if(!validate(d)) return;
+      if(transfer(d.destination)){ status('Una transferencia conserva al paciente en el censo.'); return; }
+      if(d.destination === 'Alta voluntaria'){
+        const valid = (getClinical()[pid]?.consentimientos || []).some(c => String(c.admissionId) === String(adm.id) && c.type === 'Alta voluntaria' && (c.signatureData || c.paperSignedAt));
+        if(!valid){ status('Guardá primero el consentimiento de alta voluntaria firmado en pantalla o registrado como firmado en papel.'); return; }
+      }
+      if(!confirm(`¿Quitar a ${buildPatientDisplayName(p)} del censo por ${d.destination}?`)) return;
+      const stored = save(); if(!stored) return;
+      const registry = getRegistry(), active = registry.find(x => String(x.id) === String(adm.id) && x.active !== false);
+      if(!active){ status('La internación ya no está activa.'); return; }
+      const arch = getArchive();
+      const entry = {id:uid('arch'),type:d.destination === 'Defunción' ? 'defuncion':'alta',date:d.egressAt,
+        patientId:pid,admissionId:adm.id,dni:p.dni || '',name:buildPatientDisplayName(p),dx:d.diagnoses,
+        destination:d.destination,destinationDetail:d.destinationDetail,epicText:stored.fullText,
+        epicAuthorId:stored.author.id,epicAuthorName:stored.author.name,closedAt:now(),closedBy:session?.username || ''};
+      entry.historySnapshot = hcV189BuildAdmissionSnapshot(pid,active,entry);
+      arch.push(entry); setArchive(arch);
+      active.active=false; active.closedAt=entry.closedAt; active.closeType=d.destination; active.updatedAt=entry.closedAt;
+      setRegistry(registry); sync(pid,'epicrisisFull');
+      selectedPatientId=null; renderMed(); toast('Paciente quitado del censo; historia conservada.');
+    });
+    updateDestination();
+  }
+  function consentText(data,p){
+    return [
+      'CONSENTIMIENTO Y CONSTANCIA DE ALTA VOLUNTARIA',
+      `Paciente: ${buildPatientDisplayName(p)} · DNI: ${p.dni || '—'}`,
+      `Fecha y hora: ${date(data.dateAt)}`,
+      '',
+      'Conforme a la Ley 26.529, artículos 2 inciso e), 5, 7, 10 y 11 bis, declaro que recibí información clara sobre mi estado de salud, la continuidad de la internación y los tratamientos indicados, sus alternativas y las consecuencias previsibles de rechazarlos.',
+      `Estado de salud / diagnóstico informado: ${data.diagnosis || '—'}`,
+      `Tratamiento o internación que rechazo: ${data.refusedCare || '—'}`,
+      `Riesgos y consecuencias explicados: ${data.risks || '—'}`,
+      `Alternativas y recomendaciones ofrecidas: ${data.alternatives || '—'}`,
+      '',
+      'Solicito retirarme voluntariamente. Comprendo y asumo los riesgos previsibles derivados de esta decisión informada. Los profesionales que actúen conforme a la Ley 26.529 no asumen responsabilidad derivada exclusivamente del cumplimiento de mi decisión, según su artículo 11 bis. Esta constancia no elimina los deberes legales ni las responsabilidades profesionales que correspondan.',
+      'Sé que puedo revocar mi decisión y solicitar nuevamente asistencia médica.',
+      `Profesional interviniente: ${data.professional || '—'}`,
+      `Firma de: ${data.signerName || '—'} · DNI: ${data.signerDni || '—'}`
+    ].join('\n');
+  }
+  function consentPrint(record,p){
+    const sig = record.signatureData && /^data:image\/png;base64,/i.test(record.signatureData) ? `<img src="${record.signatureData}" alt="Firma realizada en pantalla" style="width:240px;height:75px;object-fit:contain;border-bottom:1px solid #111">` : '<div style="height:70px;width:240px;border-bottom:1px solid #111"></div>';
+    const signatureStatus = record.signatureData ? `Firmado en pantalla: ${date(record.signedAt)}` : record.paperSignedAt ? `Firma en papel registrada: ${date(record.paperSignedAt)}` : 'Espacio para firma en papel';
+    printClinical('Consentimiento de alta voluntaria',`<div class="box"><div class="pre">${esc(record.text)}</div></div><div style="margin-top:26px">${sig}<div>${esc(record.signerName || 'Paciente / representante')} · DNI ${esc(record.signerDni || '—')}</div><div class="meta">${esc(signatureStatus)}</div></div>`);
+  }
+  function renderConsentimientos(){
+    const root=document.getElementById('medConsent'); if(!root) return;
+    const p=current(), adm=admission();
+    if(!p || !adm){ root.innerHTML='<div class="muted">Seleccioná un paciente internado para preparar el consentimiento.</div>'; return; }
+    const pid=p.id, cur=getClinical()[pid] || {}, consents=Array.isArray(cur.consentimientos) ? cur.consentimientos : [];
+    root.innerHTML=`<div class="card hc272Consent"><div class="panelTitle">Consentimientos</div>
+      <p class="muted">Alta voluntaria. Podés imprimir para firma en papel o registrar la firma sobre una pantalla táctil. La firma dibujada se guarda como imagen; no es una firma digital certificada.</p>
+      <div class="hc272Grid"><div class="field"><label for="hc272ConsentDate">Fecha y hora</label><input id="hc272ConsentDate" type="datetime-local" value="${esc(isoToDateTimeLocalForInput(now()))}"></div><div class="field"><label for="hc272SignerName">Firma de</label><input id="hc272SignerName" value="${esc(buildPatientDisplayName(p))}"></div></div>
+      <div class="hc272Grid"><div class="field"><label for="hc272SignerDni">DNI de quien firma</label><input id="hc272SignerDni" value="${esc(p.dni || '')}"></div><div class="field"><label for="hc272Professional">Profesional interviniente</label><input id="hc272Professional" value="${esc(session?.name || session?.username || '')}"></div></div>
+      <div class="field"><label for="hc272Diagnosis">Estado de salud / diagnóstico informado</label><textarea id="hc272Diagnosis">${esc(cur.epicrisisFull?.diagnoses || cur.ingresoFull?.data?.diag || adm.dx || '')}</textarea></div>
+      <div class="field"><label for="hc272Refused">Tratamiento o internación que rechaza</label><textarea id="hc272Refused">Continuidad de internación y tratamiento indicados</textarea></div>
+      <div class="field"><label for="hc272Risks">Riesgos y consecuencias explicados al paciente</label><textarea id="hc272Risks" placeholder="Describí los riesgos concretos de este caso"></textarea></div>
+      <div class="field"><label for="hc272Alternatives">Alternativas y recomendaciones ofrecidas</label><textarea id="hc272Alternatives" placeholder="Describí las alternativas, signos de alarma y forma de consultar"></textarea></div>
+      <div class="labSectionTitle">Firma en pantalla</div><canvas id="hc272SignaturePad" width="800" height="220" aria-label="Área para firmar con dedo, lápiz o mouse"></canvas>
+      <div class="hc272Actions"><button class="btn small" id="hc272ClearSign" type="button">Borrar firma</button><label class="hc272Paper"><input type="checkbox" id="hc272PaperSigned"> Ya firmó en papel y el original quedó resguardado</label></div>
+      <div class="hc272Actions"><button class="btn primary" id="hc272SaveConsent" type="button">Guardar consentimiento</button><button class="btn" id="hc272PrintBlank" type="button">Imprimir para firma en papel</button></div>
+      <div id="hc272ConsentStatus" class="muted" role="status" aria-live="polite"></div><div class="labSectionTitle" style="margin-top:14px">Vista previa</div><pre id="hc272ConsentPreview" class="hc272Preview"></pre>
+      <div class="labSectionTitle" style="margin-top:18px">Consentimientos guardados</div><div id="hc272ConsentList"></div>
+    </div>`;
+    const $=id=>root.querySelector(id), canvas=$('#hc272SignaturePad'), ctx=canvas.getContext('2d');
+    ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#111';
+    let drawing=false, hasSignature=false;
+    const pos=ev=>{ const r=canvas.getBoundingClientRect(); return {x:(ev.clientX-r.left)*canvas.width/r.width,y:(ev.clientY-r.top)*canvas.height/r.height}; };
+    canvas.addEventListener('pointerdown',ev=>{ ev.preventDefault(); canvas.setPointerCapture(ev.pointerId); drawing=true; hasSignature=true; const pt=pos(ev); ctx.beginPath();ctx.moveTo(pt.x,pt.y);ctx.lineTo(pt.x+.01,pt.y+.01);ctx.stroke(); });
+    canvas.addEventListener('pointermove',ev=>{ if(!drawing)return;ev.preventDefault();const pt=pos(ev);ctx.lineTo(pt.x,pt.y);ctx.stroke(); });
+    for(const eventName of ['pointerup','pointercancel','lostpointercapture']) canvas.addEventListener(eventName,()=>{drawing=false;});
+    $('#hc272ClearSign').addEventListener('click',()=>{ctx.clearRect(0,0,canvas.width,canvas.height);hasSignature=false;});
+    const read=()=>({type:'Alta voluntaria',patientId:pid,admissionId:adm.id,dateAt:$('#hc272ConsentDate').value,
+      signerName:$('#hc272SignerName').value.trim(),signerDni:$('#hc272SignerDni').value.trim(),professional:$('#hc272Professional').value.trim(),
+      diagnosis:$('#hc272Diagnosis').value.trim(),refusedCare:$('#hc272Refused').value.trim(),risks:$('#hc272Risks').value.trim(),alternatives:$('#hc272Alternatives').value.trim()});
+    const preview=()=>{const d=read();d.text=consentText(d,p);$('#hc272ConsentPreview').textContent=d.text;return d;};
+    root.querySelectorAll('input,textarea').forEach(el=>el.addEventListener('input',preview));
+    $('#hc272PrintBlank').addEventListener('click',()=>{const d=preview();consentPrint(d,p);});
+    $('#hc272SaveConsent').addEventListener('click',()=>{
+      const d=preview();
+      if(!d.dateAt || !d.signerName || !d.signerDni || !d.professional || !d.diagnosis || !d.refusedCare || !d.risks || !d.alternatives){$('#hc272ConsentStatus').textContent='Completá todos los datos clínicos y de identificación antes de guardar.';return;}
+      if(hasSignature && $('#hc272PaperSigned').checked){$('#hc272ConsentStatus').textContent='Elegí una modalidad de firma: pantalla o papel.';return;}
+      d.id=uid('consent'); d.createdAt=now();d.updatedAt=d.createdAt;d.author={id:session?.username || '',name:session?.name || ''};
+      d.signatureData=hasSignature ? canvas.toDataURL('image/png') : '';
+      d.signedAt=hasSignature ? now() : '';
+      d.paperSignedAt=$('#hc272PaperSigned').checked ? now() : '';
+      const clinical=getClinical(), record=clinical[pid] || {};
+      record.consentimientos=[...(record.consentimientos || []),d];clinical[pid]=record;setClinical(clinical);sync(pid,'consentimientos');
+      logAction(`guardó consentimiento de alta voluntaria de ${buildPatientDisplayName(p)}`,pid);
+      toast('Consentimiento guardado');renderConsentimientos();
+    });
+    const list=$('#hc272ConsentList');
+    const relevant=consents.filter(c=>String(c.admissionId)===String(adm.id));
+    list.innerHTML=relevant.length ? relevant.slice().reverse().map(c=>`<div class="hc272ConsentRow"><b>${esc(c.type || 'Consentimiento')}</b> · ${esc(date(c.dateAt || c.createdAt))}<div class="muted">${c.signatureData?'Firmado en pantalla':c.paperSignedAt?'Firma en papel registrada':'Pendiente de firma'}</div><button class="btn small" type="button" data-hc272-print-consent="${esc(c.id)}">Imprimir ${c.signatureData?'firmado':'consentimiento'}</button></div>`).join('') : '<div class="muted">No hay consentimientos guardados para esta internación.</div>';
+    list.querySelectorAll('[data-hc272-print-consent]').forEach(btn=>btn.addEventListener('click',()=>{const c=relevant.find(x=>String(x.id)===String(btn.dataset.hc272PrintConsent));if(c) consentPrint(c,p);}));
+    preview();
+  }
+  const tabs=document.querySelector('.medModuleTabs');
+  if(tabs && !tabs.querySelector('[data-medtab="consentimientos"]')) tabs.insertAdjacentHTML('beforeend','<button class="tab" data-medtab="consentimientos" type="button">Consentimientos</button>');
+  const epic=document.getElementById('medEpic');
+  if(epic && !document.getElementById('medConsent')) epic.insertAdjacentHTML('afterend','<div id="medConsent" style="display:none"></div>');
+  const style=document.createElement('style');
+  style.textContent=`.hc272Epic .field,.hc272Consent .field{margin-top:10px}.hc272Grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.hc272Actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}.hc272DestinationDetail[hidden],#hc272RemoveCensus[hidden],#hc272GoConsent[hidden]{display:none!important}.hc272Preview{white-space:pre-wrap;font:13px/1.5 Arial,sans-serif;background:#0d2746;border:1px solid #31577e;border-radius:8px;padding:12px;max-height:390px;overflow:auto}.hc272Consent canvas{display:block;width:100%;max-width:800px;height:220px;background:#fff;border:2px solid #94a3b8;border-radius:8px;touch-action:none;cursor:crosshair}.hc272Paper{font-size:13px}.hc272ConsentRow{border:1px solid #31577e;border-radius:8px;padding:10px;margin:8px 0}@media(max-width:700px){.hc272Grid{grid-template-columns:1fr}}`;
+  document.head.appendChild(style);
+  window.renderEpicrisisUI=renderEpicrisisV272;
+  const priorRenderMed=window.renderMed;
+  window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
+  window.HC_DEMO_VERSION='v272';
+  document.title='Hospitalito v272 · Epicrisis y Consentimientos · Supabase';
+})();
+
 </script>
 </body>
 </html>
