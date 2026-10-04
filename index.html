@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v275 · Prescripciones y horarios configurables · Supabase</title>
+<title>Hospitalito v276 · Sincronización clínica · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42095,6 +42095,9 @@ let hc214HotUntil=Date.now()+180000;
 let hc215Syncing=false;
 let hc215Queued=false;
 let hc215LastCycleAt=0;
+let hc229ClinicalPending=false;
+let hc229Warming=false;
+let hc229WarmRetryTimer=null;
 
 /* v220 — separar institución GLOBAL (autorización) del BACKEND institucional (datos).
    El Backend Global puede identificar la membresía con un id distinto del id del
@@ -42370,7 +42373,7 @@ function hc224SelectedPid(){
   catch(_){return "";}
 }
 function hc224WarmClinicalFields(){
-  const fields=new Set(["prescripciones","ingresoFull","ingresosPrev"]);
+  const fields=new Set(["prescripciones","ingresoFull","ingresosPrev","signosVitales","balances","balanceDetalles"]);
   try{
     const role=String((typeof getCurrentUser==="function"?getCurrentUser()?.role:"")||"");
     if(role==="imagenologo"){fields.add("imageRequests");fields.add("imageResults");}
@@ -42438,6 +42441,7 @@ async function hc214InitialPull(fromValidation=false){
     const remote=hc207RowsToSnapshot(rows);
     const hasClinicalRows=rows.some(x=>String(x?.bucket||"")==="clinical");
     const coreOnly=Number(r?.syncVersion||0)>=9 && r?.filtered===true && !hasClinicalRows;
+    hc229ClinicalPending=coreOnly;
     const explicitBuckets=new Set(Array.isArray(outbox?.buckets)?outbox.buckets:[]);
     const preserved=hc214OverlayLocalNewer(local,remote,outbox);
     if(coreOnly){
@@ -42489,7 +42493,7 @@ async function hc214InitialPull(fromValidation=false){
 
     hc214PersistOutbox();
     hc207PendingPull=false;hc207RetryCount=0;hc207ClearErr();hc214RefreshUI();
-    hc207Status(coreOnly?"Supabase · censo listo · sincronizando historia…":"Supabase · sincronizado","ok");
+    hc207Status(coreOnly?"Supabase · censo listo · sincronizando historia…":"Supabase · sincronizado",coreOnly?"warn":"ok");
     if(coreOnly){
       setTimeout(()=>{try{hc229WarmActiveClinical();}catch(e){console.warn("v229 warm clinical",e);}},40);
       setTimeout(()=>{try{window.hc229MaybePromptWorkShift?.("post-sync");}catch(_){ }},120);
@@ -42636,23 +42640,45 @@ function hc215ApplyIncoming(rows){
    Descarga sólo los campos necesarios para alarmas/bandejas de los pacientes
    activos. La historia completa se mantiene dirigida al paciente seleccionado. */
 async function hc229WarmActiveClinical(){
-  if(!hc207Connected)return false;
+  if(!hc207Connected||hc229Warming)return false;
+  hc229Warming=true;
   const reg=hc207Local("registry")||[];
   const ids=Array.from(new Set(reg.filter(a=>a&&a.active!==false&&a.patientId).map(a=>String(a.patientId)).filter(Boolean)));
-  if(!ids.length){hc207Status("Supabase · sincronizado","ok");return true;}
-  const fields=Array.from(hc224WarmClinicalFields());
-  let changed=false;
-  for(let i=0;i<ids.length;i+=4){
-    const batch=ids.slice(i,i+4);
-    const results=await Promise.all(batch.map(async pid=>{
-      try{return await hc221PatientReq(pid,fields);}catch(e){console.warn("v229 warm patient",pid,e);return null;}
-    }));
-    results.forEach(r=>{const rows=Array.isArray(r?.rows)?r.rows:[];if(rows.length&&hc215ApplyIncoming(rows))changed=true;});
-    await new Promise(resolve=>setTimeout(resolve,15));
-  }
-  if(changed)hc214RefreshUI();
-  hc207Status("Supabase · sincronizado","ok");
-  return true;
+  try{
+    const fields=Array.from(hc224WarmClinicalFields());
+    let changed=false,failed=false;
+    for(let i=0;i<ids.length;i+=4){
+      const batch=ids.slice(i,i+4);
+      const results=await Promise.all(batch.map(async pid=>{
+        try{return await hc221PatientReq(pid,fields);}catch(e){console.warn("v276 warm patient",pid,e);return null;}
+      }));
+      results.forEach(r=>{
+        if(!r){failed=true;return;}
+        const rows=Array.isArray(r.rows)?r.rows:[];
+        if(rows.length&&hc215ApplyIncoming(rows))changed=true;
+        if(rows.length&&!hc221LastApplyPersistOk)failed=true;
+      });
+      await new Promise(resolve=>setTimeout(resolve,15));
+    }
+    if(changed)hc214RefreshUI();
+    hc229ClinicalPending=failed;
+    if(failed){
+      hc207Status("guardado local · recepción clínica pendiente","warn");
+      clearTimeout(hc229WarmRetryTimer);
+      hc229WarmRetryTimer=setTimeout(()=>hc229WarmActiveClinical(),10000);
+      return false;
+    }
+    clearTimeout(hc229WarmRetryTimer);
+    hc207Status("Supabase · sincronizado","ok");
+    return true;
+  }catch(e){
+    hc229ClinicalPending=true;
+    hc207Err(e,"Recepción clínica Supabase");
+    hc207Status("guardado local · recepción clínica pendiente","warn");
+    clearTimeout(hc229WarmRetryTimer);
+    hc229WarmRetryTimer=setTimeout(()=>hc229WarmActiveClinical(),10000);
+    return false;
+  }finally{hc229Warming=false;}
 }
 try{window.hc229WarmActiveClinical=hc229WarmActiveClinical;}catch(_){ }
 
@@ -42800,8 +42826,11 @@ async function hc215SyncCycle(showAlert=false){
   const snap=hc207Snapshot();
   const outgoing=hc214Rows(snap,Array.from(captured.buckets),Array.from(captured.pids),captured.fieldMap);
   let applied=false;
+  let busyStatusTimer=null;
   try{
-    hc207Status(outgoing.length?"Supabase · enviando y recibiendo…":"Supabase · comprobando cambios…",outgoing.length?"warn":"");
+    busyStatusTimer=setTimeout(()=>{
+      if(hc215Syncing)hc207Status(outgoing.length?"Supabase · enviando y recibiendo…":"Supabase · comprobando cambios…",outgoing.length?"warn":"");
+    },1200);
     let loops=0, first=true, hasMore=false;
     do{
       const r=await hc207Req("sync",{afterSeq:hc214LastServerSeq,rows:first?outgoing:[],limit:500});
@@ -42822,7 +42851,7 @@ async function hc215SyncCycle(showAlert=false){
     try{localStorage.setItem(LS.backendLastSync,new Date().toISOString());}catch(_){ }
     if(outgoing.length||applied)hc214HotUntil=Date.now()+180000;
     if(applied)hc214RefreshUI();
-    hc207Status("Supabase · sincronizado","ok");
+    hc207Status(hc229ClinicalPending?"guardado local · recepción clínica pendiente":"Supabase · sincronizado",hc229ClinicalPending?"warn":"ok");
     if(showAlert)alert(applied?"Cambios sincronizados entre dispositivos.":"Supabase ya estaba actualizado.");
     return true;
   }catch(e){
@@ -42832,6 +42861,7 @@ async function hc215SyncCycle(showAlert=false){
     if(showAlert)alert("El dato quedó guardado localmente y se reintentará automáticamente.\n\n"+String(e?.message||e));
     return false;
   }finally{
+    clearTimeout(busyStatusTimer);
     hc207Pushing=false;hc207Pulling=false;hc215Syncing=false;hc214PersistOutbox();
     if(hc215Queued||hc207DirtyBuckets.size||hc207DirtyClinical.size)hc215ScheduleSync(35);
     else hc215ScheduleSync();
@@ -42881,7 +42911,7 @@ async function hc207Connect(inst){
     try{if(window.__hcV205Timer)clearTimeout(window.__hcV205Timer);}catch(_){}
     const migrated=await hc207MigrateIfEmpty();
     await hc214InitialPull(false);
-    hc207Status(migrated?"Supabase · migrado + sincronizado":"Supabase · sincronizado","ok");
+    hc207Status(hc229ClinicalPending?"Supabase · censo listo · sincronizando historia…":(migrated?"Supabase · migrado + sincronizado":"Supabase · sincronizado"),hc229ClinicalPending?"warn":"ok");
     try{
       const pid=String(typeof selectedPatientId!=="undefined"?selectedPatientId:"").trim();
       if(pid)setTimeout(()=>hc221PullPatientClinical(pid,true),60);
@@ -48268,8 +48298,8 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v275';
-  document.title='Hospitalito v275 · Prescripciones y horarios configurables · Supabase';
+  window.HC_DEMO_VERSION='v276';
+  document.title='Hospitalito v276 · Sincronización clínica · Supabase';
 })();
 
 </script>
