@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v273 · Prescripciones y Enfermería · Supabase</title>
+<title>Hospitalito v274 · Prescripciones, Hemoterapia y acceso · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -21,10 +21,21 @@
 #medPres .hc273PatientSupply{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;padding:7px 10px;margin-top:8px;border:1px solid #78b5e2;border-radius:8px;background:#0c2743;font-size:12px;font-weight:800;cursor:pointer}
 #medPres .hc273PatientSupply input{width:16px;height:16px;margin:0}
 #medPres .hc273PatientSupply span{color:#b7e3ff;font-weight:700}
+.hc274MedicationHeaders,#medPres .hcRxMedicationGrid{display:grid!important;grid-template-columns:minmax(210px,1.1fr) minmax(72px,90px) minmax(250px,1.7fr) auto!important;gap:0!important;align-items:center!important}
+#medPres .hc274MedicationHeaders{padding:8px 10px;margin-top:4px;background:#12395f;border:1px solid #4d83b3;border-radius:8px;font-size:13px;font-weight:900}
+#medPres .hc274MedicationHeaders>span:not(:first-child){border-left:2px solid #5e95bd;padding-left:12px}
+#medPres .hcRxMedicationGrid>.hcRxMedicationVia,#medPres .hcRxMedicationGrid>.hcRxMedicationSchedule,#medPres .hcRxMedicationGrid>.hcRxMedicationControls{border-left:2px solid #3f7098;padding:8px 10px}
+#medPres .hcRxMedicationVia{font-size:16px;font-weight:1000;color:#b8e2ff;text-align:center}
+#medPres .hcRxMedicationSchedule{justify-content:flex-start!important;text-align:left!important}
+#medPres .hc260Dose{font-size:14px!important;padding:5px 7px!important}
+#medPres .hc260Dose>b{font-size:15px!important;letter-spacing:.2px}
+#medPres .hc260Dose.done{border:2px solid #4acf8a!important;background:rgba(25,132,76,.25)!important;color:#baf7d1!important}
+#medPres .hc260Dose.done>b,#medPres .hc260Dose.done button{color:#baf7d1!important;font-weight:1000!important}
+#medPres .hc260Dose.done button{font-size:11px!important}
 .hc273ModalSupply{display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px;border:1px solid #78b5e2;border-radius:8px;background:#0c2743;color:#fff;font-size:12px;font-weight:800}
 .hc273ModalSupply input{width:17px;height:17px}
-@media(max-width:1000px){#medPres .prNewRxCompact .row4{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-@media(max-width:620px){#medPres .prNewRxCompact .row4{grid-template-columns:1fr!important}}
+@media(max-width:1000px){#medPres .prNewRxCompact .row4{grid-template-columns:repeat(2,minmax(0,1fr))!important}.hc274MedicationHeaders,#medPres .hcRxMedicationGrid{grid-template-columns:minmax(150px,1fr) 68px minmax(190px,1.5fr) auto!important}}
+@media(max-width:700px){#medPres .prNewRxCompact .row4{grid-template-columns:1fr!important}#medPres .hc274MedicationHeaders{display:none!important}#medPres .hcRxMedicationGrid{grid-template-columns:minmax(0,1fr) 72px!important}#medPres .hcRxMedicationGrid>.hcRxMedicationSchedule,#medPres .hcRxMedicationGrid>.hcRxMedicationControls{grid-column:1/-1;border-left:0;border-top:1px solid #3f7098}#medPres .hcRxMedicationGrid>.hcRxMedicationVia{border-left:1px solid #3f7098}}
 </style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -18002,6 +18013,11 @@ function renderHEMO(){
   const hemoInfusions = (cur.prescripciones?.infusionesContinuas || [])
     .filter(it=>it?.hemotherapyProduct && !hcIsDeletedPrescriptionItem(it) && !hcIsTerminalPrescriptionItem(it))
     .sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
+  const hemoHistoryById=new Map();
+  [...(cur.prescripciones?.historial||[]),...(cur.prescripciones?.infusionesContinuas||[])].forEach(it=>{
+    if(it?.hemotherapyProduct && (it.finishedAt || it.suspendedAt) && !hcIsDeletedPrescriptionItem(it))hemoHistoryById.set(String(it.id),it);
+  });
+  const hemoHistory=[...hemoHistoryById.values()].sort((a,b)=>String(b.finishedAt||b.suspendedAt||"").localeCompare(String(a.finishedAt||a.suspendedAt||"")));
 
   const evolutionForm = isHemo ? `
     <div class="field"><label>Evolución / procedimiento realizado</label><textarea id="hemoEvoTxt" placeholder="Ej: Se administra 1 U de glóbulos rojos, sin reacciones adversas."></textarea></div>
@@ -18032,13 +18048,17 @@ function renderHEMO(){
         ${evolutionForm}
         <div style="margin-top:12px;">
           <div class="labSectionTitle">Hemoderivados en Prescripciones</div>
-          ${hemoInfusions.length ? hemoInfusions.map(it=>`<div class="moduleListItem" data-hemo-infusion-id="${hcEscAttr(it.id)}"><b>${escHTML(it.drugName||hcHemotherapyProductName(it.hemotherapyProduct))}</b> • ${it.active===false ? "Pausada" : "En curso"}<div class="moduleMeta">${escHTML(it.administeredByName||"Hemoterapia")} • ${escHTML(dmyhmFromISODateTime(it.startedAt||it.createdAt||""))}</div><div style="display:flex;align-items:center;gap:7px;margin-top:5px;">${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="-1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Bajar ml/h">↓</button>` : ""}<b>${escHTML(String(Number(it.rateMlH??it.mlHour??0)))} ml/h</b><span>${it.volumeMl ? `${escHTML(it.volumeMl)} ml por bolsa` : "Volumen no informado"}</span>${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Subir ml/h">↑</button>` : ""}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin hemoderivados activos.</div>`}
+          ${hemoInfusions.length ? hemoInfusions.map(it=>`<div class="moduleListItem" data-hemo-infusion-id="${hcEscAttr(it.id)}"><b>${escHTML(it.drugName||hcHemotherapyProductName(it.hemotherapyProduct))}</b> • ${it.active===false ? "Pausada" : "En curso"}<div class="moduleMeta">${escHTML(it.administeredByName||"Hemoterapia")} • ${escHTML(dmyhmFromISODateTime(it.startedAt||it.createdAt||""))}</div><div style="display:flex;align-items:center;gap:7px;margin-top:5px;">${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="-1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Bajar ml/h">↓</button>` : ""}<b>${escHTML(String(Number(it.rateMlH??it.mlHour??0)))} ml/h</b><span>${it.volumeMl ? `${escHTML(it.volumeMl)} ml por bolsa` : "Volumen no informado"}</span>${isHemo && it.active!==false ? `<button type="button" class="btn small" data-hemo-rate="1" data-hemo-id="${hcEscAttr(it.id)}" aria-label="Subir ml/h">↑</button>` : ""}</div>${isHemo && it.active!==false ? `<button type="button" class="btn small primary" data-hemo-finish="${hcEscAttr(it.id)}" style="margin-top:8px;">Finalizar bolsa</button>` : ""}</div>`).join("") : `<div class="muted" style="font-size:12px;">Sin hemoderivados activos.</div>`}
+        </div>
+        <div style="margin-top:12px;">
+          <div class="labSectionTitle">Historial de hemoderivados</div>
+          ${hemoHistory.length ? hemoHistory.map(it=>`<div class="moduleListItem"><b>${escHTML(it.drugName||hcHemotherapyProductName(it.hemotherapyProduct))}</b> • ${escHTML(formatDoseValue(it.volumeMl||it.finalVolumeMl||0))} ml<div class="moduleMeta">Inicio: ${escHTML(dmyhmFromISODateTime(it.startedAt||it.createdAt||""))} • Final: ${escHTML(dmyhmFromISODateTime(it.finishedAt||it.suspendedAt||""))}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin administraciones finalizadas.</div>`}
         </div>
         <div style="margin-top:10px;">
           ${evos.length ? evos.map(e=>`
             <div class="moduleListItem">
                <div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div>
-               ${e.hemotherapyAdministrationStarted ? `<div class="moduleMeta" style="color:#fca5a5;font-weight:800;">Administración iniciada • ${escHTML(e.hemotherapyProductName||"Hemoderivado")} • ${e.bagVolumeMl ? `${escHTML(e.bagVolumeMl)} ml • ` : ""}63 ml/h iniciales</div>` : ""}
+               ${e.hemotherapyAdministrationStarted ? `<div class="moduleMeta" style="color:#fca5a5;font-weight:800;">Administración iniciada • ${escHTML(e.hemotherapyProductName||"Hemoderivado")} • ${e.bagVolumeMl ? `${escHTML(e.bagVolumeMl)} ml • ` : ""}63 ml/h iniciales${e.hemotherapyAdministrationFinishedAt ? ` • Finalizada ${escHTML(dmyhmFromISODateTime(e.hemotherapyAdministrationFinishedAt))}` : ""}</div>` : ""}
                <div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div>
             </div>
           `).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}
@@ -18124,6 +18144,28 @@ function renderHEMO(){
     hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
     logAction(`Hemoterapia ajustó ${item.drugName||"hemoderivado"} a ${next} ml/h`,pid);
     renderHEMO();
+  }));
+  root.querySelectorAll("[data-hemo-finish]").forEach(btn=>btn.addEventListener("click",()=>{
+    if(!isHemo)return;
+    const item=(cur.prescripciones?.infusionesContinuas||[]).find(it=>String(it.id)===String(btn.dataset.hemoFinish));
+    if(!item?.hemotherapyProduct || item.finishedAt || item.active===false)return;
+    if(!confirm(`¿Confirmás que terminó de administrarse ${item.drugName||"el hemoderivado"} (${formatDoseValue(item.volumeMl||item.finalVolumeMl||0)} ml)?`))return;
+    const at=isoNowLocalFull();
+    item.active=false;item.status="finalizada";item.finishedAt=at;item.updatedAt=at;
+    cur.prescripciones.historial=Array.isArray(cur.prescripciones.historial)?cur.prescripciones.historial:[];
+    if(!cur.prescripciones.historial.some(x=>String(x?.id||"")===String(item.id))){
+      cur.prescripciones.historial.unshift({...item,archivedAt:at});
+    }
+    const evo=(cur.hemotherapyEvolutions||[]).find(x=>String(x?.id||"")===String(item.hemotherapyEvolutionId||""));
+    if(evo)evo.hemotherapyAdministrationFinishedAt=at;
+    hcEnsurePrescriptionDailySnapshot(pid,cl);
+    cl[pid]=cur;setClinical(cl);
+    window.hc224MarkClinicalFieldDirty?.(pid,"prescripciones");
+    if(evo)window.hc224MarkClinicalFieldDirty?.(pid,"hemotherapyEvolutions");
+    hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+    logAction(`Hemoterapia finalizó ${item.drugName||"hemoderivado"} de ${buildPatientDisplayName(p)}`,pid);
+    renderHEMO();
+    if(typeof renderPrescripciones==="function")renderPrescripciones();
   }));
 }
 
@@ -22662,7 +22704,7 @@ function buildFarmaciaConsumosHTML(consumos){
         const comps = hcConsumptionRecordComponents(c).map(comp => `${escHTML(comp.drugName)}: <b>${escHTML(formatDoseValue(comp.qty))}</b> ${escHTML(comp.unit)}${comp.volumeMl ? ` / ${escHTML(formatDoseValue(comp.volumeMl))} ml` : ""}`).join(" • ");
         return `
           <div style="border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04); border-radius:12px; padding:8px; font-size:12px;">
-            <b>${escHTML(c.drugName || "Consumo")}</b> • ${escHTML(c.presentationLabel || "—")}${c.patientSupplied || c.billable===false ? " • Trae paciente · no facturar" : ""}${c.rateMlH ? ` • ${escHTML(formatDoseValue(c.rateMlH))} ml/h` : ``}
+            <b>${escHTML(c.drugName || "Consumo")}</b> • ${escHTML(c.presentationLabel || "—")}${c.patientSupplied || c.billable===false ? " • Trae paciente" : ""}${c.rateMlH ? ` • ${escHTML(formatDoseValue(c.rateMlH))} ml/h` : ``}
             <br>${comps}
             <br><span class="muted">Finalizada: ${escHTML(dmyhmFromISODateTime(c.finishedAt || c.at || "") || "—")} • Registró: ${escHTML(c.byName || "—")}</span>
           </div>
@@ -23070,6 +23112,7 @@ function patientHasPendingNurseAlert(patientId){
       const normalizedName = name.toLowerCase().replace(/\s+/g, "");
       const normalizedDose = doseText.toLowerCase().replace(/\s+/g, "");
       const title = `${name}${doseText && !normalizedName.includes(normalizedDose) ? ` ${doseText}` : ""} / ${frequencyShort}`;
+      const viaText = String(item.via || "—")==="Oral" ? "VO" : String(item.via || "—");
       const timeText = slots.map(slot=>String(slot.at || "").slice(11,16)).filter(Boolean).join(" · ");
       const pendingAck = nurse && !!item.pendingNurseAlert && !nurseAckSuppressesPendingAlert(item);
       const dueSlot = nurse && !pendingAck ? slots.find(slot=>hcMedicationSlotNeedsAlert(item,slot,now)) : null;
@@ -23087,6 +23130,7 @@ function patientHasPendingNurseAlert(patientId){
           <div class="hcRxCompactMain">
             <div class="hcRxCompactDrug" title="${escHTML(title)}">${escHTML(title)}</div>
           </div>
+          <div class="hcRxMedicationVia" aria-label="Vía ${escHTML(viaText)}">${escHTML(viaText)}</div>
           <div class="hcRxMedicationSchedule ${needsAttention ? "is-due" : ""}" title="${escHTML(subtitle)}"><span class="hc260PlanDate">${escHTML(dmyFromDateISO(displayPlanDate))}</span>${hcV260ScheduleHTML(item,slots,{nurse,historicalView,pendingAck,now,displayPlanDate})}</div>
           <div class="hcRxMedicationControls">
             ${pendingAck ? `<label class="btn small hcRxMedicationAck"><input type="checkbox" data-pr-action="nurse-ack" data-pr-id="${id}">⚠ Visto</label>` : ``}
@@ -24197,7 +24241,7 @@ function patientHasPendingNurseAlert(patientId){
       return { key, base };
     }).filter(x=>x.base).sort((a,b)=>String(a.base.name).localeCompare(String(b.base.name),"es") || String(a.base.unit).localeCompare(String(b.base.unit),"es"));
     if(!rows.length) return `<div class="muted" style="font-size:12px;">${escHTML(emptyText || "Sin consumos para mostrar.")}</div>`;
-    return `<div class="pharmConsumptionTableWrap"><table class="pharmConsumptionTable"><thead><tr><th>Fármaco / insumo</th><th>Presentación</th>${byPatient ? "<th>Paciente / DNI</th>" : ""}<th>Hoy</th><th>Últimos 7 días</th><th>Mes actual</th><th>Año actual</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="pharmConsumptionDrug">${escHTML(r.base.name)}${r.base.patientSupplied?`<span class="pharmConsumptionUnit">Trae paciente · no facturar</span>`:""}<span class="pharmConsumptionUnit">Unidad: ${escHTML(r.base.unit)}</span></td><td>${escHTML(r.base.presentation)}</td>${byPatient ? `<td>${escHTML(r.base.patientName)}<br>DNI ${escHTML(r.base.dni || "—")}</td>` : ""}${periods.map(p=>`<td>${hcConsumptionCellHTML(maps[p][r.key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="pharmConsumptionTableWrap"><table class="pharmConsumptionTable"><thead><tr><th>Fármaco / insumo</th><th>Presentación</th>${byPatient ? "<th>Paciente / DNI</th>" : ""}<th>Hoy</th><th>Últimos 7 días</th><th>Mes actual</th><th>Año actual</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="pharmConsumptionDrug">${escHTML(r.base.name)}${r.base.patientSupplied?`<span class="pharmConsumptionUnit">Trae paciente</span>`:""}<span class="pharmConsumptionUnit">Unidad: ${escHTML(r.base.unit)}</span></td><td>${escHTML(r.base.presentation)}</td>${byPatient ? `<td>${escHTML(r.base.patientName)}<br>DNI ${escHTML(r.base.dni || "—")}</td>` : ""}${periods.map(p=>`<td>${hcConsumptionCellHTML(maps[p][r.key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function hcRowsSummaryHTML(rows, emptyText){
@@ -24964,7 +25008,7 @@ function patientHasPendingNurseAlert(patientId){
         </div>
         <div class="row4 prDrugPickRow">
           <div class="field">
-            <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;">Droga ${currentDrug ? `<button type="button" class="btn small" id="btnDrugProtocol" style="padding:2px 7px;font-size:9px;">Protocolo</button>` : ``}</label>
+            <label style="display:flex;align-items:center;justify-content:space-between;gap:6px;">Droga ${currentDrug ? `<button type="button" class="btn small" id="btnDrugProtocol" style="padding:5px 9px;font-size:11px;">Configurar</button>` : ``}</label>
             <div class="prDrugCombo">
               <input id="prDrugSearchInput" value="${escHTML(currentDrugSearch)}" placeholder="🔎 Buscar medicamento" autocomplete="off" />
               <select id="prDrugSel" title="Desplegar lista alfabética de farmacia">
@@ -24973,7 +25017,7 @@ function patientHasPendingNurseAlert(patientId){
               </select>
             </div>
             <div id="prDrugSearchHint" class="muted" style="font-size:10px; margin-top:2px;">${escHTML(prescriptionDrugSearchHint)}</div>
-            ${currentDrug && currentProtocol?.enabled ? `<div style="font-size:9.5px;margin-top:2px;color:#9ae6b4;font-weight:800;">${escHTML(currentProtocol.profileName||"Protocolo")} • ${escHTML(currentProtocol.via||"")}${currentProtocol.evMode?` • ${escHTML(evAdministrationModeLabel(currentProtocol.evMode))}`:""} • mín ${escHTML(formatDoseValue(currentProtocolEval?.minDose ?? currentProtocol.minDose))} • media ${escHTML(formatDoseValue(currentProtocolEval?.mediaDose ?? currentProtocol.mediaDose))} • máx ${escHTML(formatDoseValue(currentProtocolEval?.maxDose ?? currentProtocol.maxDose))} ${escHTML(currentProtocol.doseUnit || currentDrug.unidadLabel || "")} • inicia ${escHTML(hcProtocolDoseLevelLabel(currentProtocolEval?.startDoseLevel || currentProtocol.startDoseLevel))}</div>` : (currentDrug ? `<div style="font-size:9.5px;margin-top:2px;color:#fbd38d;">Prescripción manual • tocá Protocolo para configurar modalidades rápidas</div>` : ``)}
+            ${currentDrug && currentProtocol?.enabled ? `<div style="font-size:9.5px;margin-top:2px;color:#9ae6b4;font-weight:800;">${escHTML(currentProtocol.profileName||"Protocolo")} • ${escHTML(currentProtocol.via||"")}${currentProtocol.evMode?` • ${escHTML(evAdministrationModeLabel(currentProtocol.evMode))}`:""} • mín ${escHTML(formatDoseValue(currentProtocolEval?.minDose ?? currentProtocol.minDose))} • media ${escHTML(formatDoseValue(currentProtocolEval?.mediaDose ?? currentProtocol.mediaDose))} • máx ${escHTML(formatDoseValue(currentProtocolEval?.maxDose ?? currentProtocol.maxDose))} ${escHTML(currentProtocol.doseUnit || currentDrug.unidadLabel || "")} • inicia ${escHTML(hcProtocolDoseLevelLabel(currentProtocolEval?.startDoseLevel || currentProtocol.startDoseLevel))}</div>` : (currentDrug ? `<div style="font-size:10.5px;margin-top:3px;color:#fbd38d;">Prescripción manual • Configurar abre la ficha de esta medicación y presentación.</div>` : `<div class="muted" style="font-size:10.5px;margin-top:3px;">La medicación agregada por Farmacia aparece aquí con su presentación y puede configurarse.</div>`)}
           </div>
           <div class="field">
             <label for="prPresentationSel">Presentación</label>
@@ -25404,7 +25448,7 @@ function patientHasPendingNurseAlert(patientId){
     </div>
 
     <div class="card" style="margin-top:7px;">
-      <div class="labSectionTitle">${isEnfermero ? "Plan de administración reglada" : "Medicación reglada"}</div>
+      <div class="hc274MedicationHeaders"><span>Medicación reglada</span><span>Vía</span><span>Horarios</span><span>Acciones</span></div>
       ${buildCompactScheduledMedicationHTML(visibleItems, { selectedDate: selectedPrescriptionDate, historicalView: !isCurrentPlanView })}
     </div>
 
@@ -25437,7 +25481,7 @@ function patientHasPendingNurseAlert(patientId){
       if(!item || hcIsFreeTextPrescriptionItem(item) || hcIsDeletedPrescriptionItem(item))return;
       const label=document.createElement('label');
       label.className='hc273PatientSupply';
-      label.innerHTML=`<input type="checkbox" ${item.patientSupplied?'checked':''}> Trae paciente <span>· no facturar</span>`;
+      label.innerHTML=`<input type="checkbox" ${item.patientSupplied?'checked':''}> Trae paciente`;
       row.appendChild(label);
       label.querySelector('input')?.addEventListener('change',ev=>{
         item.patientSupplied=!!ev.target.checked;
@@ -27693,8 +27737,8 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
         <textarea id="medObsText" maxlength="240"
           placeholder="${administered ? "Observación opcional: respuesta, incidencia o aclaración" : "Ej: no se cuenta con medicación; paciente se niega a su administración"}"
           ${readOnly ? "readonly" : ""}>${escHTML(currentValue)}</textarea>
-        ${administered && !readOnly ? `<label class="hc273ModalSupply"><input id="medObsPatientSupplied" type="checkbox" ${ctx?.patientSupplied?"checked":""}> Trae paciente · no facturar</label>` : ""}
-        ${readOnly && ctx?.patientSupplied ? `<div class="hc273ModalSupply">Trae paciente · no facturar</div>` : ""}
+        ${administered && !readOnly ? `<label class="hc273ModalSupply"><input id="medObsPatientSupplied" type="checkbox" ${ctx?.patientSupplied?"checked":""}> Trae paciente</label>` : ""}
+        ${readOnly && ctx?.patientSupplied ? `<div class="hc273ModalSupply">Trae paciente</div>` : ""}
         <div class="muted" style="font-size:11px; margin-top:5px;">
           ${readOnly ? "Registro de solo lectura." : (administered ? "La observación puede quedar vacía; la administración y el origen quedan registrados." : "Al guardar queda registrado y visible para el médico y Enfermería.")}
         </div>
@@ -46489,16 +46533,25 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   const PUB='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
   async function quickLogin(username,password){
     let last=null;
-    for(let attempt=0;attempt<2;attempt++){
-      const ctl=new AbortController();const tm=setTimeout(()=>{try{ctl.abort()}catch(_){}},18000);
+    for(let attempt=0;attempt<3;attempt++){
+      if(attempt)hcLoginMessage?.(`Supabase tarda en responder. Reintentando ingreso (${attempt+1}/3)…`,"info");
+      const ctl=new AbortController();const tm=setTimeout(()=>{try{ctl.abort()}catch(_){}},22000);
       try{
         const r=await fetch(LOGIN_URL,{method:'POST',headers:{'Content-Type':'application/json','apikey':PUB},body:JSON.stringify({action:'authenticateUser',username,password}),cache:'no-store',signal:ctl.signal});
         const text=await r.text();let j={};try{j=text?JSON.parse(text):{}}catch(_){throw Error('Supabase devolvió una respuesta de login inválida.');}
-        if(!r.ok||!j?.ok)throw Error(j?.error||`Supabase HTTP ${r.status}`);return j;
-      }catch(e){last=e;if(!(/AbortError/i.test(String(e?.name||''))||/aborted|abort/i.test(String(e?.message||''))))throw e;if(attempt===0)await new Promise(r=>setTimeout(r,300));}
+        if(!r.ok||!j?.ok){
+          const err=Error(j?.error||`Supabase HTTP ${r.status}`);err.status=r.status;throw err;
+        }
+        return j;
+      }catch(e){
+        last=e;
+        const retryable=/AbortError|TimeoutError/i.test(String(e?.name||'')) || /aborted|abort|failed to fetch|networkerror/i.test(String(e?.message||'')) || [429,500,502,503,504].includes(Number(e?.status));
+        if(!retryable)throw e;
+        if(attempt<2)await new Promise(resolve=>setTimeout(resolve,600*(attempt+1)));
+      }
       finally{clearTimeout(tm);}
     }
-    throw Error('Supabase está tardando más de lo normal. Reintentá; Hospitalito no perdió ningún dato local.');
+    throw Error(`No se pudo contactar el ingreso de Supabase después de tres intentos. Revisá la conexión y volvé a probar. Los datos guardados en este equipo permanecen intactos.${last?.status ? ` (HTTP ${last.status})` : ''}`);
   }
   async function enterFast(institutionId){
     const auth=hcGlobalPendingAuth||{token:hcGlobalAuthToken?.(),institutions:hcGlobalStoredInstitutions?.()||[],user:loadJSON(LS.globalAuthUser,{})};
@@ -48113,8 +48166,8 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v273';
-  document.title='Hospitalito v273 · Prescripciones y Enfermería · Supabase';
+  window.HC_DEMO_VERSION='v274';
+  document.title='Hospitalito v274 · Prescripciones, Hemoterapia y acceso · Supabase';
 })();
 
 </script>
