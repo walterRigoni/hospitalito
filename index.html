@@ -3,10 +3,29 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v272 · Epicrisis y Consentimientos · Supabase</title>
+<title>Hospitalito v273 · Prescripciones y Enfermería · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
+<style id="hc273PrescriptionClarity">
+#medPres #btnToggleNewPrescription{font-size:16px!important;font-weight:900!important;padding:11px 18px!important;border:2px solid #9bd9ff!important;box-shadow:0 0 0 3px rgba(71,171,255,.18)!important}
+#medPres .prNewRxCompact{padding:16px!important;margin:12px 0!important;border:2px solid #69b8ff!important;background:#102f52!important;box-shadow:0 10px 30px rgba(0,0,0,.22)!important}
+#medPres .prNewRxCompact .labSectionTitle{font-size:18px!important;line-height:1.25!important;margin-bottom:12px!important;padding-bottom:8px!important;border-bottom:1px solid #6cb5ed!important}
+#medPres .prNewRxCompact label{font-size:12px!important;line-height:1.3!important;margin-bottom:4px!important}
+#medPres .prNewRxCompact input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),#medPres .prNewRxCompact select:not([type="hidden"]){min-height:36px!important;height:auto!important;font-size:13px!important;padding:6px 8px!important}
+#medPres .prNewRxCompact #btnAddInfusion{font-size:15px!important;padding:10px 16px!important;border:2px solid #9bd9ff!important}
+#medPres .prNewRxCompact .row4{grid-template-columns:minmax(240px,1.2fr) minmax(170px,1fr) minmax(110px,.65fr) minmax(170px,.85fr)!important;gap:12px!important}
+#medPres .prNewRxCompact .row3{gap:12px!important}
+#medPres .prNewRxCompact .field>.muted{font-size:11px!important;line-height:1.3!important}
+#medPres .presDailyHeader,#medPres .hcNursePendingStrip{border:2px solid #497da9!important}
+#medPres .hc273PatientSupply{display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;padding:7px 10px;margin-top:8px;border:1px solid #78b5e2;border-radius:8px;background:#0c2743;font-size:12px;font-weight:800;cursor:pointer}
+#medPres .hc273PatientSupply input{width:16px;height:16px;margin:0}
+#medPres .hc273PatientSupply span{color:#b7e3ff;font-weight:700}
+.hc273ModalSupply{display:flex;align-items:center;gap:7px;margin-top:9px;padding:8px;border:1px solid #78b5e2;border-radius:8px;background:#0c2743;color:#fff;font-size:12px;font-weight:800}
+.hc273ModalSupply input{width:17px;height:17px}
+@media(max-width:1000px){#medPres .prNewRxCompact .row4{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:620px){#medPres .prNewRxCompact .row4{grid-template-columns:1fr!important}}
+</style>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="application-name" content="Hospitalito">
@@ -8976,7 +8995,27 @@ function hcMergeRecordArrays(localItems, remoteItems, options = {}){
 }
 
 function hcMergePrescriptionItemArrays(localItems, remoteItems){
-  return hcMergeRecordArrays(localItems, remoteItems, { prefix:"prescripcion", sortDir:"desc" });
+  const local=Array.isArray(localItems)?localItems:[];
+  const remote=Array.isArray(remoteItems)?remoteItems:[];
+  const byId=new Map();
+  remote.forEach((item,index)=>{if(item)byId.set(hcBackendRecordIdentity(item,`prescripcion:r${index}`),item);});
+  local.forEach((item,index)=>{
+    if(!item)return;
+    const key=hcBackendRecordIdentity(item,`prescripcion:l${index}`),other=byId.get(key);
+    if(!other){byId.set(key,item);return;}
+    const newer=hcPrescriptionItemTs(item)>=hcPrescriptionItemTs(other)?item:other;
+    const older=newer===item?other:item;
+    const merged={...older,...newer};
+    // Una edición médica y una administración de Enfermería pueden llegar a la vez.
+    // Mantener ambos registros sin revivir una orden eliminada más recientemente.
+    if(!hcIsDeletedPrescriptionItem(newer)){
+      for(const field of ["administrationRecords","pharmacyConsumptionHistory","hydrationConsumptionHistory"]){
+        merged[field]=hcMergeRecordArrays(item[field],other[field],{prefix:`${field}:${key}`,sortDir:"asc"});
+      }
+    }
+    byId.set(key,merged);
+  });
+  return [...byId.values()].sort((a,b)=>hcPrescriptionItemTs(b)-hcPrescriptionItemTs(a));
 }
 
 function hcBackendChooseNewer(localValue, remoteValue){
@@ -19312,6 +19351,15 @@ function renderPrescripciones(){
     return PRESCRIPTION_ROUTE_OPTIONS.slice();
   }
 
+  function hc273DiluentsForPrescription(drug,pres){
+    const saved=Array.isArray(drug?.diluyentes)?drug.diluyentes.filter(Boolean):[];
+    if(!drug || drug.noGammas || isDirectReadyDrug(drug))return saved;
+    // Conservar restricciones explícitas de preparaciones con regla específica.
+    if(isFenitoinaInjectablePresentation(drug,pres) || isHeparinaSodicaPresentation(drug,pres) ||
+       isInsulinaCorrientePresentation(drug,pres) || isAmiodaronaPresentation(drug,pres))return saved;
+    return [...new Set([...saved,"Solución fisiológica","Dextrosa 5%","Dextrosa 10%","Ringer lactato"])];
+  }
+
   function normalizePrescriptionRoute(drug, pres, via){
     const allowed = allowedRoutesForPrescription(drug, pres);
     const selected = String(via || "").trim();
@@ -22313,6 +22361,9 @@ function buildHydrationConsumptionRecord(item, meta, me){
     startedAt: meta?.noGammas ? hcHydrationBagStartedAt(item) : hcPreparedBagStartedAt(item),
     finishedAt: now,
     patientId: selectedPatientId || "",
+    prescriptionId: item.id || "",
+    patientSupplied: !!item.patientSupplied,
+    billable: !item.patientSupplied,
     consumptionKind: "hidratacion",
     components: [{
       drugId: item.drugId,
@@ -22426,6 +22477,8 @@ function buildPreparedInfusionConsumptionRecord(item, meta, me, patientId){
     patientId: patientId || selectedPatientId || "",
     consumptionKind: "preparado",
     prescriptionId:item.id || "",
+    patientSupplied: !!item.patientSupplied,
+    billable: !item.patientSupplied,
     slotKey:item.currentInfusionSlotKey || "",
     components: hcComponentsForInfusionItem(item, meta, 1)
   };
@@ -22478,6 +22531,9 @@ function hcRegisterPharmacyConsumptionOnPrescriptionDelete(item, meta, me, patie
 
   if(!record) return null;
   record.sourceItemId = item.id || "";
+  record.prescriptionId = item.id || "";
+  record.patientSupplied = !!item.patientSupplied;
+  record.billable = !item.patientSupplied;
   record.deletedAt = now;
   record.registeredBecause = "Eliminación médica de prescripción";
 
@@ -22606,7 +22662,7 @@ function buildFarmaciaConsumosHTML(consumos){
         const comps = hcConsumptionRecordComponents(c).map(comp => `${escHTML(comp.drugName)}: <b>${escHTML(formatDoseValue(comp.qty))}</b> ${escHTML(comp.unit)}${comp.volumeMl ? ` / ${escHTML(formatDoseValue(comp.volumeMl))} ml` : ""}`).join(" • ");
         return `
           <div style="border:1px solid rgba(255,255,255,.10); background:rgba(255,255,255,.04); border-radius:12px; padding:8px; font-size:12px;">
-            <b>${escHTML(c.drugName || "Consumo")}</b> • ${escHTML(c.presentationLabel || "—")}${c.rateMlH ? ` • ${escHTML(formatDoseValue(c.rateMlH))} ml/h` : ``}
+            <b>${escHTML(c.drugName || "Consumo")}</b> • ${escHTML(c.presentationLabel || "—")}${c.patientSupplied || c.billable===false ? " • Trae paciente · no facturar" : ""}${c.rateMlH ? ` • ${escHTML(formatDoseValue(c.rateMlH))} ml/h` : ``}
             <br>${comps}
             <br><span class="muted">Finalizada: ${escHTML(dmyhmFromISODateTime(c.finishedAt || c.at || "") || "—")} • Registró: ${escHTML(c.byName || "—")}</span>
           </div>
@@ -24105,6 +24161,7 @@ function patientHasPendingNurseAlert(patientId){
   }
 
   function hcUnitCostForConsumptionRow(row){
+    if(row?.record?.patientSupplied || row?.record?.billable===false || row?.item?.patientSupplied)return 0;
     const meta = (row?.drugId ? getDrugMeta(row.drugId) : null) || findCatalogDrugByLooseName(row?.drugName || "") || null;
     return Number(meta?.unitCost || 0) || 0;
   }
@@ -24114,8 +24171,9 @@ function patientHasPendingNurseAlert(patientId){
     rows.forEach(r=>{
       const unit = r.unit || "unidad(es)";
       const presentation = r.presentationLabel || r.presentationForm || "Sin presentación registrada";
-      const key = JSON.stringify([r.drugId || hcTextKey(r.drugName || "Insumo"), presentation, unit, byPatient ? String(r.patientId || "") : ""]);
-      if(!totals[key]) totals[key] = { key, drugId:r.drugId || "", name:r.drugName || "Insumo", presentation, patientName:r.patientName || "Paciente", dni:r.patient?.dni || "", unit, qty:0, ml:0, cost:0 };
+      const patientSupplied=!!(r.record?.patientSupplied || r.record?.billable===false || r.item?.patientSupplied);
+      const key = JSON.stringify([r.drugId || hcTextKey(r.drugName || "Insumo"), presentation, unit, byPatient ? String(r.patientId || "") : "", patientSupplied]);
+      if(!totals[key]) totals[key] = { key, drugId:r.drugId || "", name:r.drugName || "Insumo", presentation, patientName:r.patientName || "Paciente", dni:r.patient?.dni || "", unit, patientSupplied, qty:0, ml:0, cost:0 };
       const qty = Number(r.qty || 0) || 0;
       totals[key].qty += qty;
       totals[key].ml += Number(r.volumeMl || 0) || 0;
@@ -24139,7 +24197,7 @@ function patientHasPendingNurseAlert(patientId){
       return { key, base };
     }).filter(x=>x.base).sort((a,b)=>String(a.base.name).localeCompare(String(b.base.name),"es") || String(a.base.unit).localeCompare(String(b.base.unit),"es"));
     if(!rows.length) return `<div class="muted" style="font-size:12px;">${escHTML(emptyText || "Sin consumos para mostrar.")}</div>`;
-    return `<div class="pharmConsumptionTableWrap"><table class="pharmConsumptionTable"><thead><tr><th>Fármaco / insumo</th><th>Presentación</th>${byPatient ? "<th>Paciente / DNI</th>" : ""}<th>Hoy</th><th>Últimos 7 días</th><th>Mes actual</th><th>Año actual</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="pharmConsumptionDrug">${escHTML(r.base.name)}<span class="pharmConsumptionUnit">Unidad: ${escHTML(r.base.unit)}</span></td><td>${escHTML(r.base.presentation)}</td>${byPatient ? `<td>${escHTML(r.base.patientName)}<br>DNI ${escHTML(r.base.dni || "—")}</td>` : ""}${periods.map(p=>`<td>${hcConsumptionCellHTML(maps[p][r.key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    return `<div class="pharmConsumptionTableWrap"><table class="pharmConsumptionTable"><thead><tr><th>Fármaco / insumo</th><th>Presentación</th>${byPatient ? "<th>Paciente / DNI</th>" : ""}<th>Hoy</th><th>Últimos 7 días</th><th>Mes actual</th><th>Año actual</th></tr></thead><tbody>${rows.map(r=>`<tr><td class="pharmConsumptionDrug">${escHTML(r.base.name)}${r.base.patientSupplied?`<span class="pharmConsumptionUnit">Trae paciente · no facturar</span>`:""}<span class="pharmConsumptionUnit">Unidad: ${escHTML(r.base.unit)}</span></td><td>${escHTML(r.base.presentation)}</td>${byPatient ? `<td>${escHTML(r.base.patientName)}<br>DNI ${escHTML(r.base.dni || "—")}</td>` : ""}${periods.map(p=>`<td>${hcConsumptionCellHTML(maps[p][r.key])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
   }
 
   function hcRowsSummaryHTML(rows, emptyText){
@@ -24829,12 +24887,12 @@ function patientHasPendingNurseAlert(patientId){
   const currentTreatmentDays = currentDurationUnit === "days"
     ? (root.dataset.prTreatmentDays || hcTreatmentDaysBetween(currentStartAt, root.dataset.prEndAt || ""))
     : "";
-  const currentEndAt = root.dataset.prEndAt || (
+  const currentEndAt = root.dataset.prEndAt || (currentContinua ? "" : (
     currentDurationUnit === "hours" && currentHours
       ? hcAddHoursToDateTimeLocal(currentStartAt, currentHours)
       : (currentTreatmentDays ? hcAddDaysToDateTimeLocal(currentStartAt, currentTreatmentDays) : "")
-  );
-  const currentDurationValue = currentDurationUnit === "hours" ? (currentHours || hcTreatmentHoursBetween(currentStartAt, currentEndAt)) : (currentTreatmentDays || "");
+  ));
+  const currentDurationValue = currentDurationUnit === "hours" ? (currentContinua ? (root.dataset.prContinuousDurationHours || hcTreatmentHoursBetween(currentStartAt,currentEndAt)) : (currentHours || hcTreatmentHoursBetween(currentStartAt, currentEndAt))) : (currentTreatmentDays || "");
   const currentRegularidadEV = (currentProgramada && currentRegularidad === "dosis_unica" && currentDurationUnit === "days" && Number(currentTreatmentDays || 0) > 1)
     ? "cada_12h"
     : currentRegularidad;
@@ -24917,11 +24975,15 @@ function patientHasPendingNurseAlert(patientId){
             <div id="prDrugSearchHint" class="muted" style="font-size:10px; margin-top:2px;">${escHTML(prescriptionDrugSearchHint)}</div>
             ${currentDrug && currentProtocol?.enabled ? `<div style="font-size:9.5px;margin-top:2px;color:#9ae6b4;font-weight:800;">${escHTML(currentProtocol.profileName||"Protocolo")} • ${escHTML(currentProtocol.via||"")}${currentProtocol.evMode?` • ${escHTML(evAdministrationModeLabel(currentProtocol.evMode))}`:""} • mín ${escHTML(formatDoseValue(currentProtocolEval?.minDose ?? currentProtocol.minDose))} • media ${escHTML(formatDoseValue(currentProtocolEval?.mediaDose ?? currentProtocol.mediaDose))} • máx ${escHTML(formatDoseValue(currentProtocolEval?.maxDose ?? currentProtocol.maxDose))} ${escHTML(currentProtocol.doseUnit || currentDrug.unidadLabel || "")} • inicia ${escHTML(hcProtocolDoseLevelLabel(currentProtocolEval?.startDoseLevel || currentProtocol.startDoseLevel))}</div>` : (currentDrug ? `<div style="font-size:9.5px;margin-top:2px;color:#fbd38d;">Prescripción manual • tocá Protocolo para configurar modalidades rápidas</div>` : ``)}
           </div>
-          <input type="hidden" id="prPresentationSel" value="${escHTML(currentPresentation?.id || "")}">
           <div class="field">
-            <label>Vía</label>
+            <label for="prPresentationSel">Presentación</label>
+            <select id="prPresentationSel">${(currentDrug?.presentaciones || []).map(p => `<option value="${escHTML(p.id)}" ${p.id===currentPresentation?.id?"selected":""}>${escHTML(p.label || p.forma || "Presentación")}</option>`).join("")}</select>
+            <div class="muted">Elegí ampolla para las vías inyectables.</div>
+          </div>
+          <div class="field">
+            <label for="prViaSel">Vía</label>
             <select id="prViaSel">
-              ${currentAllowedRoutes.map(v => `<option value="${escHTML(v)}" ${v===currentVia?"selected":""}>${escHTML(v)}</option>`).join("")}
+              ${PRESCRIPTION_ROUTE_OPTIONS.map(v => `<option value="${escHTML(v)}" ${v===currentVia?"selected":""} ${currentAllowedRoutes.includes(v)?"":"disabled"}>${escHTML(v)}${currentAllowedRoutes.includes(v)?"":" (elegí otra presentación)"}</option>`).join("")}
             </select>
           </div>
           <div class="field">
@@ -24988,8 +25050,12 @@ function patientHasPendingNurseAlert(patientId){
 
         ${currentIVMode && currentContinua ? `
           <div class="card hcPrescriptionStartBox" style="margin-top:10px;padding:8px;">
-            <div class="field"><label>Momento de inicio</label><input id="prStartAtInput" type="datetime-local" value="${escHTML(currentStartAt)}" /></div>
-            <div class="muted" style="font-size:11px;margin-top:4px;">Puede elegir fecha y hora. Si no la cambia, se usa el momento de guardar.</div>
+            <div class="row3">
+              <div class="field"><label>Inicio</label><input id="prStartAtInput" type="datetime-local" value="${escHTML(currentStartAt)}" /></div>
+              <div class="field"><label>Duración prevista (opcional)</label><div style="display:grid;grid-template-columns:1fr .8fr;gap:5px;"><input id="prTreatmentDaysInput" type="number" min="0.25" step="0.25" value="${escHTML(currentDurationValue || "")}" placeholder="Sin límite" /><select id="prDurationUnitSel"><option value="hours" ${currentDurationUnit==="hours"?"selected":""}>Horas</option><option value="days" ${currentDurationUnit!=="hours"?"selected":""}>Días</option></select></div></div>
+              <div class="field"><label>Final previsto (opcional)</label><input id="prEndAtInput" type="datetime-local" value="${escHTML(currentEndAt)}" /></div>
+            </div>
+            <div class="muted" style="font-size:11px;margin-top:4px;">Si no indicás final, la infusión continúa hasta que se suspenda o finalice manualmente.</div>
           </div>
         ` : ``}
 
@@ -25258,12 +25324,13 @@ function patientHasPendingNurseAlert(patientId){
             <div class="field">
               <label>Diluyente</label>
               <select id="prDilSel">
-                ${currentDrug ? [...new Set([...(currentDrug.diluyentes || []), ...(currentDil ? [currentDil] : [])])].map(d => `<option value="${escHTML(d)}" ${d===currentDil?"selected":""}>${escHTML(d)}</option>`).join("") : `<option value="">—</option>`}
+                ${currentDrug ? [...new Set([...hc273DiluentsForPrescription(currentDrug,currentPresentation), ...(currentDil ? [currentDil] : [])])].map(d => `<option value="${escHTML(d)}" ${d===currentDil?"selected":""}>${escHTML(d)}</option>`).join("") : `<option value="">—</option>`}
               </select>
             </div>
             <div class="field">
               <label>Volumen final (ml)</label>
-              <input id="prVolInput" type="number" min="1" step="1" value="${escHTML(currentVol)}" ${currentInsulin && currentIVMode ? "readonly" : ""} />
+              <select id="prVolPreset" ${currentInsulin && currentIVMode ? "disabled" : ""}><option value="">Elegir volumen…</option>${[100,200,250,300,400,500].map(n=>`<option value="${n}" ${Number(currentVol)===n?"selected":""}>${n} ml</option>`).join("")}<option value="otro" ${currentVol && ![100,200,250,300,400,500].includes(Number(currentVol))?"selected":""}>Otro volumen</option></select>
+              <input id="prVolInput" type="number" min="1" step="1" value="${escHTML(currentVol)}" ${currentInsulin && currentIVMode ? "readonly" : ""} aria-label="Volumen final en mililitros" />
             </div>
             <div class="field">
               <label>Rango orientativo</label>
@@ -25362,6 +25429,36 @@ function patientHasPendingNurseAlert(patientId){
       return `<div class="hcRxInactiveItem"><div class="hcRxInactiveTitle">${escHTML(name)} · ${escHTML(reason)}</div><div class="hcRxInactiveMeta">${escHTML(prep)}${it.via ? ` · ${escHTML(it.via)}` : ``}${it.regularidad ? ` · ${escHTML(prescriptionFrequencyLabel(it.regularidad))}` : ``}${at ? ` · ${escHTML(dmyhmFromISODateTime(at) || at)}` : ``}</div></div>`;
     }).join("")}</details>` : ``}
   `;
+
+  if(isEnfermero && isCurrentPlanView){
+    root.querySelectorAll('.prListItem[data-pr-item-id]').forEach(row=>{
+      const id=row.getAttribute('data-pr-item-id') || '';
+      const item=items.find(x=>String(x?.id||'')===id);
+      if(!item || hcIsFreeTextPrescriptionItem(item) || hcIsDeletedPrescriptionItem(item))return;
+      const label=document.createElement('label');
+      label.className='hc273PatientSupply';
+      label.innerHTML=`<input type="checkbox" ${item.patientSupplied?'checked':''}> Trae paciente <span>· no facturar</span>`;
+      row.appendChild(label);
+      label.querySelector('input')?.addEventListener('change',ev=>{
+        item.patientSupplied=!!ev.target.checked;
+        item.billable=!item.patientSupplied;
+        item.updatedAt=isoNowLocalFull();
+        (item.administrationRecords||[]).forEach(rec=>{rec.patientSupplied=item.patientSupplied;rec.billable=!item.patientSupplied;});
+        ['pharmacyConsumptionHistory','hydrationConsumptionHistory','consumptionHistory'].forEach(field=>{
+          (item[field]||[]).forEach(rec=>{rec.patientSupplied=item.patientSupplied;rec.billable=!item.patientSupplied;rec.updatedAt=item.updatedAt;});
+        });
+        (cl2[pid].prescripciones.farmaciaConsumos||[]).forEach(rec=>{
+          if(String(rec.prescriptionId||rec.sourceItemId||'')===id){rec.patientSupplied=item.patientSupplied;rec.billable=!item.patientSupplied;rec.updatedAt=item.updatedAt;}
+        });
+        hcEnsurePrescriptionDailySnapshot(pid,cl2);
+        setClinical(cl2);
+        window.hc224MarkClinicalFieldDirty?.(pid,'prescripciones');
+        hcBackendMarkLocalSavedSoon();hcBackendScheduleUrgentPush();
+        logAction(`${item.patientSupplied?'Marcó':'Desmarcó'} medicación traída por paciente: ${item.drugName||item.drugId||'prescripción'}`,pid);
+        renderPrescripciones();
+      });
+    });
+  }
 
   root.querySelectorAll("[data-pr-action='jump-nurse-task']").forEach(btn=>btn.addEventListener("click",()=>{
     const id = btn.getAttribute("data-pr-id") || "";
@@ -25779,11 +25876,13 @@ function patientHasPendingNurseAlert(patientId){
 
       const rawDuration = durEl && durEl.type!=="hidden" ? (durEl.value || "") : (hoursEl?.value || "");
       if(unit === "hours"){
-        root.dataset.prHours = rawDuration;
+        if(root.dataset.prEVMode === "continua")root.dataset.prContinuousDurationHours=rawDuration;
+        else root.dataset.prHours = rawDuration;
         root.dataset.prTreatmentDays = "";
       }else{
         root.dataset.prTreatmentDays = rawDuration;
-        root.dataset.prHours = "";
+        if(root.dataset.prEVMode !== "continua")root.dataset.prHours = "";
+        if(root.dataset.prEVMode === "continua")root.dataset.prContinuousDurationHours="";
       }
 
       if(unit === "days" && Number(rawDuration || 0) > 1 && root.dataset.prEVMode === "programada" && (!root.dataset.prRegularidad || root.dataset.prRegularidad === "dosis_unica")){
@@ -25822,8 +25921,11 @@ function patientHasPendingNurseAlert(patientId){
       const spanHours=hcTreatmentHoursBetween(startEl.value,endEl.value);
       if(!spanHours){
         if(durEl)durEl.value="";
-        if(hoursEl)hoursEl.value="";
-        root.dataset.prHours="";root.dataset.prTreatmentDays="";
+        if(root.dataset.prEVMode !== "continua"){
+          if(hoursEl)hoursEl.value="";
+          root.dataset.prHours="";
+        }else root.dataset.prContinuousDurationHours="";
+        root.dataset.prTreatmentDays="";
         refreshCalc();return;
       }
 
@@ -25832,7 +25934,8 @@ function patientHasPendingNurseAlert(patientId){
         if(hours){
           if(durEl && durEl.type!=="hidden")durEl.value=hours;
           else if(hoursEl)hoursEl.value=hours;
-          root.dataset.prHours = hours;
+          if(root.dataset.prEVMode === "continua")root.dataset.prContinuousDurationHours=hours;
+          else root.dataset.prHours = hours;
           root.dataset.prTreatmentDays = "";
         }
       }else{
@@ -25841,7 +25944,7 @@ function patientHasPendingNurseAlert(patientId){
         if(days && durEl){
           durEl.value = days;
           root.dataset.prTreatmentDays = days;
-          root.dataset.prHours = "";
+          if(root.dataset.prEVMode !== "continua")root.dataset.prHours = "";
         }
       }
       refreshCalc();
@@ -25924,11 +26027,17 @@ function patientHasPendingNurseAlert(patientId){
 
       const volEl = $("#prVolInput");
       if(volEl) volEl.addEventListener("input", ()=>{
+        const preset=$("#prVolPreset");
+        if(preset)preset.value=[100,200,250,300,400,500].includes(Number(volEl.value))?String(Number(volEl.value)):"otro";
         const selectedChoice = hcParseProtocolChoiceValue($("#prDrugSel")?.value || "");
         const selectedId = selectedChoice.drugId || root.dataset.prDrug || "";
         const drug = selectedId ? getDrugMeta(selectedId) : null;
         syncHydration(drug?.noGammas ? "hours" : "rate");
         refreshCalc();
+      });
+      $("#prVolPreset")?.addEventListener("change",ev=>{
+        if(ev.target.value==="otro"){volEl?.focus();return;}
+        if(volEl){volEl.value=ev.target.value;volEl.dispatchEvent(new Event("input",{bubbles:true}));}
       });
     };
 
@@ -26228,6 +26337,10 @@ function patientHasPendingNurseAlert(patientId){
         root.dataset.prProtocolProfile = parsedChoice.profileId || "";
         root.dataset.prProtocolApplied = "";
         root.dataset.prModeDetails = "";
+        root.dataset.prEndAt = "";
+        root.dataset.prTreatmentDays = "";
+        root.dataset.prContinuousDurationHours = "";
+        root.dataset.prDurationUnit = "";
         if(val){
           const d0=getDrugMeta(val); const p0=parsedChoice.profileId ? hcGenericProtocolForDrug(d0,parsedChoice.profileId) : null;
           root.dataset.prDrugSearch = d0 ? pharmacyDrugDisplayName(d0) : "";
@@ -26447,7 +26560,9 @@ function patientHasPendingNurseAlert(patientId){
         const drug = selectedId ? getDrugMeta(selectedId) : null;
         const presId = $("#prPresentationSel")?.value || "";
         const pres = drug?.presentaciones?.find(x => x.id === presId) || drug?.presentaciones?.[0] || null;
-        const via = normalizePrescriptionRoute(drug, pres, $("#prViaSel")?.value || root.dataset.prVia || "");
+        const requestedVia=$("#prViaSel")?.value || root.dataset.prVia || "";
+        if(!allowedRoutesForPrescription(drug,pres).includes(requestedVia))return alert("La vía elegida no corresponde a esta presentación. Elegí una presentación compatible.");
+        const via = normalizePrescriptionRoute(drug, pres, requestedVia);
         const ivMode = routeAllowsIVInfusion(drug, pres, via);
 
         if(ivMode){
@@ -26568,7 +26683,9 @@ function patientHasPendingNurseAlert(patientId){
         const pres = drug.presentaciones.find(x => x.id === presId) || drug.presentaciones[0];
         if(!pres) return alert("Seleccioná una presentación.");
 
-        const via = normalizePrescriptionRoute(drug, pres, $("#prViaSel")?.value || root.dataset.prVia || "");
+        const requestedVia=$("#prViaSel")?.value || root.dataset.prVia || "";
+        if(!allowedRoutesForPrescription(drug,pres).includes(requestedVia))return alert("La vía elegida no corresponde a la presentación. Elegí ampolla u otra presentación compatible.");
+        const via = normalizePrescriptionRoute(drug, pres, requestedVia);
         const oralSolid = isOralSolidPresentation(drug, pres) && (via === "Oral" || via === "SNG") && !(root.dataset.prProtocolProfile && hcGenericProtocolForDrug(drug,root.dataset.prProtocolProfile)?.enabled);
         const ivMode = routeAllowsIVInfusion(drug, pres, via);
         const evMode = normalizeEVAdministrationMode(drug, pres, via, ivMode ? ($("#prEVModeSel")?.value || $("#prRegularidadSel")?.value || root.dataset.prEVMode || "") : "");
@@ -26591,8 +26708,9 @@ function patientHasPendingNurseAlert(patientId){
           : nowAtClick;
         const durationUnitInput = $("#prDurationUnitSel")?.value || root.dataset.prDurationUnit || ($("#prHoursInput") ? "hours" : "days");
         const treatmentDaysInput = durationUnitInput === "days" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prTreatmentDays || "") : "";
-        const treatmentHoursInput = $("#prHoursInput")?.value ||
-          (durationUnitInput==="hours" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prHours || "") : "");
+        const treatmentHoursInput = isContinua
+          ? (durationUnitInput === "hours" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prContinuousDurationHours || "") : "")
+          : ($("#prHoursInput")?.value || (durationUnitInput === "hours" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prHours || "") : ""));
         let endAtInput = $("#prEndAtInput")?.value || "";
         if(!endAtInput && treatmentHoursInput){
           endAtInput = hcAddHoursToDateTimeLocal(startAtInput || isoNowLocalFull(), treatmentHoursInput);
@@ -26786,13 +26904,13 @@ function patientHasPendingNurseAlert(patientId){
           active: true,
           editing: false,
           scheduleStartAt: isProgramada ? startAtInput : "",
-          scheduleEndAt: isProgramada ? treatmentEndAtForSave : "",
+          scheduleEndAt: ivMode && !isBolo ? treatmentEndAtForSave : "",
           treatmentDays: treatmentDaysInput || "",
           treatmentHours: endIsOnePrepared ? "" : (treatmentHoursInput || ""),
           preparedDurationHours: isProgramada && preparedDurationForOrder > 0 ? preparedDurationForOrder : null,
           durationUnit: durationUnitInput,
           medicationScheduleStartAt: (isBolo || !ivMode || isProgramada) ? gridScheduleStartAt : "",
-          medicationScheduleEndAt: (isBolo || !ivMode || (isProgramada && !(isAmiodarone && !isBolo))) ? treatmentEndAtForSave : "",
+          medicationScheduleEndAt: (isBolo || !ivMode || (ivMode && !(isAmiodarone && !isBolo))) ? treatmentEndAtForSave : "",
           administrationRecords: [],
 
           drugId: drug.id,
@@ -27017,6 +27135,7 @@ function patientHasPendingNurseAlert(patientId){
         root.dataset.prEndAt = "";
         root.dataset.prTreatmentDays = "";
         root.dataset.prHours = "";
+        root.dataset.prContinuousDurationHours = "";
         root.dataset.prDurationUnit = "";
         root.dataset.prStartSource = "";
         root.dataset.prStartTouched = "";
@@ -27049,6 +27168,7 @@ function patientHasPendingNurseAlert(patientId){
         root.dataset.prPresentation = "";
         root.dataset.prDose = "";
         root.dataset.prHours = "";
+        root.dataset.prContinuousDurationHours = "";
         root.dataset.prAmp = "1";
         root.dataset.prVol = "250";
         root.dataset.prDil = "";
@@ -27224,6 +27344,7 @@ function patientHasPendingNurseAlert(patientId){
       root.dataset.prDurationUnit = item.durationUnit || (item.treatmentHours || item.amiodaroneHours ? "hours" : "days");
       root.dataset.prTreatmentDays = item.treatmentDays || (root.dataset.prDurationUnit === "days" ? hcTreatmentDaysBetween(scheduleAt, item.medicationScheduleEndAt || item.scheduleEndAt || "") : "");
       root.dataset.prHours = item.treatmentHours || item.amiodaroneHours || (root.dataset.prDurationUnit === "hours" ? hcTreatmentHoursBetween(scheduleAt, item.scheduleEndAt || item.medicationScheduleEndAt || "") : "");
+      root.dataset.prContinuousDurationHours = item.continua ? (item.treatmentHours || hcTreatmentHoursBetween(scheduleAt,item.scheduleEndAt || item.medicationScheduleEndAt || "") || "") : "";
       root.dataset.prEndAt = item.medicationScheduleEndAt || item.scheduleEndAt || "";
       root.dataset.prEVMode = item.administrationMode || (item.bolo ? "bolo" : (item.continua ? "continua" : (item.nonContinuous ? "programada" : "")));
       root.dataset.prContinua = root.dataset.prEVMode === "continua" ? "1" : "0";
@@ -27557,26 +27678,29 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
     if(existing) existing.remove();
 
     const readOnly = !!ctx?.readOnly;
+    const administered = !!ctx?.administered;
     const currentValue = String(ctx?.observation || "").trim();
     const overlay = document.createElement("div");
     overlay.className = "medObsModalOverlay";
     overlay.innerHTML = `
       <div class="medObsModalCard" role="dialog" aria-modal="true">
-        <div style="font-weight:1000; font-size:15px;">${readOnly ? "Registro de administración" : "Observación de administración"}</div>
+        <div style="font-weight:1000; font-size:15px;">${readOnly ? "Registro de administración" : (administered ? "Confirmar administración" : "Observación de administración")}</div>
         <div class="muted" style="font-size:12px; margin-top:4px;">
           ${escHTML(ctx?.drugName || "Medicación")} • ${escHTML(dmyhmFromISODateTime(ctx?.slotAt || "") || ctx?.slotAt || "")}
         </div>
         ${ctx?.statusText ? `<div style="margin-top:8px;font-weight:900;">${escHTML(ctx.statusText)}</div>` : ""}
         ${ctx?.byName ? `<div class="muted" style="font-size:11px;margin-top:3px;">Registrado por ${escHTML(ctx.byName)}${ctx?.recordedAt ? ` • ${escHTML(dmyhmFromISODateTime(ctx.recordedAt) || ctx.recordedAt)}` : ""}</div>` : ""}
         <textarea id="medObsText" maxlength="240"
-          placeholder="Ej: no se cuenta con medicación; paciente se niega a su administración"
+          placeholder="${administered ? "Observación opcional: respuesta, incidencia o aclaración" : "Ej: no se cuenta con medicación; paciente se niega a su administración"}"
           ${readOnly ? "readonly" : ""}>${escHTML(currentValue)}</textarea>
+        ${administered && !readOnly ? `<label class="hc273ModalSupply"><input id="medObsPatientSupplied" type="checkbox" ${ctx?.patientSupplied?"checked":""}> Trae paciente · no facturar</label>` : ""}
+        ${readOnly && ctx?.patientSupplied ? `<div class="hc273ModalSupply">Trae paciente · no facturar</div>` : ""}
         <div class="muted" style="font-size:11px; margin-top:5px;">
-          ${readOnly ? "Registro de solo lectura." : "Al guardar queda registrado y visible para el médico y Enfermería."}
+          ${readOnly ? "Registro de solo lectura." : (administered ? "La observación puede quedar vacía; la administración y el origen quedan registrados." : "Al guardar queda registrado y visible para el médico y Enfermería.")}
         </div>
         <div class="medObsModalActions">
           <button type="button" class="btn small" id="medObsCancel">${readOnly ? "Cerrar" : "Cancelar"}</button>
-          ${readOnly ? "" : `<button type="button" class="btn small primary" id="medObsSave">Guardar observación</button>`}
+          ${readOnly ? "" : `<button type="button" class="btn small primary" id="medObsSave">${administered ? "Confirmar administrado" : "Guardar observación"}</button>`}
         </div>
       </div>
     `;
@@ -27590,12 +27714,12 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
     if(!readOnly){
       overlay.querySelector("#medObsSave")?.addEventListener("click", ()=>{
         const value = String(txt?.value || "").trim();
-        if(!value){
+        if(!value && !administered){
           if(txt) txt.focus();
           return;
         }
         close();
-        if(typeof onSave === "function") onSave(value);
+        if(typeof onSave === "function") onSave(value,!!overlay.querySelector('#medObsPatientSupplied')?.checked);
       });
       setTimeout(()=> txt?.focus(), 20);
     }
@@ -27619,28 +27743,30 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
       item.administrationRecords = Array.isArray(item.administrationRecords) ? item.administrationRecords : [];
       if(hcAdministrationRecordForSlot(item, slotKey)) return;
 
-      const nowIso = isoNowLocalFull();
-      item.administrationRecords.push({
-        id: uid("admininf"),
-        slotKey,
-        scheduledAt: slotAt,
-        administeredAt: nowIso,
-        infusionStartedAt: nowIso,
-        status: "infusion_started",
-        byId: me?.id || "",
-        byName: me?.name || me?.username || ""
+      btn.checked=false;
+      const drugName=getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación";
+      hcOpenMedicationObservationModal({drugName,slotAt,administered:true,patientSupplied:!!item.patientSupplied},(observation,patientSupplied)=>{
+        if(hcAdministrationRecordForSlot(item,slotKey))return;
+        const nowIso = isoNowLocalFull();
+        item.patientSupplied=patientSupplied;
+        item.billable=!patientSupplied;
+        item.administrationRecords.push({
+          id: uid("admininf"),slotKey,scheduledAt:slotAt,administeredAt:nowIso,
+          infusionStartedAt:nowIso,status:"infusion_started",observation,
+          patientSupplied,billable:!patientSupplied,
+          byId:me?.id || "",byName:me?.name || me?.username || ""
+        });
+        item.intermittentInfusionRunning = true;
+        item.currentInfusionSlotKey = slotKey;
+        item.currentInfusionScheduledAt = slotAt;
+        item.currentPreparedStartedAt = nowIso;
+        item.currentBagStartedAt = nowIso;
+        item.updatedAt = nowIso;
+        setClinical(cl2);
+        if(hcBackendConfigured()) setTimeout(()=> hcBackendPushNow(false), 80);
+        logAction(`Inició infusión programada ${drugName} (${dmyhmFromISODateTime(slotAt) || slotAt})`, pid);
+        renderMed();
       });
-      item.intermittentInfusionRunning = true;
-      item.currentInfusionSlotKey = slotKey;
-      item.currentInfusionScheduledAt = slotAt;
-      item.currentPreparedStartedAt = nowIso;
-      item.currentBagStartedAt = nowIso;
-      item.updatedAt = nowIso;
-
-      setClinical(cl2);
-      if(hcBackendConfigured()) setTimeout(()=> hcBackendPushNow(false), 80);
-      logAction(`Inició infusión programada ${getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación"} (${dmyhmFromISODateTime(slotAt) || slotAt})`, pid);
-      renderMed();
     });
   });
 
@@ -27689,22 +27815,24 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
       const idx = items.findIndex(x => x.id === id);
       if(idx < 0 || !slotKey) return;
       const item = items[idx];
-      item.administrationRecords = Array.isArray(item.administrationRecords) ? item.administrationRecords : [];
-      if(!item.administrationRecords.some(r => String(r.slotKey || "") === slotKey)){
+      chk.checked=false;
+      const drugName=getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación";
+      hcOpenMedicationObservationModal({drugName,slotAt,administered:true,patientSupplied:!!item.patientSupplied},(observation,patientSupplied)=>{
+        item.administrationRecords = Array.isArray(item.administrationRecords) ? item.administrationRecords : [];
+        if(item.administrationRecords.some(r => String(r.slotKey || "") === slotKey))return;
+        item.patientSupplied=patientSupplied;
+        item.billable=!patientSupplied;
         item.administrationRecords.push({
-          id: uid("admmed"),
-          slotKey,
-          scheduledAt: slotAt,
-          administeredAt: isoNowLocalFull(),
-          byId: me?.id || "",
-          byName: me?.name || me?.username || ""
+          id:uid("admmed"),slotKey,scheduledAt:slotAt,administeredAt:isoNowLocalFull(),
+          observation,patientSupplied,billable:!patientSupplied,
+          byId:me?.id || "",byName:me?.name || me?.username || ""
         });
-      }
-      item.updatedAt = isoNowLocalFull();
-      setClinical(cl2);
-      if(hcBackendConfigured()) setTimeout(()=> hcBackendPushNow(false), 80);
-      logAction(`Administró ${getDrugMeta(item.drugId)?.nombre || item.drugName || "medicación"} (${dmyhmFromISODateTime(slotAt) || slotAt})`, pid);
-      renderMed();
+        item.updatedAt = isoNowLocalFull();
+        setClinical(cl2);
+        if(hcBackendConfigured()) setTimeout(()=> hcBackendPushNow(false), 80);
+        logAction(`Administró ${drugName} (${dmyhmFromISODateTime(slotAt) || slotAt})`, pid);
+        renderMed();
+      });
     });
   });
 
@@ -27771,10 +27899,9 @@ Desaparecerá de la lista activa y, si corresponde, quedará registrado el consu
         readOnly:true,
         drugName,
         slotAt:record.scheduledAt || String(slotKey).split("|").slice(1).join("|"),
-        observation:isObservation
-          ? (record.observation || record.obs || "Observación registrada")
-          : "La dosis fue registrada como administrada.",
+        observation:record.observation || record.obs || (isObservation ? "Observación registrada" : "La dosis fue registrada como administrada."),
         statusText:isObservation ? "No administrado / con observación" : "Administrado: OK",
+        patientSupplied:!!(record.patientSupplied || record.billable===false || item.patientSupplied),
         byName:record.byName || "",
         recordedAt:record.administeredAt || record.observedAt || ""
       });
@@ -41818,6 +41945,7 @@ let hc207ApplyingRemote=false;
 let hc207DirtyBuckets=new Set();
 let hc207DirtyClinical=new Set();
 let hc214DirtyFields=new Map();
+const hc273RecentPrescriptionEdits=new Map();
 let hc207PendingPull=false;
 let hc207LastFullPullAt=0;
 let hc214LastServerSeq=0;
@@ -41960,6 +42088,7 @@ function hc214RestoreOutbox(inst){
 function hc214MarkFields(pid,fields){
   pid=String(pid||"");if(!pid)return;
   const arr=(Array.isArray(fields)?fields:[fields]).map(String).filter(Boolean);if(!arr.length)return;
+  if(arr.includes("prescripciones"))hc273RecentPrescriptionEdits.set(pid,Date.now()+120000);
   hc207DirtyClinical.add(pid);
   let set=hc214DirtyFields.get(pid);if(!set){set=new Set();hc214DirtyFields.set(pid,set);}arr.forEach(f=>set.add(f));
 }
@@ -42257,7 +42386,8 @@ function hc215IncomingConflictsWithFreshLocal(r){
     const [pid,field]=hc207ParseRID(r.record_id);
     if(!pid||!field)return false;
     const set=hc214DirtyFields.get(pid);
-    return !!(hc207DirtyClinical.has(pid)&&set?.has(field));
+    return !!(hc207DirtyClinical.has(pid)&&set?.has(field)) ||
+      (field==="prescripciones" && Number(hc273RecentPrescriptionEdits.get(pid)||0)>Date.now());
   }
   return hc207DirtyBuckets.has(bucket);
 }
@@ -47983,8 +48113,8 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v272';
-  document.title='Hospitalito v272 · Epicrisis y Consentimientos · Supabase';
+  window.HC_DEMO_VERSION='v273';
+  document.title='Hospitalito v273 · Prescripciones y Enfermería · Supabase';
 })();
 
 </script>
