@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v274 · Prescripciones, Hemoterapia y acceso · Supabase</title>
+<title>Hospitalito v275 · Prescripciones y horarios configurables · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -11375,6 +11375,39 @@ function hcMedicationFrequencyHours(value){
   const map = { cada_2h:2, cada_4h:4, cada_6h:6, cada_8h:8, cada_12h:12, cada_18h:18, cada_24h:24, cada_48h:48, cada_72h:72, semanal:168 };
   return map[String(value || "")] || null;
 }
+function hcMedicationClockTimes(raw){
+  if(!Array.isArray(raw)) return [];
+  return [...new Set(raw.map(value=>String(value||"").trim()==="24:00" ? "00:00" : String(value||"").trim()))]
+    .filter(value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(value))
+    .sort((a,b)=>a.localeCompare(b));
+}
+function hcMedicationClockTimesValid(raw, regularidad){
+  const interval=hcMedicationFrequencyHours(regularidad);
+  if(!interval || interval>24 || 24%interval!==0 || !Array.isArray(raw)) return false;
+  const times=hcMedicationClockTimes(raw);
+  if(times.length!==raw.length || times.length!==24/interval) return false;
+  const minutes=times.map(time=>Number(time.slice(0,2))*60+Number(time.slice(3,5)));
+  return minutes.every((minute,index)=>((minutes[(index+1)%minutes.length]-minute+1440)%1440 || 1440)===interval*60);
+}
+function hcMedicationClockLabel(value){ return value==="00:00" ? "24:00" : value; }
+function hcMedicationClockTimesForPlan(raw){
+  return hcMedicationClockTimes(raw).sort((a,b)=>{
+    const minute=time=>{const hour=Number(time.slice(0,2));return (hour<6?hour+24:hour)*60+Number(time.slice(3,5));};
+    return minute(a)-minute(b);
+  });
+}
+function hcNextMedicationClockAt(from,raw){
+  const times=hcMedicationClockTimes(raw);
+  const now=from instanceof Date ? from : new Date(from);
+  if(!times.length || isNaN(now.getTime())) return "";
+  for(let day=0;day<=1;day++){
+    for(const time of times){
+      const candidate=new Date(now.getFullYear(),now.getMonth(),now.getDate()+day,Number(time.slice(0,2)),Number(time.slice(3,5)));
+      if(candidate.getTime()>=now.getTime()) return hcLocalDateTimeValue(candidate);
+    }
+  }
+  return "";
+}
 function hcIsFreeTextPrescriptionItem(item){
   return !!item && (item.type === "texto_libre" || item.freeTextPrescription === true);
 }
@@ -11472,6 +11505,19 @@ function hcMedicationSlotsForDate(item, planDate){
   const earliestMs = Math.max(anchorMs, Number.isFinite(orderMs) ? orderMs - 24*3600000 : anchorMs);
   const treatmentEndMs = hcParseTimeMs(hcPrescriptionTreatmentEndAt(item));
   const intervalH = hcMedicationFrequencyHours(item.regularidad || "dosis_unica");
+  const fixedTimes=hcMedicationClockTimesValid(item.scheduleTimes,item.regularidad) ? hcMedicationClockTimes(item.scheduleTimes) : [];
+  if(fixedTimes.length){
+    const slots=[];
+    for(const dayKey of [planDate,hcDateKeyAddDays(planDate,1)]){
+      for(const time of fixedTimes){
+        const at=`${dayKey}T${time}`;
+        const ms=new Date(at).getTime();
+        if(ms<planStartMs || ms>=planEndMs || ms<earliestMs || (Number.isFinite(treatmentEndMs) && ms>treatmentEndMs)) continue;
+        slots.push({at,key:`${item.id}|${at}`,gridKey:time==="00:00"?"24":time.slice(0,2),time});
+      }
+    }
+    return slots.sort((a,b)=>a.at.localeCompare(b.at));
+  }
   const intervalMs = intervalH ? intervalH * 3600000 : 0;
   const firstIndex = intervalMs ? Math.max(0, Math.ceil((Math.max(planStartMs,earliestMs)-anchorMs)/intervalMs)) : 0;
   const slots = [];
@@ -11480,7 +11526,7 @@ function hcMedicationSlotsForDate(item, planDate){
     if(ms >= planEndMs || (Number.isFinite(treatmentEndMs) && ms > treatmentEndMs)) break;
     if(ms >= planStartMs && ms >= earliestMs){
       const at = hcLocalDateTimeValue(new Date(ms));
-      slots.push({ at, key:`${item.id}|${at}`, gridKey:at.slice(11,13), time:at.slice(11,16) });
+      slots.push({ at, key:`${item.id}|${at}`, gridKey:at.slice(11,16)==="00:00"?"24":at.slice(11,13), time:at.slice(11,16) });
     }
     if(!intervalMs) break;
   }
@@ -20564,6 +20610,7 @@ function renderPrescripciones(){
       via: inferredVia,
       evMode: inferredEVMode,
       regularidad: inferredRegularidad,
+      scheduleTimes: Array.isArray(src.scheduleTimes) ? [...new Set(src.scheduleTimes.map(value=>String(value||"").trim()==="24:00"?"00:00":String(value||"").trim()))].filter(value=>/^([01]\d|2[0-3]):[0-5]\d$/.test(value)).sort((a,b)=>a.localeCompare(b)) : [],
       presentationId: String(src.presentationId || (seededNorad ? "norad_4mg" : drugLike?.presentaciones?.[0]?.id || "")),
       ampoules: Number(String(src.ampoules ?? (seededNorad ? 2 : 1)).replace(",", ".")) || 1,
       finalVolumeMl: Number(String(src.finalVolumeMl ?? (seededNorad ? 100 : 250)).replace(",", ".")) || 250,
@@ -21218,6 +21265,11 @@ function renderPrescripciones(){
           <div class="field"><label>Modalidad EV</label><select id="hcProtocolEVMode">${modeOptions}</select></div>
           <div class="field" id="hcProtocolRegularidadWrap"><label>Regularidad predeterminada</label><select id="hcProtocolRegularidad">${freqOptions}</select><div id="hcProtocolRegularidadHint" class="muted" style="font-size:10px;margin-top:3px;display:none;">No aplica en infusión continua.</div></div>
         </div>
+        <div id="hcProtocolClockWrap" class="card" style="margin-top:8px;padding:9px;background:rgba(17,98,132,.18);border-color:rgba(102,207,239,.44);">
+          <label style="display:flex;align-items:center;gap:7px;font-size:13px;font-weight:900;"><input id="hcProtocolUseClockTimes" type="checkbox" style="width:auto;margin:0;" ${p.scheduleTimes?.length?"checked":""}> Elegir horarios fijos para cada día</label>
+          <div id="hcProtocolClockInputs" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px;"></div>
+          <div id="hcProtocolClockHint" class="muted" style="font-size:11px;margin-top:5px;">Los horarios quedan guardados en esta modalidad; 24:00 es medianoche.</div>
+        </div>
         <label style="display:flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.12);padding:8px;border-radius:10px;margin-top:8px;"><input id="hcProtocolEnabled" type="checkbox" style="width:auto;" ${p.enabled?"checked":""}> Mostrar este protocolo como opción rápida al prescribir</label>
 
         <div style="margin-top:12px;font-weight:1000;">Preparación</div>
@@ -21270,6 +21322,9 @@ function renderPrescripciones(){
         regularidad:(via==="EV" && String(document.getElementById("hcProtocolEVMode")?.value||"")==="continua")
           ? "dosis_unica"
           : String(document.getElementById("hcProtocolRegularidad")?.value||"dosis_unica"),
+        scheduleTimes:document.getElementById("hcProtocolUseClockTimes")?.checked
+          ? Array.from(overlay.querySelectorAll("[data-hc-protocol-clock]"),input=>input.value)
+          : [],
         presentationId: document.getElementById("hcProtocolPresentation")?.value || "",
         ampoules: Number(String(document.getElementById("hcProtocolAmpoules")?.value || "1").replace(",",".")) || 1,
         finalVolumeMl: Number(String(document.getElementById("hcProtocolVolume")?.value || "0").replace(",",".")) || 0,
@@ -21301,6 +21356,27 @@ function renderPrescripciones(){
         if(isContinuous) sel.value = "dosis_unica";
       }
       if(hint) hint.style.display = "none";
+    };
+    const renderProtocolClocks = ()=>{
+      const via=String(document.getElementById("hcProtocolVia")?.value||"EV");
+      const evMode=via==="EV"?String(document.getElementById("hcProtocolEVMode")?.value||""):"";
+      const regularidad=String(document.getElementById("hcProtocolRegularidad")?.value||"dosis_unica");
+      const hours=hcMedicationFrequencyHours(regularidad);
+      const available=evMode!=="continua" && !!hours && hours<=24 && 24%hours===0;
+      const checkbox=document.getElementById("hcProtocolUseClockTimes");
+      const inputs=document.getElementById("hcProtocolClockInputs");
+      const hint=document.getElementById("hcProtocolClockHint");
+      if(!checkbox || !inputs || !hint) return;
+      checkbox.disabled=!available;
+      if(!available){checkbox.checked=false;inputs.replaceChildren();hint.textContent="Disponible para medicación reglada con intervalos que completan 24 horas (por ejemplo, cada 6 u 8 h).";return;}
+      hint.textContent=`Elegí ${24/hours} horarios separados por ${hours} h. 24:00 es medianoche del día siguiente.`;
+      if(!checkbox.checked){inputs.replaceChildren();return;}
+      const previous=Array.from(inputs.querySelectorAll("[data-hc-protocol-clock]"),input=>input.value);
+      const initial=hcMedicationClockTimesValid(previous,regularidad)?previous:
+        hcMedicationClockTimesValid(p.scheduleTimes,regularidad)?p.scheduleTimes:
+        Array.from({length:24/hours},(_,i)=>`${String((hours*(i+1))%24).padStart(2,"0")}:00`);
+      const displayed=hcMedicationClockTimesForPlan(initial);
+      inputs.innerHTML=displayed.map((time,index)=>`<div class="field" style="width:116px;"><label>Horario ${index+1}</label><select data-hc-protocol-clock>${Array.from({length:24},(_,hour)=>{const value=`${String(hour).padStart(2,"0")}:00`;return `<option value="${value}" ${time===value?"selected":""}>${hcMedicationClockLabel(value)}</option>`;}).join("")}</select></div>`).join("");
     };
 
     const refreshLive = ()=>{
@@ -21341,8 +21417,10 @@ function renderPrescripciones(){
       if(box) box.innerHTML = `<b>Resultado para este paciente:</b><br>Mínima: <b>${escHTML(formatDoseValue(ev.minDose))} ${escHTML(liveUnit)}</b> → ${escHTML(totalText(ev.minDose))}${minMlh ? ` → ${escHTML(formatDoseValue(minMlh))} ml/h` : ""} • Media: <b>${escHTML(formatDoseValue(ev.mediaDose))} ${escHTML(liveUnit)}</b> → ${escHTML(totalText(ev.mediaDose))}${mediaMlh ? ` → ${escHTML(formatDoseValue(mediaMlh))} ml/h` : ""} • Máxima: <b>${escHTML(formatDoseValue(ev.maxDose))} ${escHTML(liveUnit)}</b> → ${escHTML(totalText(ev.maxDose))}${maxMlh ? ` → ${escHTML(formatDoseValue(maxMlh))} ml/h` : ""}<br><span style="color:#9ae6b4;"><b>Inicio: ${escHTML(hcProtocolDoseLevelLabel(ev.startDoseLevel))}</b> — ${escHTML(totalText(ev.startDose))}${startMlh ? ` → <b>${escHTML(formatDoseValue(startMlh))} ml/h</b>` : ""}</span><br>${escHTML(limitText)}${ev.reasons.length ? `<br>${escHTML(ev.reasons.join(" • "))}` : ""}${ev.warnings.length ? `<br><span style="color:#fbd38d;">${escHTML(ev.warnings.join(" "))}</span>` : ""}`;
     };
 
+    ["hcProtocolVia","hcProtocolEVMode","hcProtocolRegularidad","hcProtocolUseClockTimes"].forEach(id=>document.getElementById(id)?.addEventListener("change",renderProtocolClocks));
     ["hcProtocolProfileName","hcProtocolVia","hcProtocolEVMode","hcProtocolRegularidad","hcProtocolPresentation","hcProtocolAmpoules","hcProtocolVolume","hcProtocolDiluent","hcProtocolMinDose","hcProtocolMediaDose","hcProtocolMaxDose","hcProtocolDoseUnit","hcProtocolAdminRateUnit","hcProtocolMinAdminRate","hcProtocolMaxAdminRate","hcProtocolRenalEnabled","hcProtocolRenalBelow","hcProtocolRenalPercent","hcProtocolHepaticEnabled","hcProtocolAstAltAbove","hcProtocolBiliAbove","hcProtocolHepaticPercent"].forEach(id=>{const el=document.getElementById(id);if(el){el.addEventListener("input",refreshLive);el.addEventListener("change",refreshLive);}});
     document.querySelectorAll('input[name="hcProtocolStartDose"]').forEach(el=>el.addEventListener("change",refreshLive));
+    renderProtocolClocks();
     refreshLive();
 
     const close=()=>overlay.remove();
@@ -21363,6 +21441,7 @@ function renderPrescripciones(){
       refreshLive();
       const draft=readDraft();
       if(!draft.profileName) return alert("Poné un nombre a esta modalidad, por ejemplo “Infusión continua” o “Vía oral”.");
+      if(draft.scheduleTimes.length && !hcMedicationClockTimesValid(draft.scheduleTimes,draft.regularidad)) return alert("Los horarios deben completar el día con el intervalo elegido, sin repetir horas. Revisá la regularidad y los horarios.");
       if(draft.enabled && !draft.presentationId) return alert("Elegí la presentación que corresponde a este protocolo.");
       if(draft.minDose < 0 || draft.mediaDose < 0 || draft.maxDose < 0 || draft.minDose > draft.mediaDose || draft.mediaDose > draft.maxDose) return alert("Revisá las dosis: debe cumplirse mínima ≤ media ≤ máxima.");
       if((draft.minAdminRate>0 || draft.maxAdminRate>0) && !draft.adminRateUnit) return alert("Elegí la unidad de velocidad de administración.");
@@ -23125,13 +23204,13 @@ function patientHasPendingNurseAlert(patientId){
       const recordText = lastRecord ? ` • ${lastRecord.notAdministered || lastRecord.status === "observacion" ? "Obs" : "✓ OK"} ${String(lastRecordedSlot.at || "").slice(11,16)}` : "";
       const subtitle = `Fecha ${dmyFromDateISO(displayPlanDate)}: horarios ${timeText}${statusText}${recordText}`;
       const id = escHTML(item.id);
-      return `<div class="card prListItem hcRxCompactItem hcRxMedicationItem ${needsAttention ? "hcNurseItemAlert" : ""}" data-pr-item-id="${id}">
+      return `<div class="card prListItem hcRxCompactItem hcRxMedicationItem" data-pr-item-id="${id}">
         <div class="hcRxMedicationGrid">
           <div class="hcRxCompactMain">
-            <div class="hcRxCompactDrug" title="${escHTML(title)}">${escHTML(title)}</div>
+            <div class="hcRxCompactDrug" title="${escHTML(title)}"><span class="${needsAttention ? "hc275MedicationNameAlert" : ""}">${escHTML(title)}</span></div>
           </div>
           <div class="hcRxMedicationVia" aria-label="Vía ${escHTML(viaText)}">${escHTML(viaText)}</div>
-          <div class="hcRxMedicationSchedule ${needsAttention ? "is-due" : ""}" title="${escHTML(subtitle)}"><span class="hc260PlanDate">${escHTML(dmyFromDateISO(displayPlanDate))}</span>${hcV260ScheduleHTML(item,slots,{nurse,historicalView,pendingAck,now,displayPlanDate})}</div>
+          <div class="hcRxMedicationSchedule" title="${escHTML(subtitle)}"><span class="hc260PlanDate">${escHTML(dmyFromDateISO(displayPlanDate))}</span>${hcV260ScheduleHTML(item,slots,{nurse,historicalView,pendingAck,now,displayPlanDate})}</div>
           <div class="hcRxMedicationControls">
             ${pendingAck ? `<label class="btn small hcRxMedicationAck"><input type="checkbox" data-pr-action="nurse-ack" data-pr-id="${id}">⚠ Visto</label>` : ``}
             ${(item.insulinProtocol || isInsulinaCorrienteDrug(meta)) && !historicalView ? hcInsulinProtocolButtonHTML(item, "SC") : ``}
@@ -23163,17 +23242,20 @@ function patientHasPendingNurseAlert(patientId){
       const statusLabel = it.active === false ? "Inactiva" : "Vigente";
       const statusColor = it.active === false ? "#7dd3fc" : "#68d391";
       const statusBg = it.active === false ? "rgba(80,160,255,.18)" : "rgba(50,180,100,.18)";
+      const isNutrition = it.modulePrescription && String(it.drugName || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"")==="nutricion";
+      const freeText = String(it.text || it.freeText || it.preparationText || "");
+      const displayText = isNutrition ? freeText.replace(/^Nutrici[oó]n\s*:\s*/i,"") : freeText;
       return `
         <div class="card prListItem freeTextRxItem ${alertBlink ? "hcNurseItemAlert" : ""}" data-pr-item-id="${escHTML(it.id)}" style="${alertBlink ? "animation:nurseBlink 1s infinite; border-color:rgba(255,165,0,.8) !important;" : ""}">
           <div style="display:flex; justify-content:space-between; gap:8px; align-items:flex-start;">
             <div class="hcRxInfo" style="min-width:0; flex:1;">
               <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-                <div style="font-weight:1000; font-size:12px;">Indicación libre</div>
+                <div class="${isNutrition ? "hc275NutritionTitle" : ""}" style="font-weight:1000; font-size:12px;">${isNutrition ? "Nutrición" : "Indicación libre"}</div>
                 <span style="display:inline-block; padding:1px 6px; border-radius:999px; font-size:10px; font-weight:900; color:${statusColor}; background:${statusBg}; border:1px solid rgba(255,255,255,.12);">${escHTML(statusLabel)}</span>
                 ${alertBlink ? `<span style="display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:900; background:rgba(255,165,0,.22); color:#f6ad55; border:1px solid rgba(255,165,0,.55);">Nueva indicación médica</span>` : ``}
                 ${alertBlink ? `<label style="display:inline-flex; align-items:center; gap:5px; padding:2px 8px; border-radius:999px; font-size:11px; font-weight:900; background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.18); cursor:pointer;"><input type="checkbox" data-pr-action="nurse-ack" data-pr-id="${escHTML(it.id)}" style="width:auto; margin:0;"> Visto enfermería</label>` : ``}
               </div>
-              <div class="freeTextRxText">${escHTML(it.text || it.freeText || it.preparationText || "")}</div>
+              <div class="freeTextRxText">${escHTML(displayText)}</div>
               <div class="freeTextRxMeta">
                 Indicada: ${escHTML(createdTxt)}${it.createdByName ? ` • ${escHTML(it.createdByName)}` : ``}${updatedTxt ? ` • Actualizada: ${escHTML(updatedTxt)}` : ``}
               </div>
@@ -24916,7 +24998,9 @@ function patientHasPendingNurseAlert(patientId){
   const currentContinua = currentEVMode === "continua";
   const currentManualStartTouched = root.dataset.prStartTouched === "1";
   const currentDefaultMedicationAnchor = hcNextMedicationGridSlot(new Date());
-  const currentDefaultMedicationStartAt = isoFromNow();
+  const currentDefaultMedicationStartAt = currentProtocol?.enabled && hcMedicationClockTimesValid(currentProtocol.scheduleTimes,currentProtocol.regularidad) && !isEditingPrescription
+    ? (hcNextMedicationClockAt(new Date(),currentProtocol.scheduleTimes) || isoFromNow())
+    : isoFromNow();
   const currentIsRegladaForDefault = !!currentDrug && (!currentIVMode || currentBolo);
   const currentIsInfusionForDefault = !!currentDrug && currentIVMode && !currentBolo;
   const currentAmiodaroneAutoNow = currentAmiodarone && currentIVMode && currentProgramada && !isEditingPrescription && !currentManualStartTouched;
@@ -24971,7 +25055,7 @@ function patientHasPendingNurseAlert(patientId){
           const heparin = isHeparinaSodicaPresentation(currentDrug,currentPresentation);
           modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-built-in="${heparin ? "heparina-continua" : "insulina-continua"}">Infusión continua<br><small>${heparin ? "Protocolo fijo: 18 UI/kg/h · KPTT" : "Protocolo fijo: según glucemia"}</small></button></div>`);
         }else if(matching.length){
-          matching.forEach(p=>modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-profile="${escHTML(p.profileId)}">${escHTML(label)} · ${escHTML(p.profileName || "Protocolo")}<br><small>${escHTML(prescriptionFrequencyLabel(p.regularidad || "dosis_unica"))}</small></button><button type="button" class="btn small" data-pr-edit-profile="${escHTML(p.profileId)}" title="Configurar esta modalidad">⚙</button></div>`));
+          matching.forEach(p=>modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-profile="${escHTML(p.profileId)}">${escHTML(label)} · ${escHTML(p.profileName || "Protocolo")}<br><small>${escHTML(prescriptionFrequencyLabel(p.regularidad || "dosis_unica"))}${p.scheduleTimes?.length?` · ${escHTML(hcMedicationClockTimesForPlan(p.scheduleTimes).map(hcMedicationClockLabel).join(" / "))}`:""}</small></button><button type="button" class="btn small" data-pr-edit-profile="${escHTML(p.profileId)}" title="Configurar esta modalidad">⚙</button></div>`));
         }else if(isHeparinaSodicaPresentation(currentDrug,currentPresentation) && via === "EV" && evMode === "continua"){
           modeChoices.push(`<div class="hcRxModeChoice"><button type="button" class="btn small primary" data-pr-quick-built-in="heparina-continua">Infusión continua<br><small>Protocolo de heparina configurado</small></button><button type="button" class="btn small" data-pr-configure-mode="1" data-pr-mode-via="EV" data-pr-mode-ev="continua" data-pr-mode-label="Infusión continua" title="Configurar otra modalidad">⚙</button></div>`);
         }else{
@@ -24999,7 +25083,24 @@ function patientHasPendingNurseAlert(patientId){
   root.innerHTML = `
     ${isFarmaceutico ? pharmacyNavHTML() : ""}
 
-    ${isMedico && isCurrentPlanView ? `<div style="margin:7px 0;"><button type="button" class="btn primary" id="btnToggleNewPrescription">${showRxPanel ? "Cerrar panel" : "+ Nueva prescripción"}</button></div>` : ``}
+    <div class="card presDailyCompactCard">
+      <div class="presDailyToolbar">
+        <div class="presDailyMain">
+          <div class="presDailyTitle">Prescripciones del día</div>
+          ${isMedico && isCurrentPlanView ? `<button type="button" class="btn primary hc275NewRxButton" id="btnToggleNewPrescription">${showRxPanel ? "Cerrar panel" : "+ Nueva prescripción"}</button>` : ``}
+          <div class="presDailyClock">Plan activo: ${escHTML(activePlanDate)} (06 a 04 h) • Ahora: ${escHTML(dmyhmFromISODateTime(isoNowLocalFull()) || isoNowLocalFull())}</div>
+        </div>
+        <div class="presDailyActions">
+          <div class="field presDailyDate">
+            <label>Ver fecha</label>
+            <input id="prScheduleDate" type="date" max="${escHTML(activePlanDate)}" value="${escHTML(selectedPrescriptionDate)}">
+          </div>
+          ${!isCurrentPlanView ? `<button type="button" class="btn small primary" id="btnPrToday">Hoy</button>` : ``}
+          ${(isMedico || isEnfermero || isFarmaceutico) ? `<button type="button" class="btn small" id="btnPrServiceView">Vista servicio</button>` : ``}
+        </div>
+      </div>
+      ${!isCurrentPlanView ? `<div class="presHistoryBanner">Historial: ${escHTML(selectedPrescriptionDate)} • Solo consulta.</div>` : ``}
+    </div>
     ${showRxPanel ? `
       <div class="card prNewRxCompact ${currentDrug ? "prDrugChosen" : "prWaitingDrug"} ${modePending ? "prModePending" : ""}" style="margin-top:6px; padding:5px 7px;">
         <div class="labSectionTitle">
@@ -25127,6 +25228,7 @@ function patientHasPendingNurseAlert(patientId){
         ${currentRequiresScheduledGrid && !currentProgramada ? `
           <div class="card" style="margin-top:10px; padding:8px; border-color:rgba(80,160,255,.30); background:rgba(80,160,255,.07);">
             <div style="font-size:12px; font-weight:900; margin-bottom:8px;">Horario de medicación reglada</div>
+            ${currentProtocol?.enabled && hcMedicationClockTimesValid(currentProtocol.scheduleTimes,currentProtocol.regularidad) ? `<div class="hc275ConfiguredClockHint">Horarios de ${escHTML(currentProtocol.profileName)}: <b>${escHTML(hcMedicationClockTimesForPlan(currentProtocol.scheduleTimes).map(hcMedicationClockLabel).join(" · "))}</b>. El inicio indica desde cuándo se aplica el esquema.</div>` : ``}
             <div class="medGridStartRow medGridStartRowTreatment">
               <div class="field">
                 <label>Inicio</label>
@@ -25422,28 +25524,10 @@ function patientHasPendingNurseAlert(patientId){
       </div>
     ` : ``}
 
-    <div class="card presDailyCompactCard">
-      <div class="presDailyToolbar">
-        <div class="presDailyMain">
-          <div class="presDailyTitle">Prescripciones del día</div>
-          <div class="presDailyClock">Plan activo: ${escHTML(activePlanDate)} (06 a 04 h) • Ahora: ${escHTML(dmyhmFromISODateTime(isoNowLocalFull()) || isoNowLocalFull())}</div>
-        </div>
-        <div style="display:flex; align-items:center; gap:6px;">
-          <div class="field presDailyDate">
-            <label>Ver fecha</label>
-            <input id="prScheduleDate" type="date" max="${escHTML(activePlanDate)}" value="${escHTML(selectedPrescriptionDate)}">
-          </div>
-          ${!isCurrentPlanView ? `<button type="button" class="btn small primary" id="btnPrToday">Hoy</button>` : ``}
-          ${(isMedico || isEnfermero || isFarmaceutico) ? `<button type="button" class="btn small" id="btnPrServiceView">Vista servicio</button>` : ``}
-        </div>
-      </div>
-      ${!isCurrentPlanView ? `<div class="presHistoryBanner">Historial: ${escHTML(selectedPrescriptionDate)} • Solo consulta.</div>` : ``}
-    </div>
-
     ${nurseTasks.length ? `<div class="hcNursePendingStrip" role="status"><b>⚠ Enfermería: ${nurseTasks.length} pendiente${nurseTasks.length === 1 ? "" : "s"}</b>${nurseTasks.slice(0,5).map(task=>`<button type="button" class="btn small" data-pr-action="jump-nurse-task" data-pr-id="${escHTML(task.itemId)}" title="${escHTML(task.name + " · " + task.label)}">${escHTML(task.name)} · ${escHTML(task.label)}</button>`).join("")}</div>` : ``}
 
     <div class="card" style="margin-top:7px;">
-      <div class="labSectionTitle">Infusiones continuas / no continuas / hidratación</div>
+      <div class="labSectionTitle hc275ListHeader">Infusiones continuas / no continuas / hidratación</div>
       ${buildRows(visibleItems.filter(it => !hcIsDeletedPrescriptionItem(it) && !hcIsFreeTextPrescriptionItem(it) && (hcIsHydrationDisplayItem(it) || hcIsIntermittentInfusionItem(it) || !hcIsMedicationOrderItem(it))).sort((a,b)=>Number(b.active !== false)-Number(a.active !== false)), { historicalView: !isCurrentPlanView })}
     </div>
 
@@ -25580,7 +25664,9 @@ function patientHasPendingNurseAlert(patientId){
     root.dataset.prDurationUnit="";
     root.dataset.prTreatmentDays="";
     root.dataset.prEndAt="";
-    root.dataset.prStartAt=isoFromNow();
+    root.dataset.prStartAt=Array.isArray(profile.scheduleTimes) && profile.scheduleTimes.length && hcMedicationClockTimesValid(profile.scheduleTimes,profile.regularidad)
+      ? (hcNextMedicationClockAt(new Date(),profile.scheduleTimes) || isoFromNow())
+      : isoFromNow();
     root.dataset.prStartTouched="1";
     root.dataset.prDrugSearch=pharmacyDrugDisplayName(currentDrug);
     root.dataset.prModeDetails="1";
@@ -26746,10 +26832,13 @@ function patientHasPendingNurseAlert(patientId){
         let vol = ivMode && !isBolo ? Number(String($("#prVolInput")?.value || "").replace(",",".")) : 0;
         const w = Number(String($("#prWeightInput")?.value || "").replace(",","."));
         const nowAtClick = isoNowLocalFull();
+        const selectedScheduleProtocol=root.dataset.prProtocolProfile ? hcGenericProtocolForDrug(drug,root.dataset.prProtocolProfile) : null;
         const manualStartValue = $("#prStartAtInput")?.value || root.dataset.prStartAt || "";
         const startAtInput = manualStartValue && (root.dataset.prStartTouched === "1" || !!root.dataset.prEditingId)
           ? manualStartValue
-          : nowAtClick;
+          : (selectedScheduleProtocol?.enabled && hcMedicationClockTimesValid(selectedScheduleProtocol.scheduleTimes,selectedScheduleProtocol.regularidad)
+              ? (hcNextMedicationClockAt(new Date(),selectedScheduleProtocol.scheduleTimes) || nowAtClick)
+              : nowAtClick);
         const durationUnitInput = $("#prDurationUnitSel")?.value || root.dataset.prDurationUnit || ($("#prHoursInput") ? "hours" : "days");
         const treatmentDaysInput = durationUnitInput === "days" ? ($("#prTreatmentDaysInput")?.value || root.dataset.prTreatmentDays || "") : "";
         const treatmentHoursInput = isContinua
@@ -26924,6 +27013,11 @@ function patientHasPendingNurseAlert(patientId){
         const editingId = root.dataset.prEditingId || "";
         const editingIdx = editingId ? cl2[pid].prescripciones.infusionesContinuas.findIndex(x => x.id === editingId) : -1;
         const editingPrevious = editingIdx >= 0 ? cl2[pid].prescripciones.infusionesContinuas[editingIdx] : null;
+        const profileClockTimes=Array.isArray(genericProtocolForSave?.scheduleTimes) ? genericProtocolForSave.scheduleTimes : [];
+        if(profileClockTimes.length && !hcMedicationClockTimesValid(profileClockTimes,regularidadFinal)) return alert("El protocolo tiene horarios fijos para otra regularidad. Elegí la regularidad configurada o corregí el protocolo antes de guardar.");
+        const previousClockTimes=editingPrevious?.genericProtocolProfileId===genericProtocolForSave?.profileId && editingPrevious?.regularidad===regularidadFinal && hcMedicationClockTimesValid(editingPrevious.scheduleTimes,regularidadFinal)
+          ? editingPrevious.scheduleTimes : [];
+        const scheduleTimesForSave=previousClockTimes.length ? hcMedicationClockTimes(previousClockTimes) : hcMedicationClockTimes(profileClockTimes);
 
         const gridScheduleStartAt = (isBolo || !ivMode || isProgramada)
           ? startAtInput
@@ -26940,6 +27034,7 @@ function patientHasPendingNurseAlert(patientId){
           type: isBolo ? "bolo_ev" : (ivMode ? (isContinua ? "infusion_continua" : "infusion_no_continua") : "medicacion"),
           via,
           regularidad: regularidadFinal,
+          scheduleTimes: scheduleTimesForSave,
           regularidadLabel: regularidadLabelFinal,
           administrationMode: ivMode ? evMode : "",
           bolo: isBolo,
@@ -27384,6 +27479,8 @@ function patientHasPendingNurseAlert(patientId){
       root.dataset.prWeight = item.weightKg ? formatDoseValue(item.weightKg) : (autoWeight ? formatDoseValue(autoWeight) : "");
       root.dataset.prObs = item.observations || item.obs || "";
       root.dataset.prVia = item.via || normalizePrescriptionRoute(drug, pres, "");
+      root.dataset.prProtocolProfile = item.genericProtocolProfileId || "";
+      root.dataset.prProtocolApplied = "";
       root.dataset.prRegularidad = item.regularidad || "dosis_unica";
       root.dataset.prDurationUnit = item.durationUnit || (item.treatmentHours || item.amiodaroneHours ? "hours" : "days");
       root.dataset.prTreatmentDays = item.treatmentDays || (root.dataset.prDurationUnit === "days" ? hcTreatmentDaysBetween(scheduleAt, item.medicationScheduleEndAt || item.scheduleEndAt || "") : "");
@@ -47137,7 +47234,10 @@ function hcV260ScheduleHTML(item,slots,opts={}){
   // Include the complete daily clock pattern even on a partial initial/final day.
   // Preview clocks never create or enable an administration outside the prescribed plan.
   const times=new Map(real.map(s=>[String(s.at).slice(11,16),s]));
-  if(interval && interval<=24 && 24%interval===0){
+  const fixedTimes=hcMedicationClockTimesValid(item.scheduleTimes,item.regularidad) ? hcMedicationClockTimes(item.scheduleTimes) : [];
+  if(fixedTimes.length){
+    for(const time of fixedTimes) if(!times.has(time)) times.set(time,{time,preview:true});
+  }else if(interval && interval<=24 && 24%interval===0){
     const anchor=new Date(hcMedicationFirstDoseAt(item));
     if(!isNaN(anchor.getTime())){
       for(let h=0;h<24;h+=interval){
@@ -47147,14 +47247,16 @@ function hcV260ScheduleHTML(item,slots,opts={}){
       }
     }
   }
-  return [...times.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([time,slot])=>{
-    if(slot.preview)return `<span class="hc260Dose preview" title="Horario habitual fuera del inicio/final del plan seleccionado; no habilitado para registrar"><b>${esc(time)}</b><span>—</span></span>`;
+  const operationalMinute=time=>{const hour=Number(time.slice(0,2));return (hour<6?hour+24:hour)*60+Number(time.slice(3,5));};
+  return [...times.entries()].sort((a,b)=>operationalMinute(a[0])-operationalMinute(b[0])).map(([time,slot])=>{
+    const displayTime=time==="00:00" ? "24:00" : time;
+    if(slot.preview)return `<span class="hc260Dose preview" title="Horario habitual fuera del inicio/final del plan seleccionado; no habilitado para registrar"><b>${esc(displayTime)}</b><span>—</span></span>`;
     const rec=hcAdministrationRecordForSlot(item,slot.key),attrs=`data-pr-id="${esc(item.id)}" data-slot-key="${esc(slot.key)}" data-slot-at="${esc(slot.at)}"`;
     const title=`${dmyhmFromISODateTime(slot.at) || slot.at}`;
-    if(rec){const obs=rec.notAdministered||rec.status==='observacion';return `<span class="hc260Dose ${obs?'observed':'done'}"><b title="${esc(title)}">${esc(time)}</b><button class="btn small" type="button" data-pr-action="view-dose-record" ${attrs} title="${esc(rec.observation || rec.obs || rec.byName || 'Ver registro')}">${obs?'Observación':'✓ OK'}</button></span>`;}
+    if(rec){const obs=rec.notAdministered||rec.status==='observacion';return `<span class="hc260Dose ${obs?'observed':'done'}"><b title="${esc(title)}">${esc(displayTime)}</b><button class="btn small" type="button" data-pr-action="view-dose-record" ${attrs} title="${esc(rec.observation || rec.obs || rec.byName || 'Ver registro')}">${obs?'Observación':'✓ OK'}</button></span>`;}
     const enabled=opts.nurse&&!opts.pendingAck&&hcMedicationSlotNeedsAlert(item,slot,opts.now||new Date());
     const reason=opts.pendingAck?'Primero marcar Visto':new Date(slot.at)>(opts.now||new Date())?'Se habilita al llegar el horario':'Solo Enfermería; dentro de las últimas 24 h';
-    return `<span class="hc260Dose"><b title="${esc(title)}">${esc(time)}</b>${opts.nurse?`<label title="${esc(enabled?'Confirmar administración':reason)}"><input type="checkbox" data-pr-action="dose-administered" ${attrs} ${enabled?'':'disabled'}>OK</label><button class="btn small" type="button" data-pr-action="dose-observation" ${attrs} ${enabled?'':'disabled'} title="${esc(enabled?'Registrar observación / no administrado':reason)}">Observación</button>`:`<span title="${esc(reason)}">□</span>`}</span>`;
+    return `<span class="hc260Dose ${enabled?'hc275DoseAlert':''}"><b title="${esc(title)}">${esc(displayTime)}</b>${opts.nurse?`<label title="${esc(enabled?'Confirmar administración':reason)}"><input type="checkbox" data-pr-action="dose-administered" ${attrs} ${enabled?'':'disabled'}>OK</label><button class="btn small" type="button" data-pr-action="dose-observation" ${attrs} ${enabled?'':'disabled'} title="${esc(enabled?'Registrar observación / no administrado':reason)}">Observación</button>`:`<span title="${esc(reason)}">□</span>`}</span>`;
   }).join('');
 }
 function hcV260InvasionConsumptionRows(cl,patients,start,end,patientIds=null){
@@ -48166,10 +48268,43 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v274';
-  document.title='Hospitalito v274 · Prescripciones, Hemoterapia y acceso · Supabase';
+  window.HC_DEMO_VERSION='v275';
+  document.title='Hospitalito v275 · Prescripciones y horarios configurables · Supabase';
 })();
 
 </script>
+<style id="hc275PrescriptionPolish">
+#medPres .presDailyCompactCard{margin-top:1px!important;padding:5px 8px!important;border-radius:9px!important}
+#medPres .presDailyToolbar{min-height:36px!important;gap:8px!important;align-items:center!important}
+#medPres .presDailyMain{min-height:32px!important;gap:9px!important}
+#medPres .presDailyActions{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#medPres .presDailyTitle{font-size:14px!important}
+#medPres #btnToggleNewPrescription{font-size:15px!important;font-weight:1000!important;padding:7px 13px!important;border:2px solid #9de7ff!important;background:#075b98!important;color:#fff!important;border-radius:8px!important;box-shadow:0 2px 10px rgba(30,167,235,.38)!important;white-space:nowrap}
+#medPres #btnToggleNewPrescription:hover{background:#0877bf!important}
+#medPres .prNewRxCompact{padding:10px!important;margin:5px 0!important}
+#medPres .freeTextRxBox{margin:5px 0!important}
+#medPres .hc275ListHeader,#medPres .hc274MedicationHeaders{background:#0d647f!important;color:#fff!important;border:1px solid #5ad1ef!important;border-radius:7px!important;padding:7px 11px!important;font-size:14px!important;font-weight:1000!important;line-height:1.2!important;margin:0 0 4px!important;box-shadow:inset 4px 0 0 #9be7f7!important}
+#medPres .hc274MedicationHeaders>span:not(:first-child){border-left:2px solid #97e7f6!important}
+#medPres .hcRxModeChoice{background:#124d76!important;border:1px solid #62bce9!important}
+#medPres .hcRxModeChoice [data-pr-quick-profile],#medPres .hcRxModeChoice [data-pr-quick-built-in]{background:#126bab!important;border:2px solid #8ed8ff!important;color:#fff!important;font-size:13px!important;font-weight:1000!important;box-shadow:0 2px 7px rgba(18,113,180,.32)!important}
+#medPres .hcRxModeChoice [data-pr-quick-profile]:hover,#medPres .hcRxModeChoice [data-pr-quick-built-in]:hover{background:#1685c9!important}
+#medPres .hcRxModeChoice small{color:#d8f4ff!important;font-size:11px!important}
+#medPres .hcRxMedicationItem{padding:3px 6px!important;margin:3px 0!important;min-height:46px!important;background:#12385e!important}
+#medPres .hcRxMedicationGrid>.hcRxMedicationVia,#medPres .hcRxMedicationGrid>.hcRxMedicationSchedule,#medPres .hcRxMedicationGrid>.hcRxMedicationControls{padding:3px 8px!important;min-height:38px!important}
+#medPres .hcRxMedicationItem .hcRxCompactDrug{font-size:15px!important;line-height:1.15!important}
+#medPres .hcRxMedicationItem .hc260PlanDate{font-size:10px!important}
+#medPres .hcRxMedicationItem .hc260Dose{font-size:13px!important;padding:3px 5px!important}
+#medPres .hcRxMedicationItem .hc260Dose>b{font-size:14px!important}
+#medPres .hcRxMedicationItem .hcRxMedicationSchedule{gap:6px!important}
+#medPres .hc275MedicationNameAlert,#medPres .hc275DoseAlert{display:inline-flex;align-items:center;background:#a7470a!important;border:2px solid #ffb454!important;border-radius:6px;color:#fff!important;box-shadow:0 0 12px rgba(255,155,44,.48)!important;animation:hcV210NursePulse .9s ease-in-out infinite!important}
+#medPres .hc275MedicationNameAlert{padding:3px 6px!important}
+#medPres .hc275DoseAlert{padding:3px 5px!important}
+#medPres .hc275DoseAlert *{color:#fff!important}
+#medPres .hc275NutritionTitle{font-size:16px!important;line-height:1.25!important;color:#b4edff!important}
+#medPres .freeTextRxItem:has(.hc275NutritionTitle) .freeTextRxText{font-size:13px!important;line-height:1.35!important}
+#medPres .hc275ConfiguredClockHint{padding:6px 8px;margin:0 0 8px;border:1px solid #71cbe9;border-radius:7px;background:#124d70;color:#ecfaff;font-size:12px}
+#medPanel .medModuleTabs .tab.active:not(.hcNurseTabAlert):not(.hcImageTabAlert),body[data-hc-theme] #medPanel .medModuleTabs .tab.active:not(.hcNurseTabAlert):not(.hcImageTabAlert){background:#0879af!important;border:2px solid #91e3ff!important;color:#fff!important;box-shadow:0 0 0 2px rgba(145,227,255,.32) inset,0 2px 10px rgba(20,166,221,.34)!important}
+@media(max-width:700px){#medPres .presDailyMain{width:100%}#medPres .presDailyClock{white-space:normal!important}#medPres .hcRxMedicationItem .hcRxCompactDrug{white-space:normal!important}#medPres .hcRxMedicationGrid>.hcRxMedicationSchedule,#medPres .hcRxMedicationGrid>.hcRxMedicationControls{min-height:0!important}}
+</style>
 </body>
 </html>
