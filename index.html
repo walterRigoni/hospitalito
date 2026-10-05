@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v276 · Sincronización clínica · Supabase</title>
+<title>Hospitalito v277 · Sincronización clínica · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42066,7 +42066,7 @@ bootWithBackend();
 "use strict";
 
 const HC207_VERSION=230;
-const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-sync";
+const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-sync?forceFunctionRegion=eu-central-1";
 const HC207_PUBLISHABLE="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
 const HC207_BUCKETS=["beds","registry","patients","clinical","inst","archive","activity","chats","pharmacyDrugs","appointments","doctorSchedules"];
 
@@ -42688,7 +42688,7 @@ try{window.hc229WarmActiveClinical=hc229WarmActiveClinical;}catch(_){ }
    del servidor. Esto recupera Signos vitales, Balances, Invasiones y otros módulos
    aunque una versión anterior hubiera avanzado el cursor sync_seq sin aplicarlos.
    No mueve el cursor global: sólo revalida el paciente visible. */
-const HC221_PATIENT_SYNC_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-patient-sync";
+const HC221_PATIENT_SYNC_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-patient-sync?forceFunctionRegion=eu-central-1";
 const HC221_CORE_CLINICAL_FIELDS=[
   "ingresoFull","ingresosPrev","evolucionesFull","prescripciones",
   "signosVitales","balances","balanceDetalles","invasiones",
@@ -45595,7 +45595,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
   /* v230: función de voz retirada. Se conserva únicamente carga manual. */
 
   /* ==================== Preferencia de tema entre dispositivos ==================== */
-  const PREF_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-preferences";
+  const PREF_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-preferences?forceFunctionRegion=eu-central-1";
   const PUB_KEY="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
   const themeOut=k=>k==="blue-dark"?"navy":k;
   const themeIn=k=>k==="navy"?"blue-dark":k;
@@ -45808,9 +45808,9 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
   if(window.__hcV230Installed)return;window.__hcV230Installed=true;
   window.HC_DEMO_VERSION="v231";
 
-  const AUTH_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth";
-  const LOGIN_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login";
-  const SEED_BIND_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-seed-bind";
+  const AUTH_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth?forceFunctionRegion=eu-central-1";
+  const LOGIN_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login?forceFunctionRegion=eu-central-1";
+  const SEED_BIND_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-seed-bind?forceFunctionRegion=eu-central-1";
   const PUB_KEY="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
   let authReadyPromise=null;
 
@@ -45822,10 +45822,10 @@ body[data-hc-theme="light"] #labModalContent :where(input[type="text"],input[typ
       const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json","apikey":PUB_KEY},body:JSON.stringify({action,...(payload||{})}),cache:"no-store",signal:ctl.signal});
       const text=await r.text();let j={};
       try{j=text?JSON.parse(text):{};}catch(_){const e=new Error("Supabase devolvió una respuesta de autenticación inválida.");e.noRetry=true;throw e;}
-      if(!r.ok||!j?.ok){const e=new Error(j?.error||`Supabase HTTP ${r.status}`);e.noRetry=r.status<500;throw e;}
+      if(!r.ok||!j?.ok){const e=new Error(j?.error||`Supabase HTTP ${r.status}`);e.noRetry=r.status<500&&!/PGRST002|schema cache|statement timeout|Could not query the database/i.test(String(j?.error||""));throw e;}
       return j;
     }catch(e){
-      if(timedOut||e?.name==="AbortError"||e?.name==="TimeoutError"){const x=new Error("Supabase tardó demasiado en responder. Hospitalito volverá a intentar sin perder tus datos locales.");x.timeout=true;throw x;}
+      if(timedOut||e?.name==="AbortError"||e?.name==="TimeoutError"){const x=new Error("Supabase tardó demasiado en responder. Esperá unos segundos y volvé a intentar. Tus datos locales siguen guardados.");x.timeout=true;throw x;}
       throw e;
     }finally{clearTimeout(timer);}
   }
@@ -46122,7 +46122,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   'use strict';
   window.HC_DEMO_VERSION='v231';
   const $=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth',KEY='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
+  const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth?forceFunctionRegion=eu-central-1',KEY='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
   const token=()=>String(localStorage.getItem(LS.globalAuthToken)||session?.globalToken||'');
   const inst=()=>String(localStorage.getItem(LS.globalAuthCurrentInstitution)||session?.institutionId||'');
   async function req(action,payload={}){if(window.hc230AuthRequest)return await window.hc230AuthRequest(action,payload);const r=await fetch(AUTH,{method:'POST',headers:{'Content-Type':'application/json','apikey':KEY},body:JSON.stringify({action,...payload}),cache:'no-store'}),j=await r.json();if(!r.ok||!j?.ok)throw Error(j?.error||'Error Supabase');return j;}
@@ -46291,7 +46291,7 @@ body.hcSeedTool #btnAccount{display:none!important}body.hcSeedTool #hcSettingsNa
 'use strict';
 if(window.__hcV232Installed)return;window.__hcV232Installed=true;window.HC_DEMO_VERSION='v232';
 const $=s=>document.querySelector(s), KEY='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
-const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth',COLLAB='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-collab',CALL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-call',PLATFORM='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-platform';
+const AUTH='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-auth?forceFunctionRegion=eu-central-1',COLLAB='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-collab?forceFunctionRegion=eu-central-1',CALL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-call?forceFunctionRegion=eu-central-1',PLATFORM='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-platform?forceFunctionRegion=eu-central-1';
 const esc=s=>typeof escHTML==='function'?escHTML(String(s??'')):String(s??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
 const token=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminToken):localStorage.getItem(LS.globalAuthToken))||session?.globalToken||'');
 const inst=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminInstitutionId):localStorage.getItem(LS.globalAuthCurrentInstitution))||session?.institutionId||'');
@@ -46656,7 +46656,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   'use strict';
   window.HC_DEMO_VERSION='v249';
   try{document.title='HC Demo v249 · Supabase';}catch(_){ }
-  const LOGIN_URL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login';
+  const LOGIN_URL='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-login?forceFunctionRegion=eu-central-1';
   const PUB='sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol';
   async function quickLogin(username,password){
     let last=null;
@@ -46672,7 +46672,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
         return j;
       }catch(e){
         last=e;
-        const retryable=/AbortError|TimeoutError/i.test(String(e?.name||'')) || /aborted|abort|failed to fetch|networkerror/i.test(String(e?.message||'')) || [429,500,502,503,504].includes(Number(e?.status));
+        const retryable=/AbortError|TimeoutError/i.test(String(e?.name||'')) || /aborted|abort|failed to fetch|networkerror|PGRST002|schema cache|statement timeout|Could not query the database/i.test(String(e?.message||'')) || [429,500,502,503,504].includes(Number(e?.status));
         if(!retryable)throw e;
         if(attempt<2)await new Promise(resolve=>setTimeout(resolve,600*(attempt+1)));
       }
@@ -48298,8 +48298,8 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v276';
-  document.title='Hospitalito v276 · Sincronización clínica · Supabase';
+  window.HC_DEMO_VERSION='v277';
+  document.title='Hospitalito v277 · Sincronización clínica · Supabase';
 })();
 
 </script>
