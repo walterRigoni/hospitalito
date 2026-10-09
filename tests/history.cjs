@@ -141,7 +141,8 @@ async function integration(){
   run('hc270CheckScope()');assert.equal(json('hc270State.sources.size'),0);assert.equal(el('medHistoria').innerHTML,'');
   console.log('PASS search/read-only view, permission bootstrap, distinct auth/data IDs, full targeted read and session isolation');
 }
-assert.match(html,/const CURRENT_VERSION = 270;/,'update detector must compare against the delivered version');
+const deliveredVersion=Number(html.match(/<title>Hospitalito v(\d+)/)[1]);
+assert.equal(Number(html.match(/const CURRENT_VERSION = (\d+);/)[1]),deliveredVersion,'update detector must compare against the delivered version');
 assert.equal((html.match(/id="hc-v270-history"/g)||[]).length,1);
 assert.match(html,/show\("#medHistoria", medTab==="historia"\)/);
 integration().catch(e=>{console.error(e);process.exitCode=1;});
