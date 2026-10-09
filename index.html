@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v277 · Sincronización clínica · Supabase</title>
+<title>Hospitalito v278 · Sincronización clínica · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42373,7 +42373,7 @@ function hc224SelectedPid(){
   catch(_){return "";}
 }
 function hc224WarmClinicalFields(){
-  const fields=new Set(["prescripciones","ingresoFull","ingresosPrev","signosVitales","balances","balanceDetalles"]);
+  const fields=new Set(["prescripciones","ingresoFull","ingresosPrev","clinicalMedia","signosVitales","balances","balanceDetalles"]);
   try{
     const role=String((typeof getCurrentUser==="function"?getCurrentUser()?.role:"")||"");
     if(role==="imagenologo"){fields.add("imageRequests");fields.add("imageResults");}
@@ -42690,7 +42690,7 @@ try{window.hc229WarmActiveClinical=hc229WarmActiveClinical;}catch(_){ }
    No mueve el cursor global: sólo revalida el paciente visible. */
 const HC221_PATIENT_SYNC_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-patient-sync?forceFunctionRegion=eu-central-1";
 const HC221_CORE_CLINICAL_FIELDS=[
-  "ingresoFull","ingresosPrev","evolucionesFull","prescripciones",
+  "ingresoFull","ingresosPrev","evolucionesFull","clinicalMedia","prescripciones",
   "signosVitales","balances","balanceDetalles","invasiones",
   "nursingReports","surgicalSheets","monitoringRecords",
   "labRequests","labResults","microRequests","microResults",
@@ -45495,7 +45495,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
     admin:["Administración","Admisión","Contabilidad","Guardia / Recepción","Consultorios"],
     administrativo:["Administración","Admisión","Contabilidad","Guardia / Recepción","Consultorios"]
   };
-  const DUTY=[{id:"guardia_activa",label:"Guardia activa"},{id:"guardia_pasiva",label:"Guardia pasiva"},{id:"seguimiento",label:"Seguimiento"}];
+  const DUTY=[{id:"guardia_activa",label:"Guardia activa"},{id:"guardia_pasiva",label:"Guardia pasiva"},{id:"interconsulta",label:"Disponible para interconsulta"},{id:"seguimiento",label:"Seguimiento"}];
   let shiftRequired=false,shiftOpen=false,promptTimer=null,promptWaitCount=0;
   function shiftId(date=localDate()){return `workshift:${dataInstitution()||"local"}:${userName()}:${date}`;}
   function todayShift(){const id=shiftId();return activity().find(x=>String(x?.id||"")===id||(
@@ -47112,7 +47112,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 270;
+  const CURRENT_VERSION = 278;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -48298,8 +48298,8 @@ document.title="Hospitalito v271 · Supabase";
   window.renderEpicrisisUI=renderEpicrisisV272;
   const priorRenderMed=window.renderMed;
   window.renderMed=function(){const result=priorRenderMed.apply(this,arguments);const panel=document.getElementById('medConsent');if(panel){panel.style.display=medTab==='consentimientos'?'':'none';if(medTab==='consentimientos'){document.getElementById('medPanelTitle').textContent='Consentimientos';renderConsentimientos();}}return result;};
-  window.HC_DEMO_VERSION='v277';
-  document.title='Hospitalito v277 · Sincronización clínica · Supabase';
+  window.HC_DEMO_VERSION="v278";
+  document.title='Hospitalito v278 · Sincronización clínica · Supabase';
 })();
 
 </script>
@@ -48336,5 +48336,285 @@ document.title="Hospitalito v271 · Supabase";
 #medPanel .medModuleTabs .tab.active:not(.hcNurseTabAlert):not(.hcImageTabAlert),body[data-hc-theme] #medPanel .medModuleTabs .tab.active:not(.hcNurseTabAlert):not(.hcImageTabAlert){background:#0879af!important;border:2px solid #91e3ff!important;color:#fff!important;box-shadow:0 0 0 2px rgba(145,227,255,.32) inset,0 2px 10px rgba(20,166,221,.34)!important}
 @media(max-width:700px){#medPres .presDailyMain{width:100%}#medPres .presDailyClock{white-space:normal!important}#medPres .hcRxMedicationItem .hcRxCompactDrug{white-space:normal!important}#medPres .hcRxMedicationGrid>.hcRxMedicationSchedule,#medPres .hcRxMedicationGrid>.hcRxMedicationControls{min-height:0!important}}
 </style>
+
+<style id="hc-v278-style">
+.hc278MediaPicker{margin-top:12px;padding:10px;border:1px solid var(--hc230-line,rgba(255,255,255,.16));border-radius:12px;background:var(--hc230-surface,rgba(255,255,255,.04))}
+.hc278MediaTitle{font-weight:900;margin-bottom:3px}.hc278MediaHelp,.hc278MediaInfo{font-size:11px;opacity:.75;margin-bottom:7px}.hc278MediaError{font-size:11px;color:#fca5a5;margin:6px 0}
+.hc278MediaStrip,.hc278SavedGallery{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.hc278MediaThumb,.hc278SavedImage{position:relative;width:112px;border:1px solid rgba(255,255,255,.18);border-radius:10px;background:rgba(255,255,255,.05);padding:5px;color:inherit;text-align:left}
+.hc278MediaThumb img,.hc278SavedImage img{display:block;width:100%;height:78px;object-fit:cover;border-radius:7px;background:#000}.hc278MediaThumb span,.hc278SavedImage span{display:block;font-size:10px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hc278MediaThumb button{position:absolute;right:1px;top:1px;width:24px;height:24px;border-radius:50%;border:0;background:#991b1b;color:#fff;font-weight:900}.hc278MediaView{margin-top:10px}
+#hc278ImageOverlay{position:fixed;inset:0;z-index:16000;display:none;place-items:center;background:rgba(0,0,0,.88);padding:12px}#hc278ImageOverlay.show{display:grid}.hc278ImageCard{width:min(96vw,1100px);height:min(94vh,900px);display:flex;flex-direction:column;gap:8px}.hc278ImageCard img{min-height:0;flex:1;width:100%;object-fit:contain;background:#000}.hc278ImageCaption{color:#fff;font-weight:800}
+#hc278ProfessionalsModal{position:fixed;inset:0;z-index:15000;display:none;place-items:center;background:rgba(3,12,25,.78);padding:14px}#hc278ProfessionalsModal.show{display:grid}.hc278ProfCard{width:min(760px,96vw);max-height:90vh;overflow:auto;background:var(--hc230-surface,#10263f);color:var(--hc230-text,#fff);border:1px solid var(--hc230-line,rgba(255,255,255,.16));border-radius:18px;padding:14px}
+.hc278ProfHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.hc278ProfHead h2{margin:0 0 3px}.hc278ProfHead>div>div{font-size:12px;opacity:.75}.hc278ProfLegend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;margin:12px 0}.hc278ProfLegend span{display:flex;align-items:center;gap:5px}.hc278ProfLegend i,.hc278ProfDot{width:11px;height:11px;border-radius:50%;display:inline-block;flex:0 0 11px}.active{--hc278:#22c55e}.passive{--hc278:#3b82f6}.consult{--hc278:#eab308}.follow{--hc278:#94a3b8}.hc278ProfLegend i,.hc278ProfDot{background:var(--hc278)}
+.hc278ProfGroup{margin-top:12px}.hc278ProfGroup h3{margin:0 0 6px;font-size:14px}.hc278ProfRow{display:flex;align-items:center;gap:9px;padding:9px 7px;border-top:1px solid var(--hc230-line,rgba(255,255,255,.12))}.hc278ProfMain{display:flex;flex-direction:column;min-width:0;flex:1}.hc278ProfMain span{font-size:11px;opacity:.72;white-space:normal}.hc278ProfStatus{font-size:10px;font-weight:900;border:1px solid var(--hc278);color:var(--hc278);padding:3px 7px;border-radius:999px}.hc278ProfEmpty{padding:24px;text-align:center;opacity:.72}
+@media(max-width:620px){.hc278ProfStatus{max-width:92px;text-align:center}.hc278MediaThumb,.hc278SavedImage{width:96px}.hc278MediaThumb img,.hc278SavedImage img{height:68px}}
+</style>
+<script id="hc-v278-patch">
+
+(function(){
+"use strict";
+if(window.__hcV278Installed)return;
+window.__hcV278Installed=true;
+
+/* =========================
+   v278 · sincronización rápida
+   ========================= */
+try{
+  /* En v277 el envío local ya era inmediato (25–35 ms). Para que otra PC lo
+     reciba antes, acortamos sólo el sondeo visible. Cuando la app queda oculta
+     baja automáticamente la frecuencia. */
+  if(typeof hc215NextDelay==="function"){
+    hc215NextDelay=function(){
+      if(document.hidden)return 3000;
+      return Date.now()<hc214HotUntil?650:2500;
+    };
+  }
+}catch(e){console.warn("v278 sync cadence",e);}
+
+/* No permitir que una dosis de un plan clínico anterior active la alarma de hoy.
+   La hora 24:00 se representa como 00:00 del día siguiente, pero pertenece al
+   mismo plan 06:00–05:59 y seguirá alertando recién cuando realmente llegue. */
+try{
+  if(typeof hcMedicationSlotNeedsAlert==="function"&&!hcMedicationSlotNeedsAlert.__hc278){
+    const base=hcMedicationSlotNeedsAlert;
+    const wrapped=function(item,slot,now=new Date()){
+      try{
+        const slotPlan=hcMedicationOperationalDateKey(slot?.at||"");
+        const currentPlan=hcMedicationOperationalDateKey(now);
+        if(slotPlan&&currentPlan&&slotPlan!==currentPlan)return false;
+      }catch(_){}
+      return base(item,slot,now);
+    };
+    wrapped.__hc278=true;
+    hcMedicationSlotNeedsAlert=wrapped;
+  }
+}catch(e){console.warn("v278 horario medicación",e);}
+
+/* =========================
+   v278 · imágenes clínicas
+   ========================= */
+window.__hcV278PendingMedia=window.__hcV278PendingMedia||new Map();
+function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function key(pid,kind){return String(pid||"")+"|"+String(kind||"");}
+function pending(pid,kind){
+  const k=key(pid,kind);
+  if(!window.__hcV278PendingMedia.has(k))window.__hcV278PendingMedia.set(k,{items:[],loading:false,error:""});
+  return window.__hcV278PendingMedia.get(k);
+}
+function clearPending(pid,kind){window.__hcV278PendingMedia.delete(key(pid,kind));}
+function dataUrlFromFile(file){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result||""));r.onerror=()=>reject(r.error||new Error("No se pudo leer la imagen"));r.readAsDataURL(file);});}
+async function compressImage(file){
+  const src=await dataUrlFromFile(file);
+  if(file.size<=180000)return {dataUrl:src,width:0,height:0,compressed:false};
+  return await new Promise(resolve=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const maxSide=1600,ratio=Math.min(1,maxSide/Math.max(img.naturalWidth||1,img.naturalHeight||1));
+        const w=Math.max(1,Math.round((img.naturalWidth||1)*ratio)),h=Math.max(1,Math.round((img.naturalHeight||1)*ratio));
+        const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+        const ctx=cv.getContext("2d",{alpha:false});ctx.fillStyle="#fff";ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,w,h);
+        let q=.78,ds=cv.toDataURL("image/jpeg",q);
+        while(ds.length>650000&&q>.5){q-=.08;ds=cv.toDataURL("image/jpeg",q);}
+        resolve({dataUrl:ds,width:w,height:h,compressed:true});
+      }catch(_){resolve({dataUrl:src,width:0,height:0,compressed:false});}
+    };
+    img.onerror=()=>resolve({dataUrl:src,width:0,height:0,compressed:false});
+    img.src=src;
+  });
+}
+async function loadSelectedImages(input,pid,kind){
+  const st=pending(pid,kind);st.loading=true;st.error="";renderPending(pid,kind);
+  try{
+    const files=Array.from(input?.files||[]).filter(f=>String(f.type||"").startsWith("image/")).slice(0,4);
+    const out=[];let total=0;
+    for(const file of files){
+      const img=await compressImage(file);
+      if(img.dataUrl.length>850000){st.error=(st.error?st.error+" ":"")+file.name+" quedó demasiado grande y no se agregó.";continue;}
+      if(total+img.dataUrl.length>2000000){st.error=(st.error?st.error+" ":"")+"Se alcanzó el límite de 2 MB por nota.";break;}
+      total+=img.dataUrl.length;
+      out.push({name:file.name||"Imagen",type:file.type||"image/jpeg",size:file.size||0,dataUrl:img.dataUrl,width:img.width,height:img.height,compressed:img.compressed});
+    }
+    st.items=out;
+    if(!out.length&&!st.error)st.error="No se seleccionaron imágenes válidas.";
+  }catch(e){st.error=e?.message||String(e);}
+  finally{st.loading=false;renderPending(pid,kind);}
+}
+function renderPending(pid,kind){
+  const box=document.querySelector('[data-hc278-pending="'+kind+'"]');if(!box)return;
+  const st=pending(pid,kind);
+  box.innerHTML=(st.loading?'<div class="hc278MediaInfo">Procesando imágenes…</div>':"")+
+    (st.error?'<div class="hc278MediaError">'+esc(st.error)+'</div>':"")+
+    (st.items.length?'<div class="hc278MediaStrip">'+st.items.map((x,i)=>'<div class="hc278MediaThumb"><img src="'+esc(x.dataUrl)+'" alt=""><span>'+esc(x.name)+'</span><button type="button" data-hc278-remove="'+i+'" data-kind="'+kind+'">×</button></div>').join("")+'</div>':'');
+}
+function mediaForRecord(pid,rec){
+  const cur=getClinical?.()?.[pid]||{},all=Array.isArray(cur.clinicalMedia)?cur.clinicalMedia:[],ids=new Set(Array.isArray(rec?.mediaIds)?rec.mediaIds:[]);
+  return all.filter(x=>ids.has(x.id));
+}
+function galleryHTML(rows){
+  if(!rows.length)return "";
+  return '<div class="hc278SavedGallery">'+rows.map(x=>'<button type="button" class="hc278SavedImage" data-hc278-open="'+esc(x.id)+'"><img src="'+esc(x.dataUrl)+'" alt="'+esc(x.name||"Imagen clínica")+'"><span>'+esc(x.name||"Imagen clínica")+'</span></button>').join("")+'</div>';
+}
+function injectPicker(container,pid,kind,label){
+  if(!container||container.querySelector('[data-hc278-picker="'+kind+'"]'))return;
+  const card=document.createElement("div");
+  card.className="hc278MediaPicker";
+  card.setAttribute("data-hc278-picker",kind);
+  card.innerHTML='<div class="hc278MediaTitle">'+esc(label)+'</div><div class="hc278MediaHelp">Hasta 4 imágenes. Se comprimen antes de sincronizar para no enlentecer las indicaciones.</div><input type="file" accept="image/*" multiple data-hc278-input="'+kind+'"><div data-hc278-pending="'+kind+'"></div>';
+  container.appendChild(card);
+  const input=card.querySelector("input");
+  input.addEventListener("change",()=>loadSelectedImages(input,pid,kind));
+  renderPending(pid,kind);
+}
+function savePendingToRecord(pid,kind,rec){
+  const st=pending(pid,kind);
+  if(st.loading||!st.items.length||!rec)return false;
+  const me=getCurrentUser?.()||session||{},cl=getClinical(),cur=cl[pid]||{},media=Array.isArray(cur.clinicalMedia)?cur.clinicalMedia.slice():[];
+  const ids=Array.isArray(rec.mediaIds)?rec.mediaIds.slice():[];
+  const now=typeof isoNowLocalFull==="function"?isoNowLocalFull():new Date().toISOString();
+  st.items.forEach(item=>{
+    const id=typeof uid==="function"?uid("media"):"media_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+    media.push({id,...item,context:kind,recordId:rec.id||"",createdAt:now,createdBy:me.username||me.id||"",createdByName:me.name||me.username||""});
+    ids.push(id);
+  });
+  rec.mediaIds=Array.from(new Set(ids));cur.clinicalMedia=media;cl[pid]=cur;setClinical(cl);
+  try{window.hc224MarkClinicalFieldDirty?.(pid,"clinicalMedia");}catch(_){}
+  try{hcBackendScheduleUrgentPush?.();}catch(_){}
+  clearPending(pid,kind);
+  return true;
+}
+function decorateIngreso(){
+  const pid=String(selectedPatientId||"");if(!pid)return;
+  const form=document.getElementById("ingresoFormWrap");
+  if(form&&form.style.display!=="none")injectPicker(form,pid,"ingreso","Imágenes del ingreso");
+  const root=document.getElementById("medIngreso"),rec=getClinical?.()?.[pid]?.ingresoFull;
+  if(root&&rec){
+    let box=root.querySelector("#hc278IngresoSavedMedia");
+    if(!box){box=document.createElement("div");box.id="hc278IngresoSavedMedia";box.className="hc278MediaView";const pretty=root.querySelector("#ingresoPrettyWrap");(pretty?.parentElement||root).appendChild(box);}
+    box.innerHTML=galleryHTML(mediaForRecord(pid,rec));
+  }
+}
+function decorateEvo(){
+  const pid=String(selectedPatientId||"");if(!pid)return;
+  const editor=document.getElementById("evoEditorWrap");
+  if(editor&&editor.style.display!=="none"){
+    const target=editor.querySelector("#evoPlantillaWrap")||editor.querySelector("#evoLibreWrap")||editor;
+    injectPicker(target,pid,"evolucion","Imágenes de la evolución");
+  }
+  const viewer=document.getElementById("evoViewer");
+  if(viewer&&viewer.style.display!=="none"){
+    const arr=typeof evoGetList==="function"?evoGetList(pid).arr:[],rec=(typeof openedEvoIndex!=="undefined"&&openedEvoIndex!==null)?arr[openedEvoIndex]:arr[arr.length-1];
+    let box=viewer.querySelector("#hc278EvoSavedMedia");if(!box){box=document.createElement("div");box.id="hc278EvoSavedMedia";viewer.appendChild(box);}
+    box.innerHTML=rec?galleryHTML(mediaForRecord(pid,rec)):"";
+  }
+}
+function scheduleDecorate(){clearTimeout(window.__hcV278DecorateTimer);window.__hcV278DecorateTimer=setTimeout(()=>{try{decorateIngreso();decorateEvo();}catch(e){console.warn("v278 decorar media",e);}},40);}
+try{
+  if(typeof renderIngresoUI==="function"){
+    const base=renderIngresoUI;renderIngresoUI=function(){const r=base.apply(this,arguments);scheduleDecorate();return r;};window.renderIngresoUI=renderIngresoUI;
+  }
+  if(typeof evoRenderEditor==="function"){
+    const base=evoRenderEditor;evoRenderEditor=function(){const r=base.apply(this,arguments);scheduleDecorate();return r;};window.evoRenderEditor=evoRenderEditor;
+  }
+  if(typeof evoRender==="function"){
+    const base=evoRender;evoRender=function(){const r=base.apply(this,arguments);scheduleDecorate();return r;};window.evoRender=evoRender;
+  }
+}catch(e){console.warn("v278 wrappers media",e);}
+document.addEventListener("click",ev=>{
+  const rm=ev.target.closest?.("[data-hc278-remove]");
+  if(rm){
+    const pid=String(selectedPatientId||""),kind=rm.getAttribute("data-kind"),st=pending(pid,kind),i=Number(rm.getAttribute("data-hc278-remove"));
+    if(Number.isInteger(i))st.items.splice(i,1);renderPending(pid,kind);return;
+  }
+  const saveIngreso=ev.target.closest?.("#btnGuardarIngreso,#btnGuardarCambiosIngreso");
+  if(saveIngreso){
+    const pid=String(selectedPatientId||""),st=pending(pid,"ingreso");
+    if(st.loading){ev.preventDefault();ev.stopImmediatePropagation();alert("Esperá un instante: las imágenes todavía se están procesando.");return;}
+    const before=getClinical?.()?.[pid]?.ingresoFull?.updatedAt||"";
+    setTimeout(()=>{const rec=getClinical?.()?.[pid]?.ingresoFull;if(rec&&st.items.length&&(!before||rec.updatedAt!==before)){if(savePendingToRecord(pid,"ingreso",rec)){const cl=getClinical();cl[pid].ingresoFull=rec;setClinical(cl);try{window.hc224MarkClinicalFieldDirty?.(pid,"ingresoFull");}catch(_){}scheduleDecorate();}}},0);
+    return;
+  }
+  const saveEvo=ev.target.closest?.("#btnSaveEvo,#btnSaveEvoFree");
+  if(saveEvo){
+    const pid=String(selectedPatientId||""),st=pending(pid,"evolucion");
+    if(st.loading){ev.preventDefault();ev.stopImmediatePropagation();alert("Esperá un instante: las imágenes todavía se están procesando.");return;}
+    const before=(typeof evoGetList==="function"?evoGetList(pid).arr:[]).map(x=>x?.updatedAt||"").join("|");
+    setTimeout(()=>{
+      const arr=typeof evoGetList==="function"?evoGetList(pid).arr:[],after=arr.map(x=>x?.updatedAt||"").join("|");
+      const rec=(typeof openedEvoIndex!=="undefined"&&openedEvoIndex!==null)?arr[openedEvoIndex]:arr[arr.length-1];
+      if(rec&&st.items.length&&after!==before){
+        if(savePendingToRecord(pid,"evolucion",rec)){const cl=getClinical(),cur=cl[pid]||{};cur.evolucionesFull=arr;cl[pid]=cur;setClinical(cl);try{window.hc224MarkClinicalFieldDirty?.(pid,"evolucionesFull");}catch(_){}scheduleDecorate();}
+      }
+    },0);
+    return;
+  }
+  const open=ev.target.closest?.("[data-hc278-open]");
+  if(open){
+    const pid=String(selectedPatientId||""),id=open.getAttribute("data-hc278-open"),media=(getClinical?.()?.[pid]?.clinicalMedia||[]).find(x=>String(x.id)===String(id));
+    if(media?.dataUrl){const ov=document.getElementById("hc278ImageOverlay");ov.querySelector("img").src=media.dataUrl;ov.querySelector(".hc278ImageCaption").textContent=media.name||"Imagen clínica";ov.classList.add("show");}
+  }
+  if(ev.target.closest?.("#hc278ImageClose")||ev.target?.id==="hc278ImageOverlay")document.getElementById("hc278ImageOverlay")?.classList.remove("show");
+},true);
+
+const obs=new MutationObserver(scheduleDecorate);
+obs.observe(document.body,{childList:true,subtree:true});
+
+/* Visor */
+const overlay=document.createElement("div");overlay.id="hc278ImageOverlay";overlay.innerHTML='<div class="hc278ImageCard"><button type="button" class="btn small" id="hc278ImageClose">Cerrar</button><div class="hc278ImageCaption"></div><img alt="Imagen clínica"></div>';document.body.appendChild(overlay);
+
+/* =========================
+   v278 · Profesionales disponibles
+   ========================= */
+function localNow(){return new Date();}
+function shiftActive(x,now=localNow()){
+  if(x?.kind!=="work_shift")return false;
+  const a=new Date(x.startDateTime||((x.startDate||x.dateLocal||"")+"T"+(x.startTime||"00:00"))),b=new Date(x.endDateTime||((x.endDate||x.dateLocal||"")+"T"+(x.endTime||"23:59")));
+  return Number.isFinite(a.getTime())&&Number.isFinite(b.getTime())&&a<=now&&now<=b;
+}
+function statusMeta(mode){
+  return mode==="guardia_activa"?{label:"Guardia activa",cls:"active"}:
+    mode==="guardia_pasiva"?{label:"Guardia pasiva",cls:"passive"}:
+    mode==="interconsulta"?{label:"Interconsulta",cls:"consult"}:
+    {label:"Seguimiento",cls:"follow"};
+}
+function professionalRows(){
+  const acts=Array.isArray(getActivity?.())?getActivity():[],users=Array.isArray(getUsers?.())?getUsers():[],um=new Map(users.map(u=>[String(u.username||""),u]));
+  return acts.filter(x=>shiftActive(x)).map(x=>{
+    const u=um.get(String(x.user||""))||{},sp=String(u.specialty||u.especialidad||"").trim()||String(x.role||"Profesional");
+    return {...x,displayName:u.name||x.name||x.user||"Profesional",specialty:sp,license:u.licenseNumber||"",status:statusMeta(x.dutyType)};
+  }).sort((a,b)=>a.specialty.localeCompare(b.specialty,"es")||a.displayName.localeCompare(b.displayName,"es"));
+}
+function renderProfessionals(){
+  const body=document.getElementById("hc278ProfessionalsBody");if(!body)return;
+  const rows=professionalRows();
+  if(!rows.length){body.innerHTML='<div class="hc278ProfEmpty">No hay profesionales con jornada activa en este momento.</div>';return;}
+  const groups=new Map();rows.forEach(r=>{if(!groups.has(r.specialty))groups.set(r.specialty,[]);groups.get(r.specialty).push(r);});
+  body.innerHTML=[...groups.entries()].map(([sp,list])=>'<section class="hc278ProfGroup"><h3>'+esc(sp)+'</h3>'+list.map(r=>'<div class="hc278ProfRow"><span class="hc278ProfDot '+r.status.cls+'"></span><div class="hc278ProfMain"><b>'+esc(r.displayName)+'</b><span>'+esc((r.services||[]).join(" · ")||"Sin servicio consignado")+(r.license?' · '+esc(r.license):'')+'</span></div><span class="hc278ProfStatus '+r.status.cls+'">'+esc(r.status.label)+'</span></div>').join("")+'</section>').join("");
+}
+function ensureProfessionals(){
+  if(document.getElementById("hc278ProfessionalsModal"))return;
+  const m=document.createElement("div");m.id="hc278ProfessionalsModal";m.innerHTML='<div class="hc278ProfCard"><div class="hc278ProfHead"><div><h2>Profesionales</h2><div>Guardias y disponibilidad actual por especialidad.</div></div><button type="button" class="btn small" id="hc278ProfessionalsClose">Cerrar</button></div><div class="hc278ProfLegend"><span><i class="active"></i>Guardia activa</span><span><i class="passive"></i>Guardia pasiva</span><span><i class="consult"></i>Interconsulta</span></div><div id="hc278ProfessionalsBody"></div></div>';document.body.appendChild(m);
+  const right=document.querySelector(".topbar>div:last-child");
+  if(right&&!document.getElementById("btnProfessionals")){const b=document.createElement("button");b.id="btnProfessionals";b.type="button";b.className="btn small";b.textContent="Profesionales";right.insertBefore(b,document.getElementById("btnAccount")||document.getElementById("btnLogout")||null);}
+}
+ensureProfessionals();
+function refreshProfButton(){const b=document.getElementById("btnProfessionals");if(b)b.style.display=session&&!session.localSeed&&session.role!=="superadmin"?"inline-flex":"none";}
+document.addEventListener("click",ev=>{
+  if(ev.target.closest?.("#btnProfessionals")){renderProfessionals();document.getElementById("hc278ProfessionalsModal")?.classList.add("show");return;}
+  if(ev.target.closest?.("#hc278ProfessionalsClose")||ev.target?.id==="hc278ProfessionalsModal"){document.getElementById("hc278ProfessionalsModal")?.classList.remove("show");return;}
+},true);
+setInterval(()=>{refreshProfButton();if(document.getElementById("hc278ProfessionalsModal")?.classList.contains("show"))renderProfessionals();},1200);
+refreshProfButton();
+
+/* Forzar sincronización al volver a la app: muy útil en teléfono. */
+window.addEventListener("focus",()=>{try{hc215ScheduleSync?.(25);}catch(_){}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){try{hc215ScheduleSync?.(25);}catch(_){}}});
+
+window.HC_DEMO_VERSION="v278";
+document.title="Hospitalito v278 · Imágenes clínicas, profesionales y sincronización rápida · Supabase";
+console.info("Hospitalito v278 activo.");
+})();
+
+</script>
 </body>
 </html>
