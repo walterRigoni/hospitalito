@@ -1,4 +1,18 @@
-# Sincronización clínica de Hospitalito v281
+# Sincronización clínica de Hospitalito v282
+
+## Avisos médicos restaurados en v282
+
+El subrayado naranja del paciente y de cada módulo se obtiene ahora del cambio clínico recibido, sin esperar la transferencia del historial de actividad. La respuesta incluye el autor verificado, la revisión y la fecha del servidor. También se incluye esta información en la consulta dirigida del paciente. No se agregaron permisos ni tablas.
+
+El médico recibe avisos por acciones de otros usuarios. Abrir un módulo marca ese módulo como revisado para ese médico en ese equipo; una nueva acción vuelve a encenderlo. Otros módulos, pacientes, instituciones y usuarios conservan su estado independiente. El aviso pendiente y las lecturas se conservan al recargar. La autoría en las escrituras se toma de la sesión validada.
+
+Prueba con sesiones aisladas contra el servidor real: una administración de enfermería encendió el aviso del médico en 1537 ms sin entregar actividad clínica. Se verificaron el color naranja, el apagado al abrir, una nueva acción, un resultado de laboratorio, recarga, acciones propias y aislamiento por módulo, paciente, institución y usuario. Las sesiones y datos sintéticos se eliminaron al finalizar. Este tiempo es una medición de prueba, no una garantía para toda conexión.
+
+Desplegar las versiones actualizadas de `hospitalito-care`, `hospitalito-sync` y `hospitalito-patient-sync`; publicar `index.html` y `service-worker.js` de v282. Los clientes v281 pueden seguir enviando datos clínicos y generar avisos en un médico que use v282. La corrección conserva la separación del catálogo introducida en v281.
+
+Pruebas portables: `node tests/doctor-alerts.cjs` y `node tests/clinical-sync.cjs` con Node.js 24.
+
+## Sincronización prioritaria incorporada en v281
 
 Una indicación podía quedar guardada solamente en el equipo mientras el catálogo de medicamentos y otros datos grandes ocupaban la conexión. Además, dos guardados simultáneos podían competir por la misma ficha. Aumentar el plan del servidor por sí solo no corrige esos problemas.
 
