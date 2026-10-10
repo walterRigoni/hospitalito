@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
 
 const TABLE='hc_state',SESS='hc_sync_sessions';
-const DEFAULT_CARE=false;
+const DEFAULT_CARE=true;
 const BULK=['pharmacyDrugs','archive','activity'];
 const ALLOWED=new Set(['beds','registry','patients','clinical','inst','archive','activity','chats','pharmacyDrugs','appointments','doctorSchedules']);
 const SHARED=new Set(['beds','registry','patients','inst','archive','activity','chats','pharmacyDrugs','appointments','doctorSchedules']);
