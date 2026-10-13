@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v284 · Instituciones, licencias y Contabilidad · Supabase</title>
+<title>Hospitalito v285 · Acceso del administrador · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42072,7 +42072,7 @@ bootWithBackend();
 (function(){
 "use strict";
 
-const HC207_VERSION=284;
+const HC207_VERSION=285;
 const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-care?forceFunctionRegion=eu-central-1";
 const HC207_PUBLISHABLE="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
 const HC207_BUCKETS=["beds","registry","patients","clinical","inst","archive","activity","chats","pharmacyDrugs","appointments","doctorSchedules"];
@@ -42111,7 +42111,7 @@ let hc281BulkBusy=false,hc281BulkLast=0,hc281BulkError='',hc281LastAckAt='',hc28
 const hc281BulkRevisions=new Map();
 function hc281CarePending(){return hc207DirtyClinical.size>0||[...hc207DirtyBuckets].some(b=>!HC281_BULK.has(b));}
 window.hc281MarkBulkDirty=function(bucket){if(!HC281_BULK.has(bucket))return;hc207DirtyBuckets.add(bucket);hc214PersistOutbox();setTimeout(()=>hc281BulkSync(),600);};
-window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:284};};
+window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:285};};
 async function hc281BulkRequest(action,payload={},legacy=false){
  const token=await hc207EnsureSession(false),inst=hc207InstitutionId,ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),legacy?90000:25000);
  try{const r=await fetch(legacy?HC281_LEGACY_URL:HC207_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:HC207_PUBLISHABLE},body:JSON.stringify({action,institutionId:inst,syncToken:token,...payload}),signal:ctl.signal,cache:'no-store',priority:'low'});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||`Catálogo HTTP ${r.status}`);return j;}finally{clearTimeout(timer);}
@@ -47201,7 +47201,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 284;
+  const CURRENT_VERSION = 285;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -48828,10 +48828,27 @@ const idleKey=()=>`hc.v280.idle.${session?.username||''}`,lastKey=()=>`hc.v280.a
 const idleMinutes=()=>{const n=Number(localStorage.getItem(idleKey())||5);return [2,5,10,15].includes(n)?n:5;};
 function touched(){if(!session||window.hc280Locked)return;lastActivity=Date.now();localStorage.setItem(lastKey(),String(lastActivity));}
 function setMessage(root,text){root.querySelector('[data-security-message]').textContent=text;}
+async function hc285RestoreSeedForUnlock(){
+ const binding=String(localStorage.getItem('hc.deviceBinding.v279')||'');
+ const seedToken=String(localStorage.getItem(LS.seedAdminToken)||'');
+ if(binding||seedToken){
+  // A linked administrator must renew its server authorization before continuing.
+  if(!binding)await hc279PrepareDevice();
+  const restored=await hc279RestoreDevice();
+  session={...session,globalToken:restored.seedAdminToken,institutionId:String(restored.institution.id),institutionName:String(restored.institution.displayName||restored.institution.name||'')};
+  saveJSON(LS.session,session);
+  hcBackendApplyResolvedBackend?.(restored.backend,{status:false});
+ }else{
+  // First-time setup opens only institution configuration; no clinical token is issued.
+  [LS.seedAdminInstitutionId,LS.globalAuthToken,LS.globalAuthCurrentInstitution].forEach(k=>localStorage.removeItem(k));
+  session={...session,globalToken:'',institutionId:'',institutionName:''};
+  saveJSON(LS.session,session);
+ }
+}
 function lock(){if(!session||window.hc280Locked)return;window.hc280PersistDrafts?.();window.hc280Locked=true;lockedUser=session.username;lockedInst=session.institutionId;localStorage.setItem(`hc.v280.locked.${lockedUser}`,'1');document.body.classList.add('hc280IsLocked');
- const root=document.createElement('div');root.id='hc280Lock';root.className='hc280Overlay';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.innerHTML=`<div class="card"><h2>Sesión bloqueada</h2><p>Por seguridad, confirmá tu identidad para continuar. Tu borrador se conservó.</p><p><b>${escHTML(session.name||lockedUser)}</b></p><label for="hc280UnlockPassword">Contraseña</label><input id="hc280UnlockPassword" type="password" autocomplete="current-password"><button class="btn primary" data-unlock-password>Continuar con contraseña</button><button class="btn" data-unlock-device ${secure()?'':'disabled'}>Usar huella, rostro o PIN</button><p data-security-message role="status"></p><button class="btn" data-lock-exit>Salir</button></div>`;document.body.appendChild(root);document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=true);
- async function unlock(useDevice){if(busy)return;busy=true;try{setMessage(root,'Verificando…');let a;if(session.localSeed){if(useDevice)throw Error('El administrador local utiliza contraseña.');if(q('#hc280UnlockPassword').value!=='admin')throw Error('Contraseña incorrecta.');await hc279RestoreDevice();a=null;}else{a=useDevice?await authenticate(lockedUser):await passwordAuth(lockedUser,q('#hc280UnlockPassword').value);if(a.user.username!==lockedUser)throw Error('La cuenta verificada no coincide.');if(!a.user.isGlobalAdmin&&!a.institutions.some(i=>String(i.id)===String(lockedInst)))throw Error('Tu acceso a la institución cambió.');localStorage.setItem(LS.globalAuthToken,a.token);saveJSON(LS.globalAuthUser,a.user);saveJSON(LS.globalAuthInstitutions,a.institutions);session={...session,globalToken:a.token};saveJSON(LS.session,session);}
-  window.hc280Locked=false;localStorage.removeItem(`hc.v280.locked.${lockedUser}`);root.remove();document.body.classList.remove('hc280IsLocked');document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=false);touched();hcBackendEnsureSyncLoop?.();
+ const root=document.createElement('div');root.id='hc280Lock';root.className='hc280Overlay';root.setAttribute('role','dialog');root.setAttribute('aria-modal','true');root.innerHTML=`<div class="card"><h2>Sesión bloqueada</h2><p>Por seguridad, confirmá tu identidad para continuar. Tu borrador se conservó.</p><p><b>${escHTML(session.name||lockedUser)}</b></p><label for="hc280UnlockPassword">Contraseña</label><input id="hc280UnlockPassword" type="password" autocomplete="current-password"><button class="btn primary" data-unlock-password>${session.localSeed?'Entrar a Administración':'Continuar con contraseña'}</button><button class="btn" data-unlock-device ${secure()&&!session.localSeed?'':'disabled'}>Usar huella, rostro o PIN</button>${session.localSeed&&!localStorage.getItem('hc.deviceBinding.v279')&&!localStorage.getItem(LS.seedAdminToken)?'<p>Entrá a Administración → Institución para vincular este equipo.</p>':''}<p data-security-message role="status"></p><button class="btn" data-lock-exit>Salir</button></div>`;document.body.appendChild(root);document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=true);
+ async function unlock(useDevice){if(busy)return;busy=true;try{setMessage(root,'Verificando…');let a;if(session.localSeed){if(useDevice)throw Error('El administrador local utiliza contraseña.');if(q('#hc280UnlockPassword').value!=='admin')throw Error('Contraseña incorrecta.');await hc285RestoreSeedForUnlock();a=null;}else{a=useDevice?await authenticate(lockedUser):await passwordAuth(lockedUser,q('#hc280UnlockPassword').value);if(a.user.username!==lockedUser)throw Error('La cuenta verificada no coincide.');if(!a.user.isGlobalAdmin&&!a.institutions.some(i=>String(i.id)===String(lockedInst)))throw Error('Tu acceso a la institución cambió.');localStorage.setItem(LS.globalAuthToken,a.token);saveJSON(LS.globalAuthUser,a.user);saveJSON(LS.globalAuthInstitutions,a.institutions);session={...session,globalToken:a.token};saveJSON(LS.session,session);}
+  window.hc280Locked=false;localStorage.removeItem(`hc.v280.locked.${lockedUser}`);root.remove();document.body.classList.remove('hc280IsLocked');document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=false);touched();if(session.localSeed&&!hcSeedAdminInstitutionReady()){setAdminTab('conf');hcUpdateSeedAdminAccessUI();}hcBackendEnsureSyncLoop?.();
  }catch(e){setMessage(root,e.name==='NotAllowedError'?'Verificación cancelada. Podés usar tu contraseña.':String(e.message||e));}finally{busy=false;}}
  root.querySelector('[data-unlock-password]').onclick=()=>unlock(false);root.querySelector('[data-unlock-device]').onclick=()=>unlock(true);q('#hc280UnlockPassword').onkeydown=e=>{if(e.key==='Enter')unlock(false);};root.querySelector('[data-lock-exit]').onclick=()=>{root.remove();window.hc280Locked=false;document.body.classList.remove('hc280IsLocked');document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=false);logout();};q('#hc280UnlockPassword').focus();
 }
@@ -49066,7 +49083,7 @@ function decorate(){augmentLogo();if(medTab==='hemoterapia')bloodButtons();if(me
 const render=window.renderMed;window.renderMed=renderMed=function(){const r=render.apply(this,arguments);decorate();applyReadOnly();return r};
 for(const name of ['renderMedPanel','renderNUT','renderHEM','renderKINE']){const f=window[name];if(typeof f==='function')window[name]=function(){const r=f.apply(this,arguments);decorate();applyReadOnly();return r}}
 let decorationPending=false;const observer=new MutationObserver(()=>{if(decorationPending)return;decorationPending=true;setTimeout(()=>{decorationPending=false;observer.disconnect();try{decorate()}finally{observer.observe(document.body,{childList:true,subtree:true})}},100)});observer.observe(document.body,{childList:true,subtree:true});setInterval(()=>{if(!document.hidden)hc283NurseSignals()},1500);
-window.HC_DEMO_VERSION='v283';document.title='Hospitalito · HC Demo v283 · Supabase';decorate();
+window.HC_DEMO_VERSION='v285';document.title='Hospitalito · HC Demo v285 · Supabase';decorate();
 })();
 </script>
 
