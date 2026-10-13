@@ -10,7 +10,8 @@ async function actor(c:any,token:string,i:string){
  if(ss.data&&Date.parse(ss.data.expires_at)>Date.now()&&String(ss.data.institution_id)===i)return{username:'admin',role:'admin',dataId:ir.data.data_institution_id||i};
  if(!us.data||Date.parse(us.data.expires_at)<=Date.now())throw Error('Sesión vencida.');
  const [u,m]=await Promise.all([c.from('hc_auth_users').select('active,is_global_admin').eq('username',us.data.username).maybeSingle(),c.from('hc_auth_memberships').select('active,role').eq('username',us.data.username).eq('institution_id',i).maybeSingle()]);
- if(!u.data?.active||u.data.is_global_admin||!m.data?.active)throw Error('No tenés acceso a esta institución.');
+ if(u.data?.active&&u.data.is_global_admin)return{username:us.data.username,role:'superadmin',dataId:ir.data.data_institution_id||i};
+ if(!u.data?.active||!m.data?.active)throw Error('No tenés acceso a esta institución.');
  return{username:us.data.username,role:m.data.role,dataId:ir.data.data_institution_id||i};
 }
 const MIME:any={pdf:'application/pdf',png:'image/png',jpg:'image/jpeg',jpeg:'image/jpeg',txt:'text/plain',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',doc:'application/msword'};
@@ -37,7 +38,7 @@ Deno.serve(async(req:Request)=>{
   const keys=JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS')||'{}');if(!Object.values(keys).includes(req.headers.get('apikey')))throw Error('Aplicación no autorizada.');
   const b=await req.json(),c=db(),i=text(b.institutionId),a=await actor(c,text(b.token,500),i),act=text(b.action),kind=text(b.kind);
   if(act==='saveInstitutionBrand'){
-   if(a.role!=='admin')throw Error('Sólo Administración puede cambiar el membrete.');const logo=text(b.logoData,500000);
+   if(!['admin','superadmin'].includes(a.role))throw Error('Sólo Administración y Hospitalito pueden cambiar el membrete.');const logo=text(b.logoData,500000);
    if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Logo inválido. Usá PNG, JPG o WebP.');
    const ir=await c.from('hc_auth_institutions').update({logo_data:logo,updated_at:new Date().toISOString()}).eq('id',i);if(ir.error)throw ir.error;
    for(let n=0;n<6;n++){
@@ -49,6 +50,7 @@ Deno.serve(async(req:Request)=>{
     if(u.error&&u.error.code!=='23505')throw u.error;if(u.data?.length)return R({ok:true,branding});
    }throw Error('Hubo otro cambio de membrete. Reintentá.');
   }
+  if(a.role==='superadmin'||a.role==='contabilidad')throw Error('Este rol no accede a registros clínicos.');if(['save','uploadConsent','finishConsent'].includes(act)){const l=await c.rpc('hc284_access_mode',{p_data_id:a.dataId,p_username:a.username});if(l.error)throw l.error;if(l.data==='ro')throw Error('La licencia permite consulta. Revisá Facturación para habilitar nuevas cargas.');}
   if(!['donor','blood_unit','consent_template','consent_patient'].includes(kind))throw Error('Registro inválido.');
   if(act==='list'){
    if(kind==='donor'&&!['hemoterapia','admin'].includes(a.role))throw Error('Los datos personales de donantes son exclusivos de Hemoterapia.');
@@ -87,4 +89,3 @@ Deno.serve(async(req:Request)=>{
   return R({ok:false,error:'Acción no reconocida.'},400);
  }catch(e){return R({ok:false,error:String((e as any)?.message||e)},400)}
 });
-

@@ -29,8 +29,9 @@ function db(){
 async function requireSync(c:any,token:string,institutionId:string){
   if(!token||!institutionId)throw new Error('Falta sesión de sincronización.');
   const h=await sha256(token);
-  const {data,error}=await c.from(SESSION_TABLE).select('institution_id,expires_at').eq('token_hash',h).maybeSingle();
+  const {data,error}=await c.from(SESSION_TABLE).select('institution_id,expires_at,role').eq('token_hash',h).maybeSingle();
   if(error)throw error;
+  if(data?.role==='contabilidad')throw Error('El rol Contador no accede a la historia clínica.');
   if(!data||String(data.institution_id)!==institutionId||Date.parse(data.expires_at)<=Date.now()){
     throw new Error('Sesión de sincronización inválida o vencida.');
   }
