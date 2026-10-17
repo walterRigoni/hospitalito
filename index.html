@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v286 · Historia de internación, dieta y portales · Supabase</title>
+<title>Hospitalito v287 · Consultorios y herramientas por especialidad · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -42082,7 +42082,7 @@ bootWithBackend();
 (function(){
 "use strict";
 
-const HC207_VERSION=286;
+const HC207_VERSION=287;
 const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-care?forceFunctionRegion=eu-central-1";
 const HC207_PUBLISHABLE="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
 const HC207_BUCKETS=["beds","registry","patients","clinical","inst","archive","activity","chats","pharmacyDrugs","appointments","doctorSchedules"];
@@ -42121,7 +42121,7 @@ let hc281BulkBusy=false,hc281BulkLast=0,hc281BulkError='',hc281LastAckAt='',hc28
 const hc281BulkRevisions=new Map();
 function hc281CarePending(){return hc207DirtyClinical.size>0||[...hc207DirtyBuckets].some(b=>!HC281_BULK.has(b));}
 window.hc281MarkBulkDirty=function(bucket){if(!HC281_BULK.has(bucket))return;hc207DirtyBuckets.add(bucket);hc214PersistOutbox();setTimeout(()=>hc281BulkSync(),600);};
-window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:286};};
+window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:287};};
 async function hc281BulkRequest(action,payload={},legacy=false){
  const token=await hc207EnsureSession(false),inst=hc207InstitutionId,ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),legacy?90000:25000);
  try{const r=await fetch(legacy?HC281_LEGACY_URL:HC207_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:HC207_PUBLISHABLE},body:JSON.stringify({action,institutionId:inst,syncToken:token,...payload}),signal:ctl.signal,cache:'no-store',priority:'low'});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||`Catálogo HTTP ${r.status}`);return j;}finally{clearTimeout(timer);}
@@ -47211,7 +47211,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 286;
+  const CURRENT_VERSION = 287;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -48089,6 +48089,7 @@ hc270SearchPatients=async function(){
     if(seq!==hc270State.searchGeneration||scope!==hc270Scope())return;
     show();
   }catch(e){
+    if(seq!==hc270State.searchGeneration||scope!==hc270Scope())return;
     localError=e?.message||String(e);
     try{hc270LocalSource();show();}catch(_){}
   }
@@ -49093,7 +49094,7 @@ function decorate(){augmentLogo();if(medTab==='hemoterapia')bloodButtons();if(me
 const render=window.renderMed;window.renderMed=renderMed=function(){const r=render.apply(this,arguments);decorate();applyReadOnly();return r};
 for(const name of ['renderMedPanel','renderNUT','renderHEM','renderKINE']){const f=window[name];if(typeof f==='function')window[name]=function(){const r=f.apply(this,arguments);decorate();applyReadOnly();return r}}
 let decorationPending=false;const observer=new MutationObserver(()=>{if(decorationPending)return;decorationPending=true;setTimeout(()=>{decorationPending=false;observer.disconnect();try{decorate()}finally{observer.observe(document.body,{childList:true,subtree:true})}},100)});observer.observe(document.body,{childList:true,subtree:true});setInterval(()=>{if(!document.hidden)hc283NurseSignals()},1500);
-window.HC_DEMO_VERSION='v286';document.title='Hospitalito · HC Demo v286 · Supabase';decorate();
+window.HC_DEMO_VERSION='v287';document.title='Hospitalito · HC Demo v287 · Supabase';decorate();
 })();
 </script>
 
@@ -49279,6 +49280,145 @@ body.hc286ArchiveOpen #medPanel>.medModuleTabs,body.hc286ArchiveOpen #medPanel>#
   }catch(e){status=403;body={ok:false,error:e.message}}
   if(active===a&&a.scope===hc270Scope())a.frame.contentWindow.postMessage({type:'hc286-archive-response',nonce:a.nonce,id:m.id,body,status},'*');
  });
+})();
+</script>
+
+<script id="hc-v287-specialty-tools">
+/* Hospitalito: herramientas locales por especialidad. Sin acceso a red ni guardado clínico. */
+(function(root,factory){
+  const api=factory();
+  if(typeof module==='object'&&module.exports)module.exports=api;
+  else root.HospitalitoSpecialtyTools=api;
+})(typeof globalThis!=='undefined'?globalThis:this,function(){
+  'use strict';
+  const DAY=86400000,tools=new Map();
+  const normalize=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  function dateValue(value){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(value)))throw new Error('Completá una fecha válida.');
+    const stamp=Date.parse(value+'T00:00:00Z');
+    if(!Number.isFinite(stamp)||new Date(stamp).toISOString().slice(0,10)!==value)throw new Error('Completá una fecha válida.');
+    return stamp;
+  }
+  function dueDate({lmp,reference,cycleDays=28,regularity='regular'}){
+    if(regularity!=='regular')throw new Error('Con FUM incierta o ciclos irregulares, la fecha debe establecerse con la evaluación obstétrica y la ecografía.');
+    const start=dateValue(lmp),at=dateValue(reference),cycle=Number(cycleDays);
+    if(String(cycleDays).trim()===''||!Number.isInteger(cycle)||cycle<15||cycle>60)throw new Error('Revisá la duración del ciclo: ingresá días enteros entre 15 y 60. Fuera de ese rango corresponde una evaluación obstétrica.');
+    if(start>at)throw new Error('La FUM no puede ser posterior a la fecha de referencia.');
+    const due=start+(280+cycle-28)*DAY,days=280-Math.round((due-at)/DAY);
+    if(days<0||days>315)throw new Error('Revisá las fechas y la duración del ciclo: la edad gestacional queda fuera del intervalo de esta calculadora (0 a 45 semanas).');
+    return {dueDate:new Date(due).toISOString().slice(0,10),weeks:Math.floor(days/7),days:days%7,gestationalDays:days,cycleDays:cycle};
+  }
+  function register(tool){
+    if(!tool||!/^[-a-z0-9]+$/.test(tool.id||'')||!tool.title||!Array.isArray(tool.specialties)||!tool.specialties.length)throw new Error('Definición de herramienta incompleta.');
+    if(tools.has(tool.id))throw new Error('Ya existe esa herramienta.');
+    if(!['calculator','table','risk','reference'].includes(tool.kind))throw new Error('Tipo de herramienta inválido.');
+    if(['calculator','risk'].includes(tool.kind)&&(!Array.isArray(tool.fields)||typeof tool.calculate!=='function'))throw new Error('La herramienta debe definir sus campos y cálculo.');
+    if(['table','reference'].includes(tool.kind)&&(!Array.isArray(tool.columns)||!Array.isArray(tool.rows)))throw new Error('La tabla debe definir columnas y filas.');
+    if(!tool.source?.url||!/^https:\/\//.test(tool.source.url))throw new Error('La herramienta necesita una referencia clínica HTTPS.');
+    tools.set(tool.id,Object.freeze({...tool,specialties:Object.freeze([...tool.specialties])}));
+    return tool.id;
+  }
+  function list(specialty=''){
+    const query=normalize(specialty);
+    return [...tools.values()].filter(tool=>!query||query==='todas las especialidades'||tool.specialties.some(s=>normalize(s)===query));
+  }
+  function formatDate(iso){const [year,month,day]=iso.split('-');return day+'/'+month+'/'+year;}
+  register({id:'obstetric-due-date',title:'Gestograma: fecha probable de parto',kind:'calculator',version:'1',specialties:['Ginecología y Obstetricia','Ginecología','Obstetricia'],
+    description:'Estimación por fecha de última menstruación (FUM) y duración de un ciclo regular.',
+    source:{title:'Merck Manual: evaluación obstétrica',url:'https://www.merckmanuals.com/professional/gynecology-and-obstetrics/approach-to-the-pregnant-woman-and-prenatal-care/evaluation-of-the-obstetric-patient'},
+    fields:[{id:'lmp',label:'Primer día de la última menstruación',type:'date',required:true},{id:'cycleDays',label:'Duración habitual del ciclo (días)',type:'number',min:15,max:60,step:1,value:28,required:true},{id:'reference',label:'Fecha para calcular la edad gestacional',type:'date',defaultToday:true,required:true},{id:'regularity',label:'FUM y regularidad del ciclo',type:'select',value:'regular',options:[{value:'regular',label:'FUM conocida y ciclos regulares'},{value:'uncertain',label:'FUM incierta o ciclos irregulares'}]}],
+    calculate:values=>{const result=dueDate(values);return{title:'Estimación obstétrica',lines:[['Fecha probable de parto',formatDate(result.dueDate)],['Edad gestacional al '+formatDate(values.reference),result.weeks+(result.weeks===1?' semana':' semanas')+' y '+result.days+(result.days===1?' día':' días')],['FUM',formatDate(values.lmp)],['Ciclo regular',result.cycleDays+' días']],note:'Estimación por FUM. Confirmar la datación con ecografía y criterio obstétrico. No reemplaza ni modifica una fecha probable de parto ya establecida.'};}
+  });
+  return Object.freeze({register,list,dueDate,formatDate,normalize});
+});
+
+</script>
+<style id="hc-v287-styles">
+#hc270SearchResults{position:relative}
+#hc270SearchResults:has(#hc287CloseSearch) .hc270PatientResult{padding-right:44px}
+#hc287CloseSearch{position:absolute;right:5px;top:5px;z-index:1;width:30px;height:30px;min-height:30px;padding:0;line-height:1;font-size:23px;border-radius:8px;background:#174a60;color:#fff}
+#hc287SpecialtyTools{margin:0 0 14px;min-width:0}
+#hc287SpecialtyTools summary{cursor:pointer;font-weight:700;padding:4px 0}
+#hc287SpecialtyTools .hc287Fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;margin:12px 0}
+#hc287SpecialtyTools label{display:flex;flex-direction:column;gap:6px;min-width:0}
+#hc287SpecialtyTools input,#hc287SpecialtyTools select{width:100%;box-sizing:border-box;min-width:0;color:#eff9ff}
+#hc287SpecialtyTools p{line-height:1.45}
+#hc287SpecialtyTools .hc287Result{padding:12px;border:1px solid #57b9cc;border-radius:10px;white-space:normal;overflow-wrap:anywhere}
+#hc287SpecialtyTools .hc287Result dt{color:#b8d8e5;margin-top:8px}
+#hc287SpecialtyTools .hc287Result dd{margin:2px 0 8px;font-weight:700}
+#hc287SpecialtyTools a{color:#9ae7ff!important}
+#hc287SpecialtyTools table{width:100%;border-collapse:collapse}
+#hc287SpecialtyTools th,#hc287SpecialtyTools td{text-align:left;padding:8px;border-bottom:1px solid #406278;overflow-wrap:anywhere}
+#hc287SpecialtyTools .hc287Error{color:#ffcf9c}
+</style>
+<script id="hc-v287-ui">
+(()=>{
+ 'use strict';
+ const api=window.HospitalitoSpecialtyTools,escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const closeBase=hc270SearchResults;
+ hc270SearchResults=function(){
+   closeBase.apply(this,arguments);
+   const results=document.getElementById('hc270SearchResults');
+   if(!results||!hc270State.searchRows.length)return;
+   const button=document.createElement('button');button.id='hc287CloseSearch';button.type='button';button.textContent='×';button.title='Cerrar resultados de búsqueda';button.setAttribute('aria-label','Cerrar resultados de búsqueda');
+   button.onclick=()=>{hc270State.searchGeneration++;hc270State.searchRows=[];hc270State.searchLimit=30;const query=document.getElementById('hc270PatientQuery'),status=document.getElementById('hc270SearchStatus');if(query)query.value='';if(status)status.textContent='';hc270SearchResults();};
+   results.prepend(button);
+ };
+ const state=new Map();
+ function today(){const date=new Date();return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
+ function mount(appt){
+   const root=document.getElementById('medConsult');if(!root||root.querySelector('#hc287SpecialtyTools'))return;
+   const me=getCurrentUser(),doctor=appt?.doctorId?getUsers().find(u=>u.username===appt.doctorId):null;
+   const specialty=String(appt?.specialty||appt?.especialidad||doctor?.specialty||doctor?.especialidad||me?.specialty||me?.especialidad||'').trim();
+   const key=[me?.username||'',typeof hcCurrentDataInstitutionId==='function'?hcCurrentDataInstitutionId():localStorage.getItem(LS.backendRegistryId)||'',selectedPatientId||'',appt?.id||'agenda'].join('|');
+   let saved=state.get(key);if(!saved){saved={specialty:specialty||'Todas las especialidades',toolId:'',values:{},open:false};state.set(key,saved);if(state.size>40)state.delete(state.keys().next().value);}
+   const specialties=[...new Set(['Todas las especialidades',saved.specialty,'Ginecología y Obstetricia','Cardiología','Clínica médica','Pediatría',...api.list().flatMap(t=>t.specialties)])];
+   const card=document.createElement('details');card.id='hc287SpecialtyTools';card.className='card';card.open=saved.open;
+   card.innerHTML='<summary>Herramientas por especialidad</summary><p class="muted">Tablas, escalas y calculadoras de consulta. Los resultados se copian cuando los necesitás; no se guardan automáticamente en la historia.</p><label>Especialidad<select id="hc287Specialty">'+specialties.map(s=>'<option '+(s===saved.specialty?'selected ':'')+'value="'+escape(s)+'">'+escape(s)+'</option>').join('')+'</select></label><div id="hc287ToolContent"></div>';
+   root.prepend(card);card.ontoggle=()=>{saved.open=card.open};
+   const container=card.querySelector('#hc287ToolContent');
+   function show(){
+     const available=api.list(saved.specialty);
+     if(!available.length){container.innerHTML='<p class="muted">Este espacio está preparado para agregar tablas y escalas de '+escape(saved.specialty)+'. Elegí Ginecología y Obstetricia para usar el gestograma disponible.</p>';return;}
+     if(!available.some(t=>t.id===saved.toolId))saved.toolId=available[0].id;
+     const tool=available.find(t=>t.id===saved.toolId);
+     container.innerHTML='<label style="margin-top:12px">Herramienta<select id="hc287Tool">'+available.map(t=>'<option value="'+escape(t.id)+'" '+(t.id===saved.toolId?'selected':'')+'>'+escape(t.title)+'</option>').join('')+'</select></label><p>'+escape(tool.description||tool.title)+'</p>';
+     container.querySelector('#hc287Tool').onchange=event=>{saved.toolId=event.target.value;show()};
+     if(tool.kind==='table'||tool.kind==='reference'){
+       const table=document.createElement('div');table.style.overflowX='auto';table.innerHTML='<table><thead><tr>'+tool.columns.map(c=>'<th>'+escape(c)+'</th>').join('')+'</tr></thead><tbody>'+tool.rows.map(row=>'<tr>'+row.map(value=>'<td>'+escape(value)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';container.append(table);
+     }else{
+       const values=saved.values[tool.id]||(saved.values[tool.id]={});
+       const form=document.createElement('form');form.noValidate=true;
+       form.innerHTML='<div class="hc287Fields">'+tool.fields.map(field=>{
+         if(values[field.id]===undefined)values[field.id]=field.defaultToday?(appt?.date||today()):field.value??'';
+         const id='hc287Field-'+field.id,value=values[field.id];
+         return '<label for="'+escape(id)+'">'+escape(field.label)+(field.type==='select'?'<select id="'+escape(id)+'" name="'+escape(field.id)+'">'+field.options.map(option=>'<option value="'+escape(option.value)+'" '+(String(value)===String(option.value)?'selected':'')+'>'+escape(option.label)+'</option>').join('')+'</select>':'<input id="'+escape(id)+'" name="'+escape(field.id)+'" type="'+escape(['date','number','text'].includes(field.type)?field.type:'text')+'" value="'+escape(value)+'" '+['min','max','step'].filter(k=>field[k]!==undefined).map(k=>k+'="'+escape(field[k])+'"').join(' ')+' '+(field.required?'required':'')+'>')+'</label>';
+       }).join('')+'</div><button class="btn primary" type="submit">Calcular</button><div id="hc287Calculation" role="status" aria-live="polite" style="margin-top:12px"></div>';
+       const result=form.querySelector('#hc287Calculation');
+       form.addEventListener('input',event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();}});
+       form.addEventListener('change',event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();}});
+       form.onsubmit=event=>{
+         event.preventDefault();
+         try{
+           const output=tool.calculate({...values});
+           result.className='hc287Result';result.innerHTML='<strong>'+escape(output.title||tool.title)+'</strong><dl>'+output.lines.map(line=>'<dt>'+escape(line[0])+'</dt><dd>'+escape(line[1])+'</dd>').join('')+'</dl>'+(output.note?'<p>'+escape(output.note)+'</p>':'')+'<button class="btn small" type="button" id="hc287CopyResult">Copiar resultado</button><span id="hc287CopyStatus" style="margin-left:8px"></span>';
+           result.querySelector('#hc287CopyResult').onclick=async()=>{
+             const text=tool.title+'\n'+output.lines.map(line=>line[0]+': '+line[1]).join('\n')+(output.note?'\n'+output.note:'');
+             try{await navigator.clipboard.writeText(text);result.querySelector('#hc287CopyStatus').textContent='Copiado';}catch(_){result.querySelector('#hc287CopyStatus').textContent='Seleccioná el resultado y copialo manualmente.';}
+           };
+         }catch(error){result.className='hc287Error';result.textContent=error.message||'Revisá los datos ingresados.';}
+       };
+       container.append(form);
+     }
+     const source=document.createElement('p'),link=document.createElement('a');link.href=tool.source.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Referencia: '+tool.source.title;source.append(link);container.append(source);
+   }
+   card.querySelector('#hc287Specialty').onchange=event=>{saved.specialty=event.target.value;saved.toolId='';show()};show();
+ }
+ const ambulatoryBase=renderAmbulatoryConsultorioUI;
+ renderAmbulatoryConsultorioUI=function(appt){const result=ambulatoryBase.apply(this,arguments);mount(appt);return result};
+ const consultBase=renderConsultoriosMedico;
+ renderConsultoriosMedico=function(){const result=consultBase.apply(this,arguments);mount(selectedPatientId?findConsultorioAppointmentForPatient(selectedPatientId):null);return result};
+ hc270SearchResults();
 })();
 </script>
 
