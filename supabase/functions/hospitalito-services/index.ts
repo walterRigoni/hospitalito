@@ -32,11 +32,38 @@ function clean(kind:string,p:any){
  }
  return out;
 }
+const HC286_DEFAULT_PORTALS={portals:[{id:'informe-medico',name:'Informe Médico',url:'https://portal.informemedico.com.ar/'}],activeId:'informe-medico'};
+function hc286PortalURL(raw:any){
+ const url=new URL(String(raw||'').trim());
+ if(!['https:','http:'].includes(url.protocol)||url.username||url.password||!url.hostname||url.href.length>2048)throw Error('Ingresá una dirección web válida, sin usuario ni contraseña.');
+ return url.href;
+}
+function hc286CleanPortals(raw:any){
+ if(!Array.isArray(raw?.portals)||raw.portals.length>30)throw Error('Se admiten hasta 30 portales por institución.');
+ const ids=new Set(),urls=new Set();
+ const portals=raw.portals.map((p:any)=>{const id=String(p.id||'').trim(),name=String(p.name||'').trim();if(!/^[\w-]{1,80}$/.test(id)||!name||name.length>120||ids.has(id))throw Error('Revisá el nombre y el identificador de cada portal.');ids.add(id);const url=hc286PortalURL(p.url);if(urls.has(url))throw Error('Esa dirección ya está en la lista.');urls.add(url);return{id,name,url};});
+ const activeId=String(raw.activeId||'');if(activeId&&!ids.has(activeId))throw Error('Seleccioná un portal de la lista.');return{portals,activeId:activeId||portals[0]?.id||''};
+}
+async function hc286ImagePortals(c:any,a:any,institutionId:string,b:any){
+ if(a.role==='contabilidad')throw Error('Este rol no accede a los módulos clínicos.');
+ const canManage=['admin','superadmin','medico','imagenologo'].includes(a.role);
+ const old=await c.from('hc_imaging_portals').select('payload,revision').eq('institution_id',institutionId).maybeSingle();if(old.error)throw old.error;
+ if(b.action==='imagePortals')return R({ok:true,config:old.data?.payload||HC286_DEFAULT_PORTALS,revision:Number(old.data?.revision||0),canManage});
+ if(!canManage)throw Error('Tu rol puede elegir y abrir portales. Sólo Medicina, Imágenes o Administración pueden modificar la lista.');
+ if(Number(b.revision)!==Number(old.data?.revision||0))return R({ok:false,error:'Otro usuario cambió los portales. Actualizá la lista antes de guardar.'},409);
+ const payload=hc286CleanPortals(b.config),revision=Number(old.data?.revision||0)+1;
+ const row={payload,revision,updated_by:a.username,updated_at:new Date().toISOString()};
+ const saved=old.data?await c.from('hc_imaging_portals').update(row).eq('institution_id',institutionId).eq('revision',old.data.revision).select('revision'):await c.from('hc_imaging_portals').insert({institution_id:institutionId,...row}).select('revision');
+ if(saved.error&&saved.error.code!=='23505')throw saved.error;if(!saved.data?.length)return R({ok:false,error:'Otro usuario cambió los portales. Actualizá la lista.'},409);
+ return R({ok:true,config:payload,revision,canManage});
+}
+
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:CORS});
  try{
   const keys=JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS')||'{}');if(!Object.values(keys).includes(req.headers.get('apikey')))throw Error('Aplicación no autorizada.');
   const b=await req.json(),c=db(),i=text(b.institutionId),a=await actor(c,text(b.token,500),i),act=text(b.action),kind=text(b.kind);
+  if(['imagePortals','saveImagePortals'].includes(act))return await hc286ImagePortals(c,a,i,b);
   if(act==='saveInstitutionBrand'){
    if(!['admin','superadmin'].includes(a.role))throw Error('Sólo Administración y Hospitalito pueden cambiar el membrete.');const logo=text(b.logoData,500000);
    if(!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(logo))throw Error('Logo inválido. Usá PNG, JPG o WebP.');
