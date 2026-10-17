@@ -1,16 +1,13 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v285**, basada en v284.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v286**, basada en v285.
 
 - [Abrir la aplicación](https://walterRigoni.github.io/hospitalito/)
-- [Archivo HTML v285](https://walterRigoni.github.io/hospitalito/Hospitalito_v285.html)
-- [Guía de uso y configuración](Hospitalito_v285_guia.md)
+- [Archivo HTML v286](https://walterRigoni.github.io/hospitalito/Hospitalito_v286.html)
+- [Guía de uso y configuración](Hospitalito_v286_guia.md)
 
-Esta versión permite al administrador sin vinculación desbloquear la configuración de Institución, conserva la validación del servidor para equipos vinculados y muestra la versión correcta en el título. También corrige la carga y visualización de logos, permite al observador filtrar el censo y agrega configuración de servicios y camas. Incluye el rol Contador, registros de ingresos y egresos, contratos por institución o usuario, prueba inicial de 30 días editable, avisos de vencimiento y controles de servicio.
+Las internaciones anteriores se consultan con la botonera clínica habitual en una vista violeta, aislada de las cachés editables. Prescripciones abre en el cierre o último día conocido y permite revisar fechas previas. Se conserva el aviso cuando una copia histórica está incompleta. La dieta muestra su indicación completa en prescripciones, el resumen lateral y el adjunto de Evolución. Los portales de imágenes se guardan por institución y recuerdan la última elección.
 
-Los cobros están desactivados hasta configurar precios, cuentas receptoras y credenciales del proveedor en el servidor. La integración preparada con Mercado Pago utiliza Checkout Pro y notificaciones verificadas; no almacena datos de tarjeta. Las liquidaciones internas no son comprobantes fiscales de ARCA. El acceso biométrico utiliza las credenciales del dispositivo y requiere una plataforma compatible configurada por el usuario.
+Se conservan el acceso inicial del administrador, logos, servicios y camas, rol Contador, contabilidad y sincronización clínica. Los cobros siguen desactivados hasta configurar precios, cuentas y credenciales del proveedor. Las liquidaciones internas no son comprobantes fiscales. TURN y la integración de IA continúan pendientes de configuración/desarrollo.
 
-Se conservan los módulos y la sincronización clínica de v283. El directorio `supabase` contiene las funciones y migraciones del servidor; `tests` incluye comprobaciones de historia, prescripciones, sincronización, avisos, permisos y cobros sin pagos reales. Las credenciales permanentes permanecen en el servidor.
-
-El relevo TURN para videollamadas entre redes distintas continúa pendiente de configuración. La integración de IA permanece como una posibilidad futura.
-
+`supabase` conserva funciones y migraciones; `tests` contiene comprobaciones de historia, prescripciones, sincronización, permisos y cobros sin pagos reales. Las credenciales permanentes permanecen en el servidor.
