@@ -1,13 +1,15 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v287**, basada en v286.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v288**, basada en v287.
 
 - [Abrir la aplicación](https://walterRigoni.github.io/hospitalito/)
-- [Archivo HTML v287](https://walterRigoni.github.io/hospitalito/Hospitalito_v287.html)
-- [Guía de las mejoras](Hospitalito_v287_guia.md)
-- [Extensión de herramientas por especialidad](HERRAMIENTAS_ESPECIALIDAD.md)
+- [Archivo HTML v288](https://walterRigoni.github.io/hospitalito/Hospitalito_v288.html)
+- [Guía de las mejoras](Hospitalito_v288_guia.md)
+- [Implementación y pruebas de Escalas](ESCALAS.md)
 
-Los resultados de búsqueda se cierran con una X sin cambiar el paciente abierto. Consultorios incorpora herramientas por especialidad y un gestograma por FUM, con fecha probable de parto y edad gestacional. Los cálculos son locales y no se guardan automáticamente en la historia. Queda preparado el registro para agregar tablas, referencias y escalas validadas; las demás especialidades todavía no incluyen escalas. Se conserva la sincronización de v286 sin cambios del servidor.
+El módulo **Escalas** reemplaza el panel de herramientas por especialidad de Consultorios. Incluye 18 herramientas con fuentes y validaciones: NIHSS, Glasgow, variantes TIMI, GRACE clásico, APACHE II, SOFA, qSOFA, CURB-65, CRB-65, CHA₂DS₂-VA/VASc, HAS-BLED, Wells TEP/TVP, Child–Pugh, gestograma y revisión de vancomicina por AUC24. Los cálculos son locales, sin guardado clínico automático ni decisiones terapéuticas autónomas.
+
+Consultorios permite plegar los horarios. Laboratorio distribuye las solicitudes en dos columnas y agrega vancocinemia, contexto de muestra y revisión médica de órdenes activas ante un resultado nuevo o corregido. Un nivel aislado no cambia automáticamente la dosis. Se conserva la sincronización y el servidor de v287. La X de búsqueda, internaciones anteriores, dieta y portales institucionales se mantienen.
 
 Las internaciones anteriores se consultan con la botonera clínica habitual en una vista violeta, aislada de las cachés editables. Prescripciones abre en el cierre o último día conocido y permite revisar fechas previas. Se conserva el aviso cuando una copia histórica está incompleta. La dieta muestra su indicación completa en prescripciones, el resumen lateral y el adjunto de Evolución. Los portales de imágenes se guardan por institución y recuerdan la última elección.
 

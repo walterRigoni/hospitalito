@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v287 · Consultorios y herramientas por especialidad · Supabase</title>
+<title>Hospitalito v288 · Escalas y monitorización de vancomicina · Supabase</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -6315,6 +6315,7 @@ html::-webkit-scrollbar-corner{
       <button class="tab" data-medtab="micro" type="button">Microbiología</button>
       <button class="tab" data-medtab="imagenes" type="button">Estudios/Imágenes</button>
       <button class="tab" data-medtab="consultorios" type="button">Consultorios</button>
+<button class="tab" data-medtab="escalas" type="button">Escalas</button>
       <button class="tab" data-medtab="nutricion" type="button">Nutrición</button>
       <button class="tab" data-medtab="hemoterapia" type="button">Hemoterapia</button>
       <button class="tab" data-medtab="kinesiologia" type="button">Kinesiología</button>
@@ -6413,6 +6414,7 @@ html::-webkit-scrollbar-corner{
     </div>
 
     <div id="medConsult" style="display:none;"></div>
+<div id="medScales" style="display:none"></div>
 
     <div id="medNutricion" style="display:none;">
       <div class="muted" style="font-size:12px;">(Módulo de Nutrición en preparación.)</div>
@@ -11947,13 +11949,13 @@ document.querySelectorAll("[data-medtab]").forEach(btn=>{
   }
 
   if(isBioq){
-    const allowed = ["historia", "laboratorio", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["escalas", "historia", "laboratorio", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isMicrobio){
-    const allowed = ["historia", "micro", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["escalas", "historia", "micro", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isFarm){
-    const allowed = ["historia", "prescripciones", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
+    const allowed = ["escalas", "historia", "prescripciones", "informes_enfermeria", "foja_quirurgica", "monitoreos"];
     btn.style.display = allowed.includes(t) ? "" : "none";
   }else if(isImagenologo){
     btn.style.display = "";
@@ -17006,7 +17008,7 @@ document.addEventListener("click", function(e){
     const rid = btnSave.getAttribute("data-lab-save-edit");
     const pid = btnSave.getAttribute("data-lab-patient");
     const txtEl = document.getElementById("labEditText_" + rid);
-    const txt = (txtEl && txtEl.value ? txtEl.value : "").trim();
+    let txt = (txtEl && txtEl.value ? txtEl.value : "").trim();
 
     if(!txt){
       alert("El resultado no puede quedar vacío.");
@@ -17039,6 +17041,7 @@ document.addEventListener("click", function(e){
       if(kpttRow) kpttRow.value=kpttLine[1];
       else r.resultRows.push({key:"kptt",label:"KPTT",unit:"seg",ref:"",value:kpttLine[1]});
     }
+    if(window.hc288PrepareEditedLab)txt=window.hc288PrepareEditedLab(r,txt);
     r.prettyText = txt;
     r.resultText = txt;
     r.editedAt = isoNowLocalFull();
@@ -29060,13 +29063,13 @@ const isNutricionista = user?.role === "nutricionista";
 const isHemoterapia = user?.role === "hemoterapia";
 const isKinesiologo = user?.role === "kinesiologo";
 
-if(isBioq && medTab !== "historia" && medTab !== "laboratorio" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isBioq && medTab !== "escalas" && medTab !== "historia" && medTab !== "laboratorio" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "laboratorio";
 }
-if(isMicrobio && medTab !== "historia" && medTab !== "micro" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
+if(isMicrobio && medTab !== "escalas" && medTab !== "historia" && medTab !== "micro" && medTab !== "informes_enfermeria" && medTab !== "foja_quirurgica" && medTab !== "monitoreos"){
   medTab = "micro";
 }
-if(isImagenologo && !selectedPatientId && medTab !== "historia" && medTab !== "imagenes"){
+if(isImagenologo && !selectedPatientId && medTab !== "escalas" && medTab !== "historia" && medTab !== "imagenes"){
   medTab = "imagenes";
 }
 
@@ -33681,6 +33684,8 @@ document.addEventListener("click", function(e){
       reportedByName: me.name
     };
 
+    result.vancomycinTdm = window.hc288ReadLabMeta?.(resultRows);
+    window.hc288AppendLabMeta?.(result);
     result.prettyText = buildLabResultPretty(result);
 
     cur.labResults.push(result);
@@ -42082,7 +42087,7 @@ bootWithBackend();
 (function(){
 "use strict";
 
-const HC207_VERSION=287;
+const HC207_VERSION=288;
 const HC207_FUNCTION_URL="https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-care?forceFunctionRegion=eu-central-1";
 const HC207_PUBLISHABLE="sb_publishable_izvgUn3YKK4i_GD1OB5C6A_UJQl93ol";
 const HC207_BUCKETS=["beds","registry","patients","clinical","inst","archive","activity","chats","pharmacyDrugs","appointments","doctorSchedules"];
@@ -42121,7 +42126,7 @@ let hc281BulkBusy=false,hc281BulkLast=0,hc281BulkError='',hc281LastAckAt='',hc28
 const hc281BulkRevisions=new Map();
 function hc281CarePending(){return hc207DirtyClinical.size>0||[...hc207DirtyBuckets].some(b=>!HC281_BULK.has(b));}
 window.hc281MarkBulkDirty=function(bucket){if(!HC281_BULK.has(bucket))return;hc207DirtyBuckets.add(bucket);hc214PersistOutbox();setTimeout(()=>hc281BulkSync(),600);};
-window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:287};};
+window.hc281SyncState=function(){const clinical={};hc214DirtyFields.forEach((v,pid)=>clinical[pid]=[...v]);if(hc279InFlight)hc279InFlight.snapshot.fieldMap.forEach((v,pid)=>clinical[pid]=[...new Set([...(clinical[pid]||[]),...v])]);return {institucion:hc207Inst(),usuario:session?.username,conexion:hc207Connected?'conectado':'reconectando',ultimaConfirmacionClinica:hc281LastAckAt,ultimoViajeServidorMs:hc281LastLatency,pacientesConCambiosPendientes:clinical,catalogosPendientes:[...hc207DirtyBuckets].filter(b=>HC281_BULK.has(b)),ultimoError:localStorage.getItem(LS.backendLastError)||'',errorCatalogo:hc281BulkError,version:288};};
 async function hc281BulkRequest(action,payload={},legacy=false){
  const token=await hc207EnsureSession(false),inst=hc207InstitutionId,ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),legacy?90000:25000);
  try{const r=await fetch(legacy?HC281_LEGACY_URL:HC207_FUNCTION_URL,{method:'POST',headers:{'Content-Type':'application/json',apikey:HC207_PUBLISHABLE},body:JSON.stringify({action,institutionId:inst,syncToken:token,...payload}),signal:ctl.signal,cache:'no-store',priority:'low'});const j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||`Catálogo HTTP ${r.status}`);return j;}finally{clearTimeout(timer);}
@@ -46236,7 +46241,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
   function injectTopButtons(){const right=$('.topbar>div:last-child');if(!right)return;if(!$('#hc231NotifyBtn')){const b=document.createElement('button');b.className='btn small';b.id='hc231NotifyBtn';b.type='button';b.innerHTML='🔔 <span class="hc231NotifyBadge" id="hc231NotifyBadge"></span>';right.insertBefore(b,$('#btnAccount')||null);}if(session?.role==='observador'&&!$('#hc231ObserverView')){const b=document.createElement('button');b.className='btn small';b.id='hc231ObserverView';b.type='button';b.textContent='Vista gestión';right.insertBefore(b,$('#hc231NotifyBtn'));}if(session?.role==='superadmin'&&!$('#hc231PlatformTop')){const b=document.createElement('button');b.className='btn small primary';b.id='hc231PlatformTop';b.type='button';b.textContent='Plataforma';right.insertBefore(b,$('#hc231NotifyBtn'));}}
   function observerMode(){const on=session?.role==='observador';document.body.classList.toggle('hcObserver',on);injectTopButtons();}
-  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.closest('#medHistoria,#hc270PatientSearch,#hc280Security,#hc280Lock'))return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
+  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.closest('#medHistoria,#medScales,#hc270PatientSearch,#hc280Security,#hc280Lock'))return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
   document.addEventListener('click',ev=>{if(session?.role==='observador'){const b=mutatingControl(ev.target);if(b){ev.preventDefault();ev.stopImmediatePropagation();toast?.('Modo Observador: solo lectura');return;}}const add=ev.target.closest?.('#hc231AddContact');if(add){const q=String($('#hc231ContactUsername')?.value||'').trim();if(!q)return;req('addContact',{token:token(),institutionId:inst(),username:q}).then(()=>refreshContacts(true)).catch(e=>alert(e.message||e));return;}if(ev.target.closest?.('#hc231NotifyBtn,#hc231OpenNotificationsSettings')){const m=$('#hc231NotificationsModal');m.classList.add('show');m.setAttribute('aria-hidden','false');refreshNotifications(true);return;}if(ev.target.closest?.('#hc231NotificationsClose')){$('#hc231NotificationsModal')?.classList.remove('show');return;}if(ev.target.closest?.('#hc231MarkAllRead')){req('markNotificationsRead',{token:token(),institutionId:inst()}).then(()=>{localNotifs.forEach(x=>x.read_at=new Date().toISOString());return refreshNotifications(true)});return;}if(ev.target.closest?.('#hc231ObserverView')){const med=$('#appMed'),adm=$('#appAdmin'),toAdmin=med?.style.display!=='none';if(toAdmin){med.style.display='none';adm.style.display='grid';try{renderAdmin?.();}catch(_){}}else{adm.style.display='none';med.style.display='grid';try{renderMed?.();}catch(_){}}ev.target.closest('#hc231ObserverView').textContent=toAdmin?'Vista clínica':'Vista gestión';return;}if(ev.target.closest?.('#hc231InstallApp')){const pr=window.hc231InstallPrompt;if(pr){pr.prompt();pr.userChoice.finally(()=>{window.hc231InstallPrompt=null;$('#hc231InstallApp')?.remove();});}return;}if(ev.target.closest?.('#hc231PlatformTop')){showPlatform();return;}if(ev.target.closest?.('#hc231PlatformRefresh')){loadPlatform();return;}if(ev.target.closest?.('#hc231PlatformAccount')){window.hcSettingsOpen?.('account');return;}if(ev.target.closest?.('#hc231CreateInst')){createInstitution();return;}const pc=ev.target.closest?.('[data-hc231-contact]');if(pc){const u=pc.getAttribute('data-hc231-contact');req('addContact',{token:token(),institutionId:inst(),username:u}).then(()=>{toast?.('Contacto agregado');refreshContacts(false)}).catch(e=>alert(e.message||e));return;}},true);
   document.addEventListener('click',ev=>{if(ev.target.closest?.('[data-hcs-chat]')){const u=ev.target.closest('[data-hcs-chat]').getAttribute('data-hcs-chat');window.hc231ActiveChat=u;refreshConversation(u,false);}if(ev.target.closest?.('#hcsChatBack,#hcsMembersBack'))window.hc231ActiveChat='';if(ev.target.closest?.('[data-hcs-section="members"]'))setTimeout(()=>{augmentMembers();refreshContacts(true)},50);},true);
   function augmentMembers(){const list=$('#hcsMemberList');if(!list||$('#hc231ContactAdder'))return;const card=document.createElement('div');card.id='hc231ContactAdder';card.className='hcSettingsCard';card.style.marginBottom='12px';card.innerHTML='<div class="hcSettingsCardTitle">Agregar contacto por usuario</div><div class="hcSettingsCardSub">Permite conversar con un profesional de otra institución sin darle acceso a historias clínicas.</div><div class="hc231AddContact"><input id="hc231ContactUsername" placeholder="Nombre de usuario exacto"><button class="hcSettingsBtn primary" id="hc231AddContact" type="button">Agregar</button></div>';list.parentElement?.insertBefore(card,list);directory.forEach(u=>{const el=list.querySelector(`[data-hcs-member="${CSS.escape(u.username)}"]`);if(el&&!el.querySelector('.hc231ContactScope')){const sp=document.createElement('span');sp.className='hc231ContactScope';sp.textContent=u.contactScope==='institución'?'Misma institución':'Contacto';el.lastElementChild?.appendChild(sp);}})}
@@ -46425,7 +46430,7 @@ const logoutBase=window.logout||logout;window.logout=logout=function(){try{$('#h
 /* -------- Observador: interfaz realmente de lectura -------- */
 const mutWords=/(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar|cambiar|mover|alta|defunci[oó]n)/i;
 const viewWords=/(imprimir|vista|ver |volver|buscar|actualizar|hoy|fecha|protocolo|gr[aá]fico|historial|cerrar|abrir|censo)/i;
-function observerPolish(){if(session?.role!=='observador')return;document.querySelectorAll('#appMed input,#appMed textarea,#appAdmin input,#appAdmin textarea').forEach(e=>{if(e.type==='date'||e.type==='search')return;e.readOnly=true;e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed select,#appAdmin select').forEach(e=>{if(e.id==='medAreaFilter'||/filter|filtro|fecha|date|view|hc286ImagePortal/i.test(e.id)){e.classList.remove('hcV232ObserverLocked');e.disabled=false;}else e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed button,#appAdmin button').forEach(b=>{if(b.closest('#medHistoria,#hc270PatientSearch'))return;if(b.matches('.tab,[data-medtab],[data-admin-tab],#btnMobileCensusToggle,#btnMobileCensusClose'))return;const t=(b.textContent||'').trim();if(mutWords.test(t)&&!viewWords.test(t))b.classList.add('hcV232ObserverHidden');});}
+function observerPolish(){if(session?.role!=='observador')return;document.querySelectorAll('#appMed input,#appMed textarea,#appAdmin input,#appAdmin textarea').forEach(e=>{if(e.closest('#medScales')||e.type==='date'||e.type==='search')return;e.readOnly=true;e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed select,#appAdmin select').forEach(e=>{if(e.closest('#medScales')||e.id==='medAreaFilter'||/filter|filtro|fecha|date|view|hc286ImagePortal/i.test(e.id)){e.classList.remove('hcV232ObserverLocked');e.disabled=false;}else e.classList.add('hcV232ObserverLocked')});document.querySelectorAll('#appMed button,#appAdmin button').forEach(b=>{if(b.closest('#medHistoria,#hc270PatientSearch'))return;if(b.matches('.tab,[data-medtab],[data-admin-tab],#btnMobileCensusToggle,#btnMobileCensusClose'))return;const t=(b.textContent||'').trim();if(mutWords.test(t)&&!viewWords.test(t))b.classList.add('hcV232ObserverHidden');});}
 let hc265DecorationTimer=null;
 const hc265ObserveOptions={childList:true,subtree:true};
 const obs=new MutationObserver(()=>{
@@ -47211,7 +47216,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 287;
+  const CURRENT_VERSION = 288;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -49054,7 +49059,7 @@ window.hc283LogoFile=logoFile;
 function augmentLogo(){const conf=$('#adminConf');if(!conf||$('#hc283LogoSettings')||session?.role!=='admin')return;const box=document.createElement('div');box.className='hc283Panel';box.id='hc283LogoSettings';box.innerHTML='<b>Logos del membrete institucional</b><p class="muted">Se ajustan automáticamente: institución a la izquierda y Hospitalito en un cuadrado pequeño a la derecha.</p><div class="hc283Grid"><div class="field"><label>Logo de la institución</label><input id="hc283InstitutionLogoFile" type="file" accept="image/png,image/jpeg,image/webp"></div><div class="field"><label>Logo cuadrado de Hospitalito (opcional)</label><input id="hc283ProgramLogoFile" type="file" accept="image/png,image/jpeg,image/webp"></div></div><div class="hc283Actions"><button class="btn primary" type="button" id="hc283SaveLogos">Guardar logos</button></div><div id="hc283LogoStatus" role="status"></div>';conf.prepend(box);$('#hc283SaveLogos').onclick=async()=>{const b=$('#hc283SaveLogos');b.disabled=true;try{const logo=await logoFile($('#hc283InstitutionLogoFile').files[0])||safeLogo(getInst().logoData);if(!logo)throw Error('Elegí el logo de la institución.');const programLogo=await logoFile($('#hc283ProgramLogoFile').files[0],256);const j=await request('saveInstitutionBrand',{logoData:logo,...(programLogo?{programLogo}:{})});setInst({...getInst(),...j.branding});renderInstitutionHeader();$('#hc283LogoStatus').textContent='Logos guardados en la institución y en todos sus membretes.';}catch(e){$('#hc283LogoStatus').textContent=e.message}finally{b.disabled=false}}}
 // La historia se consulta completa; los cambios se limitan al servicio del usuario.
 const saveClinical=setClinical;setClinical=window.setClinical=function(next){const allow=fields[session?.role];if(!allow)return saveClinical(next);const old=getClinical(),out={...old};for(const [pid,rec]of Object.entries(next||{})){const previous=old[pid]||{},copy={...previous};for(const key of allow)if(Object.hasOwn(rec||{},key))copy[key]=rec[key];out[pid]=copy}return saveClinical(out)};
-function applyReadOnly(){const service=own[session?.role];document.querySelectorAll('.hc283ReadBanner').forEach(e=>e.remove());document.querySelectorAll('.hc283ReadOnlyControl').forEach(e=>{e.disabled=false;e.readOnly=false;e.classList.remove('hc283ReadOnlyControl')});if(!service)return;document.querySelectorAll('[data-medtab]').forEach(b=>b.style.display='');if(medTab===service)return;const panel=$('#medPanel');if(!panel)return;const banner=document.createElement('div');banner.className='hc283ReadBanner';banner.textContent='Consulta de la historia clínica · sólo podés modificar tu módulo de '+({kinesiologia:'Kinesiología',hemoterapia:'Hemoterapia',nutricion:'Nutrición'}[service]);$('#medPanelTitle')?.after(banner);
+function applyReadOnly(){const service=own[session?.role];document.querySelectorAll('.hc283ReadBanner').forEach(e=>e.remove());document.querySelectorAll('.hc283ReadOnlyControl').forEach(e=>{e.disabled=false;e.readOnly=false;e.classList.remove('hc283ReadOnlyControl')});if(!service)return;document.querySelectorAll('[data-medtab]').forEach(b=>b.style.display='');if(medTab===service||medTab==='escalas')return;const panel=$('#medPanel');if(!panel)return;const banner=document.createElement('div');banner.className='hc283ReadBanner';banner.textContent='Consulta de la historia clínica · sólo podés modificar tu módulo de '+({kinesiologia:'Kinesiología',hemoterapia:'Hemoterapia',nutricion:'Nutrición'}[service]);$('#medPanelTitle')?.after(banner);
  const mut=/(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuev[oa]|crear|enviar|cargar|registrar|confirmar|aplicar|reabrir|finalizar|firmar|cambiar|mover|alta|defunci[oó]n)/i;
  const view=/(imprimir|vista|ver|volver|buscar|fecha|protocolo|gr[aá]fico|historial|cerrar|abrir|censo|adjuntar últimos|adjuntar resultados)/i;
  panel.querySelectorAll('button').forEach(b=>{if(b.matches('[data-medtab],.tab')||b.closest('#medHistoria'))return;if(mut.test(b.textContent)&&!view.test(b.textContent)){b.disabled=true;b.classList.add('hc283ReadOnlyControl')}});
@@ -49094,7 +49099,7 @@ function decorate(){augmentLogo();if(medTab==='hemoterapia')bloodButtons();if(me
 const render=window.renderMed;window.renderMed=renderMed=function(){const r=render.apply(this,arguments);decorate();applyReadOnly();return r};
 for(const name of ['renderMedPanel','renderNUT','renderHEM','renderKINE']){const f=window[name];if(typeof f==='function')window[name]=function(){const r=f.apply(this,arguments);decorate();applyReadOnly();return r}}
 let decorationPending=false;const observer=new MutationObserver(()=>{if(decorationPending)return;decorationPending=true;setTimeout(()=>{decorationPending=false;observer.disconnect();try{decorate()}finally{observer.observe(document.body,{childList:true,subtree:true})}},100)});observer.observe(document.body,{childList:true,subtree:true});setInterval(()=>{if(!document.hidden)hc283NurseSignals()},1500);
-window.HC_DEMO_VERSION='v287';document.title='Hospitalito · HC Demo v287 · Supabase';decorate();
+window.HC_DEMO_VERSION='v288';document.title='Hospitalito · HC Demo v288 · Supabase';decorate();
 })();
 </script>
 
@@ -49364,61 +49369,274 @@ body.hc286ArchiveOpen #medPanel>.medModuleTabs,body.hc286ArchiveOpen #medPanel>#
    button.onclick=()=>{hc270State.searchGeneration++;hc270State.searchRows=[];hc270State.searchLimit=30;const query=document.getElementById('hc270PatientQuery'),status=document.getElementById('hc270SearchStatus');if(query)query.value='';if(status)status.textContent='';hc270SearchResults();};
    results.prepend(button);
  };
- const state=new Map();
- function today(){const date=new Date();return date.getFullYear()+'-'+String(date.getMonth()+1).padStart(2,'0')+'-'+String(date.getDate()).padStart(2,'0');}
- function mount(appt){
-   const root=document.getElementById('medConsult');if(!root||root.querySelector('#hc287SpecialtyTools'))return;
-   const me=getCurrentUser(),doctor=appt?.doctorId?getUsers().find(u=>u.username===appt.doctorId):null;
-   const specialty=String(appt?.specialty||appt?.especialidad||doctor?.specialty||doctor?.especialidad||me?.specialty||me?.especialidad||'').trim();
-   const key=[me?.username||'',typeof hcCurrentDataInstitutionId==='function'?hcCurrentDataInstitutionId():localStorage.getItem(LS.backendRegistryId)||'',selectedPatientId||'',appt?.id||'agenda'].join('|');
-   let saved=state.get(key);if(!saved){saved={specialty:specialty||'Todas las especialidades',toolId:'',values:{},open:false};state.set(key,saved);if(state.size>40)state.delete(state.keys().next().value);}
-   const specialties=[...new Set(['Todas las especialidades',saved.specialty,'Ginecología y Obstetricia','Cardiología','Clínica médica','Pediatría',...api.list().flatMap(t=>t.specialties)])];
-   const card=document.createElement('details');card.id='hc287SpecialtyTools';card.className='card';card.open=saved.open;
-   card.innerHTML='<summary>Herramientas por especialidad</summary><p class="muted">Tablas, escalas y calculadoras de consulta. Los resultados se copian cuando los necesitás; no se guardan automáticamente en la historia.</p><label>Especialidad<select id="hc287Specialty">'+specialties.map(s=>'<option '+(s===saved.specialty?'selected ':'')+'value="'+escape(s)+'">'+escape(s)+'</option>').join('')+'</select></label><div id="hc287ToolContent"></div>';
-   root.prepend(card);card.ontoggle=()=>{saved.open=card.open};
-   const container=card.querySelector('#hc287ToolContent');
-   function show(){
-     const available=api.list(saved.specialty);
-     if(!available.length){container.innerHTML='<p class="muted">Este espacio está preparado para agregar tablas y escalas de '+escape(saved.specialty)+'. Elegí Ginecología y Obstetricia para usar el gestograma disponible.</p>';return;}
-     if(!available.some(t=>t.id===saved.toolId))saved.toolId=available[0].id;
-     const tool=available.find(t=>t.id===saved.toolId);
-     container.innerHTML='<label style="margin-top:12px">Herramienta<select id="hc287Tool">'+available.map(t=>'<option value="'+escape(t.id)+'" '+(t.id===saved.toolId?'selected':'')+'>'+escape(t.title)+'</option>').join('')+'</select></label><p>'+escape(tool.description||tool.title)+'</p>';
-     container.querySelector('#hc287Tool').onchange=event=>{saved.toolId=event.target.value;show()};
-     if(tool.kind==='table'||tool.kind==='reference'){
-       const table=document.createElement('div');table.style.overflowX='auto';table.innerHTML='<table><thead><tr>'+tool.columns.map(c=>'<th>'+escape(c)+'</th>').join('')+'</tr></thead><tbody>'+tool.rows.map(row=>'<tr>'+row.map(value=>'<td>'+escape(value)+'</td>').join('')+'</tr>').join('')+'</tbody></table>';container.append(table);
-     }else{
-       const values=saved.values[tool.id]||(saved.values[tool.id]={});
-       const form=document.createElement('form');form.noValidate=true;
-       form.innerHTML='<div class="hc287Fields">'+tool.fields.map(field=>{
-         if(values[field.id]===undefined)values[field.id]=field.defaultToday?(appt?.date||today()):field.value??'';
-         const id='hc287Field-'+field.id,value=values[field.id];
-         return '<label for="'+escape(id)+'">'+escape(field.label)+(field.type==='select'?'<select id="'+escape(id)+'" name="'+escape(field.id)+'">'+field.options.map(option=>'<option value="'+escape(option.value)+'" '+(String(value)===String(option.value)?'selected':'')+'>'+escape(option.label)+'</option>').join('')+'</select>':'<input id="'+escape(id)+'" name="'+escape(field.id)+'" type="'+escape(['date','number','text'].includes(field.type)?field.type:'text')+'" value="'+escape(value)+'" '+['min','max','step'].filter(k=>field[k]!==undefined).map(k=>k+'="'+escape(field[k])+'"').join(' ')+' '+(field.required?'required':'')+'>')+'</label>';
-       }).join('')+'</div><button class="btn primary" type="submit">Calcular</button><div id="hc287Calculation" role="status" aria-live="polite" style="margin-top:12px"></div>';
-       const result=form.querySelector('#hc287Calculation');
-       form.addEventListener('input',event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();}});
-       form.addEventListener('change',event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();}});
-       form.onsubmit=event=>{
-         event.preventDefault();
-         try{
-           const output=tool.calculate({...values});
-           result.className='hc287Result';result.innerHTML='<strong>'+escape(output.title||tool.title)+'</strong><dl>'+output.lines.map(line=>'<dt>'+escape(line[0])+'</dt><dd>'+escape(line[1])+'</dd>').join('')+'</dl>'+(output.note?'<p>'+escape(output.note)+'</p>':'')+'<button class="btn small" type="button" id="hc287CopyResult">Copiar resultado</button><span id="hc287CopyStatus" style="margin-left:8px"></span>';
-           result.querySelector('#hc287CopyResult').onclick=async()=>{
-             const text=tool.title+'\n'+output.lines.map(line=>line[0]+': '+line[1]).join('\n')+(output.note?'\n'+output.note:'');
-             try{await navigator.clipboard.writeText(text);result.querySelector('#hc287CopyStatus').textContent='Copiado';}catch(_){result.querySelector('#hc287CopyStatus').textContent='Seleccioná el resultado y copialo manualmente.';}
-           };
-         }catch(error){result.className='hc287Error';result.textContent=error.message||'Revisá los datos ingresados.';}
-       };
-       container.append(form);
-     }
-     const source=document.createElement('p'),link=document.createElement('a');link.href=tool.source.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent='Referencia: '+tool.source.title;source.append(link);container.append(source);
-   }
-   card.querySelector('#hc287Specialty').onchange=event=>{saved.specialty=event.target.value;saved.toolId='';show()};show();
- }
- const ambulatoryBase=renderAmbulatoryConsultorioUI;
- renderAmbulatoryConsultorioUI=function(appt){const result=ambulatoryBase.apply(this,arguments);mount(appt);return result};
- const consultBase=renderConsultoriosMedico;
- renderConsultoriosMedico=function(){const result=consultBase.apply(this,arguments);mount(selectedPatientId?findConsultorioAppointmentForPatient(selectedPatientId):null);return result};
  hc270SearchResults();
+})();
+</script>
+
+<script id="hc-v288-scales-core">
+/* Cálculos clínicos locales. Datos incompletos no equivalen a cero. Sin escrituras ni red. */
+(function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.HospitalitoScales=api;})(typeof globalThis!=='undefined'?globalThis:this,function(){
+ 'use strict';
+ const tools=[];
+ const source=(title,url)=>({title,url});
+ const sources={
+  nih:source('NINDS · NIH Stroke Scale, 2025','https://www.ninds.nih.gov/sites/default/files/2025-03/KnowStroke_NIHStrokeScale_March2025_508c.pdf'),
+  stroke:source('AHA/ASA · ACV isquémico, 2026','https://professional.heart.org/en/science-news/2026-guideline-for-the-early-management-of-patients-with-acute-ischemic-stroke'),
+  timi:source('TIMI Study Group · UA/NSTEMI','https://timi.org/calculators/timi-risk-score-calculator-for-ua-nstemi/'),
+  stemi:source('TIMI Study Group · STEMI','https://timi.org/timi-risk-score-calculator-for-stemi/'),
+  grace:source('AHA · GRACE clásico, tabla de ingreso','https://eguideline.guidelinecentral.com/i/589485-acute-coronary-syndromes-guidelines/5'),
+  apache:source('Knaus et al. · APACHE II, 1985','https://pubmed.ncbi.nlm.nih.gov/3928249/'),
+  apacheTable:source('Merck Manual · tabla APACHE II','https://www.merckmanuals.com/professional/multimedia/table/acute-physiologic-assessment-and-chronic-health-evaluation-apache-ii-scoring-system'),
+  sofa:source('Singer et al. · Sepsis-3, SOFA y qSOFA','https://jamanetwork.com/journals/jama/fullarticle/2492881'),
+  gcs:source('Glasgow Coma Scale · evaluación estructurada','https://www.glasgowcomascale.org/gcs-aid/'),
+  curb:source('NICE NG250 · neumonía en adultos','https://www.nice.org.uk/guidance/ng250/chapter/Recommendations'),
+  wells:source('NICE NG158 · Wells para TVP y TEP','https://www.nice.org.uk/guidance/ng158/chapter/Recommendations'),
+  af:source('ESC · fibrilación auricular, 2024','https://academic.oup.com/eurheartj/article/45/36/3314/7738779'),
+  vasc:source('ACC/AHA · fibrilación auricular, 2023','https://pmc.ncbi.nlm.nih.gov/articles/PMC11095842/'),
+  bled:source('Pisters et al. · HAS-BLED, 2010','https://pubmed.ncbi.nlm.nih.gov/20299623/'),
+  child:source('Merck Manual · Child–Turcotte–Pugh','https://www.merckmanuals.com/professional/hepatic-and-biliary-disorders/fibrosis-and-cirrhosis/cirrhosis'),
+  vanco:source('ASHP/IDSA · monitorización de vancomicina','https://www.idsociety.org/practice-guideline/vancomycin/')
+ };
+ const num=(id,label,min,max,step='any',when)=>({id,label,type:'number',min,max,step,required:true,...(when?{when}:{})});
+ const select=(id,label,options,when)=>({id,label,type:'select',required:true,options:options.map(([value,label])=>({value:String(value),label})),...(when?{when}:{})});
+ const yes=(id,label)=>select(id,label,[[0,'No'],[1,'Sí']]);
+ const visible=(f,v)=>!f.when||f.when(v);
+ function number(v,id,min=-Infinity,max=Infinity,integer=false){
+  const raw=String(v[id]??'').trim();if(!/^-?(?:\d+(?:[.,]\d*)?|[.,]\d+)$/.test(raw))throw Error('Completá el campo '+id+' con un número válido.');
+  const value=Number(raw.replace(',','.'));if(!Number.isFinite(value)||value<min||value>max||(integer&&!Number.isInteger(value)))throw Error('Revisá el valor de '+id+'.');return value;
+ }
+ function validate(tool,values){
+  for(const f of tool.fields){if(!visible(f,values))continue;const value=String(values[f.id]??'').trim();
+   if(!value)throw Error('Falta completar: '+f.label+'.');
+   if(f.type==='select'&&!f.options.some(o=>o.value===value))throw Error('Seleccioná un valor válido en '+f.label+'.');
+   if(f.type==='number')number(values,f.id,f.min,f.max,f.step===1);
+  }
+ }
+ function add(tool){tools.push({...tool,version:tool.version||'1'});}
+ const total=(parts,max,note,extra=[])=>({score:parts.reduce((n,p)=>n+p[1],0),max,parts,note,extra});
+ const sum=(v,ids)=>ids.reduce((n,id)=>n+Number(v[id]),0);
+ const band=(value,rows)=>{for(const [limit,points] of rows)if(value<limit)return points;throw Error('Tabla de puntuación incompleta.');};
+ function calculate(id,values){const tool=tools.find(t=>t.id===id);if(!tool)throw Error('Escala no disponible.');validate(tool,values);return tool.calculate(values);}
+ const motorArm=[[0,'Sin descenso en 10 s'],[1,'Desciende, sin tocar apoyo'],[2,'Cae antes de 10 s; esfuerzo contra gravedad'],[3,'Sin esfuerzo contra gravedad'],[4,'Sin movimiento'],['UN','No evaluable: amputación o fusión articular']];
+ const motorLeg=[[0,'Sin descenso en 5 s'],[1,'Desciende, sin tocar apoyo'],[2,'Cae antes de 5 s; esfuerzo contra gravedad'],[3,'Sin esfuerzo contra gravedad'],[4,'Sin movimiento'],['UN','No evaluable: amputación o fusión articular']];
+ const nihFields=[
+  select('loc','1a · Conciencia',[[0,'Alerta'],[1,'Somnoliento, responde a estímulo leve'],[2,'Requiere estímulos repetidos o dolor'],[3,'Coma; respuestas reflejas o ausentes']]),
+  select('questions','1b · Mes y edad',[[0,'Ambas respuestas correctas'],[1,'Una correcta'],[2,'Ninguna correcta']]),
+  select('commands','1c · Dos órdenes',[[0,'Cumple ambas'],[1,'Cumple una'],[2,'No cumple ninguna']]),
+  select('gaze','2 · Mirada horizontal',[[0,'Normal'],[1,'Paresia parcial'],[2,'Desviación forzada o paresia total']]),
+  select('vision','3 · Campos visuales',[[0,'Sin defecto'],[1,'Hemianopsia parcial'],[2,'Hemianopsia completa'],[3,'Hemianopsia bilateral / ceguera cortical']]),
+  select('face','4 · Paresia facial',[[0,'Normal'],[1,'Leve asimetría'],[2,'Paresia inferior marcada'],[3,'Parálisis completa de uno o ambos lados']]),
+  select('armL','5a · Brazo izquierdo',motorArm),select('armR','5b · Brazo derecho',motorArm),select('legL','6a · Pierna izquierda',motorLeg),select('legR','6b · Pierna derecha',motorLeg),
+  select('ataxia','7 · Ataxia de extremidades',[[0,'Ausente'],[1,'En una extremidad'],[2,'En dos extremidades'],['UN','No evaluable: amputación o fusión articular']]),
+  select('sensation','8 · Sensibilidad',[[0,'Normal'],[1,'Pérdida leve o moderada'],[2,'Pérdida grave o total']]),
+  select('language','9 · Lenguaje',[[0,'Sin afasia'],[1,'Afasia leve o moderada'],[2,'Afasia grave'],[3,'Mutismo / afasia global']]),
+  select('dysarthria','10 · Disartria',[[0,'Ausente'],[1,'Leve o moderada'],[2,'Grave / anartria'],['UN','No evaluable: intubación u otra barrera física']]),
+  select('neglect','11 · Extinción / inatención',[[0,'Ausente'],[1,'En una modalidad'],[2,'Profunda o en más de una modalidad']])
+ ];
+ add({id:'nihss',title:'NIHSS',category:'Neurología',population:'Evaluación profesional de ACV; aplicar el examen oficial en orden.',fields:nihFields,sources:[sources.nih,source('NIHSS · formulario oficial disponible en AHA','https://cpr.heart.org/-/media/Data-Import/downloadables/5/2/3/NIH-Stroke-Scale-UCM_490144.pdf'),sources.stroke],description:'15 componentes; total 0–42. Usá las instrucciones oficiales para las maniobras y los casos especiales.',calculate(v){
+  if(nihFields.some(f=>v[f.id]==='UN'))throw Error('Hay componentes no evaluables (UN). Documentá el motivo y los componentes; no se informa un total NIHSS completo ni se reemplaza UN por cero.');
+  return total(nihFields.map(f=>[f.label,Number(v[f.id])]),42,'NIHSS cuantifica el déficit; no determina por sí solo la indicación de trombólisis.',[['Trombólisis','Requiere evaluación urgente de tiempo de inicio/última vez sano, déficit discapacitante, neuroimagen, presión, glucemia, anticoagulantes y contraindicaciones. Un NIHSS bajo no excluye un déficit discapacitante. Consultar protocolo de ACV y guía AHA/ASA 2026.']]);
+ }});
+ const timiUA=[yes('age65','Edad ≥65 años'),yes('risk3','Al menos 3 factores coronarios: HTA, diabetes, dislipidemia, tabaquismo actual o antecedente familiar'),yes('cad','Estenosis coronaria conocida ≥50%'),yes('asa','Aspirina en los últimos 7 días'),yes('angina','Al menos 2 episodios anginosos en 24 h'),yes('st','Desviación del ST ≥0,5 mm'),yes('markers','Marcadores cardíacos elevados')];
+ add({id:'timi-ua',title:'TIMI · angina inestable / NSTEMI',category:'Cardiología',population:'Adultos con síndrome coronario agudo sin elevación del ST.',fields:timiUA,sources:[sources.timi],calculate:v=>total(timiUA.map(f=>[f.label,Number(v[f.id])]),7,'Puntaje TIMI para UA/NSTEMI; no usar esta versión para STEMI.')});
+ const timiST=[num('age','Edad (años)',18,120,1),yes('history','Diabetes, hipertensión o angina previa'),num('sbp','Presión sistólica (mmHg)',20,300),num('hr','Frecuencia cardíaca (/min)',10,300),yes('killip','Killip II–IV'),num('weight','Peso (kg)',20,350),yes('anterior','ST anterior elevado o bloqueo de rama izquierda'),yes('delay','Tiempo a tratamiento >4 h')];
+ add({id:'timi-stemi',title:'TIMI · STEMI',category:'Cardiología',population:'Adultos con infarto con elevación del ST; modelo original.',fields:timiST,sources:[sources.stemi],calculate:v=>total([['Edad',Number(v.age)>=75?3:Number(v.age)>=65?2:0],['Antecedentes',Number(v.history)],['PAS <100',Number(v.sbp)<100?3:0],['FC >100',Number(v.hr)>100?2:0],['Killip II–IV',2*Number(v.killip)],['Peso <67',Number(v.weight)<67?1:0],['Anterior / BRI',Number(v.anterior)],['Demora >4 h',Number(v.delay)]],14,'Versión STEMI original. No reemplaza la estrategia urgente de reperfusión ni la evaluación actual del paciente.')});
+ const graceFields=[num('age','Edad (años)',18,120,1),num('hr','Frecuencia cardíaca (/min)',10,300),num('sbp','Presión sistólica (mmHg)',20,300),num('creatinine','Creatinina (mg/dL)',0.01,30),select('killip','Clase Killip',[[0,'I · sin insuficiencia cardíaca'],[20,'II · estertores / tercer ruido'],[39,'III · edema pulmonar'],[59,'IV · shock cardiogénico']]),yes('arrest','Paro cardíaco al ingreso'),yes('st','Desviación del ST'),yes('markers','Marcadores cardíacos elevados')];
+ add({id:'grace',title:'GRACE clásico · puntos al ingreso',category:'Cardiología',population:'Adultos con síndrome coronario agudo; tabla clásica, no GRACE 2.0.',fields:graceFields,sources:[sources.grace],calculate(v){
+  const result=total([['Edad',band(Number(v.age),[[30,0],[40,8],[50,25],[60,41],[70,58],[80,75],[90,91],[Infinity,100]])],['Frecuencia',band(Number(v.hr),[[50,0],[70,3],[90,9],[110,15],[150,24],[200,38],[Infinity,46]])],['PAS',band(Number(v.sbp),[[80,58],[100,53],[120,43],[140,34],[160,24],[200,10],[Infinity,0]])],['Creatinina',band(Number(v.creatinine),[[0.4,1],[0.8,4],[1.2,7],[1.6,10],[2,13],[4,21],[Infinity,28]])],['Killip',Number(v.killip)],['Paro',39*Number(v.arrest)],['ST',28*Number(v.st)],['Marcadores',14*Number(v.markers)]],372,'Tabla de puntos del GRACE clásico. No equivale a una probabilidad continua de GRACE 2.0.');
+  result.extra.push(['Estratificación clásica en SCASEST',result.score<=108?'Bajo (≤108)':result.score<=140?'Intermedio (109–140)':'Alto (>140)']);return result;
+ }});
+ const gcsFields=[select('eye','Apertura ocular',[[4,'Espontánea'],[3,'A la voz'],[2,'A la presión'],[1,'Ausente'],['NT','No evaluable']]),select('verbal','Respuesta verbal',[[5,'Orientada'],[4,'Confusa'],[3,'Palabras'],[2,'Sonidos'],[1,'Ausente'],['NT','No evaluable, p. ej. intubación']]),select('motor','Respuesta motora',[[6,'Obedece órdenes'],[5,'Localiza'],[4,'Flexión normal / retirada'],[3,'Flexión anormal'],[2,'Extensión'],[1,'Ausente'],['NT','No evaluable']])];
+ add({id:'gcs',title:'Glasgow · GCS',category:'Neurología',population:'Escala de adulto. Registrar interferencias como sedación o intubación.',fields:gcsFields,sources:[sources.gcs],calculate(v){if(gcsFields.some(f=>v[f.id]==='NT'))throw Error('Componente no evaluable (NT): registrar E, V y M por separado; no informar un total completo.');return total(gcsFields.map(f=>[f.label,Number(v[f.id])]),15,'Reportar componentes además del total. La evaluación seriada y las interferencias deben registrarse.');}});
+ const apacheFields=[num('age','Edad (años)',18,120,1),num('temp','Temperatura central (°C)',20,45),num('map','Presión arterial media (mmHg)',10,250),num('hr','Frecuencia cardíaca (/min)',0,300),num('rr','Frecuencia respiratoria (/min)',0,100),num('fio2','FiO₂ (fracción: 0,21 a 1)',0.21,1),num('pao2','PaO₂ (mmHg), si FiO₂ <0,50',0,800,'any',v=>Number(v.fio2)<0.5),num('gradient','Gradiente A–a O₂ (mmHg), si FiO₂ ≥0,50',0,800,'any',v=>Number(v.fio2)>=0.5),select('acid','Medición ácido-base',[['ph','pH arterial disponible'],['bicarbonate','Sin gasometría arterial: bicarbonato venoso']]),num('ph','pH arterial',6,8.5,'any',v=>v.acid==='ph'),num('bicarbonate','Bicarbonato venoso (mEq/L)',0,100,'any',v=>v.acid==='bicarbonate'),num('sodium','Sodio (mEq/L)',70,250),num('potassium','Potasio (mEq/L)',0.5,15),num('creatinine','Creatinina (mg/dL)',0.01,30),yes('aki','Insuficiencia renal aguda (duplica puntos de creatinina)'),num('hct','Hematocrito (%)',1,80),num('wbc','Leucocitos (miles/µL; p. ej. 12,5)',0,200),num('gcs','Glasgow evaluable, sin efecto de sedación (3–15)',3,15,1),select('chronic','Enfermedad orgánica grave o inmunocompromiso previos',[[0,'Ausentes'],[2,'Presentes: posoperatorio electivo'],[5,'Presentes: no operado o cirugía urgente']])];
+ function apache(v){
+  const n=id=>Number(v[id]);
+  const physiology=[
+   ['Temperatura',band(n('temp'),[[30,4],[32,3],[34,2],[36,1],[38.5,0],[39,1],[41,3],[Infinity,4]])],
+   ['PAM',band(n('map'),[[50,4],[70,2],[110,0],[130,2],[160,3],[Infinity,4]])],
+   ['FC',band(n('hr'),[[40,4],[55,3],[70,2],[110,0],[140,2],[180,3],[Infinity,4]])],
+   ['FR',band(n('rr'),[[6,4],[10,2],[12,1],[25,0],[35,1],[50,3],[Infinity,4]])],
+   ['Oxigenación',n('fio2')>=0.5?band(n('gradient'),[[200,0],[350,2],[500,3],[Infinity,4]]):(n('pao2')<55?4:n('pao2')<=60?3:n('pao2')<=70?1:0)],
+   ['Ácido-base',v.acid==='ph'?band(n('ph'),[[7.15,4],[7.25,3],[7.33,2],[7.5,0],[7.6,1],[7.7,3],[Infinity,4]]):band(n('bicarbonate'),[[15,4],[18,3],[22,2],[32,0],[41,1],[52,3],[Infinity,4]])],
+   ['Sodio',band(n('sodium'),[[111,4],[120,3],[130,2],[150,0],[155,1],[160,2],[180,3],[Infinity,4]])],
+   ['Potasio',band(n('potassium'),[[2.5,4],[3,2],[3.5,1],[5.5,0],[6,1],[7,3],[Infinity,4]])],
+   ['Creatinina',band(n('creatinine'),[[0.6,2],[1.5,0],[2,2],[3.5,3],[Infinity,4]])*(n('aki')?2:1)],
+   ['Hematocrito',band(n('hct'),[[20,4],[30,2],[46,0],[50,1],[60,2],[Infinity,4]])],
+   ['Leucocitos',band(n('wbc'),[[1,4],[3,2],[15,0],[20,1],[40,2],[Infinity,4]])],['Glasgow',15-n('gcs')]
+  ];
+  return total([...physiology,['Edad',band(n('age'),[[45,0],[55,2],[65,3],[75,5],[Infinity,6]])],['Salud crónica',n('chronic')]],71,'APACHE II: seleccionar para cada variable el valor que otorgue más puntos en las primeras 24 h de UCI. No es una probabilidad individual de mortalidad; no informa porcentaje sin el modelo diagnóstico correspondiente.');
+ }
+ add({id:'apache-ii',title:'APACHE II',category:'Cuidados críticos',population:'Adultos en UCI; no aplicar a pediatría. Ver definiciones de salud crónica en la fuente.',fields:apacheFields,sources:[sources.apache,sources.apacheTable],calculate:apache});
+ const sofaFields=[num('pf','PaO₂ / FiO₂ (mmHg)',0,1000),yes('support','Soporte respiratorio'),num('platelets','Plaquetas (miles/µL)',0,2000),num('bilirubin','Bilirrubina total (mg/dL)',0,100),select('cv','Peor condición cardiovascular (vasoactivos en µg/kg/min)',[[0,'PAM ≥70; sin vasoactivos'],[1,'PAM <70; sin vasoactivos'],[2,'Dopamina ≤5 o dobutamina a cualquier dosis'],[3,'Dopamina >5 a 15; adrenalina o noradrenalina ≤0,1'],[4,'Dopamina >15; adrenalina o noradrenalina >0,1']]),num('gcs','Glasgow (3–15)',3,15,1),num('creatinine','Creatinina (mg/dL)',0,30),num('urine','Diuresis de 24 h (mL)',0,20000)];
+ add({id:'sofa',title:'SOFA · versión clásica',category:'Cuidados críticos',population:'Adultos; evaluación por órganos. Seleccionar el peor criterio cardiovascular.',fields:sofaFields,sources:[sources.sofa],calculate(v){const n=id=>Number(v[id]);return total([['Respiratorio',n('pf')<100&&n('support')?4:n('pf')<200&&n('support')?3:n('pf')<300?2:n('pf')<400?1:0],['Coagulación',band(n('platelets'),[[20,4],[50,3],[100,2],[150,1],[Infinity,0]])],['Hepático',band(n('bilirubin'),[[1.2,0],[2,1],[6,2],[12,3],[Infinity,4]])],['Cardiovascular',n('cv')],['Neurológico',band(n('gcs'),[[6,4],[10,3],[13,2],[15,1],[Infinity,0]])],['Renal',Math.max(band(n('creatinine'),[[1.2,0],[2,1],[3.5,2],[5,3],[Infinity,4]]),n('urine')<200?4:n('urine')<500?3:0)]],24,'SOFA clásico. Interpretar cambios respecto del basal; un total aislado no diagnostica ni descarta sepsis.');}});
+ const qsofa=[num('rr','Frecuencia respiratoria (/min)',0,100),num('sbp','Presión sistólica (mmHg)',20,300),yes('mental','Alteración del estado mental')];
+ add({id:'qsofa',title:'qSOFA',category:'Cuidados críticos',population:'Adultos con sospecha de infección; herramienta pronóstica, no prueba diagnóstica.',fields:qsofa,sources:[sources.sofa],calculate(v){const r=total([['FR ≥22',Number(v.rr)>=22?1:0],['PAS ≤100',Number(v.sbp)<=100?1:0],['Alteración mental',Number(v.mental)]],3,'Un puntaje bajo no excluye sepsis ni debe demorar su atención.');r.extra.push(['Interpretación',r.score>=2?'Mayor riesgo: valorar disfunción orgánica y evaluación urgente.':'Menos de 2 criterios; continuar evaluación según sospecha clínica.']);return r;}});
+ function curbFields(withUrea){return[num('age','Edad (años)',18,120,1),yes('confusion','Confusión nueva / desorientación'),...(withUrea?[num('urea','Urea sérica (mmol/L; no BUN en mg/dL)',0,100)]:[]),num('rr','Frecuencia respiratoria (/min)',0,100),num('sbp','Presión sistólica (mmHg)',20,300),num('dbp','Presión diastólica (mmHg)',10,200)];}
+ for(const withUrea of [true,false])add({id:withUrea?'curb65':'crb65',title:withUrea?'CURB-65':'CRB-65',category:'Neumonología',population:withUrea?'Adultos con neumonía adquirida en la comunidad, ámbito hospitalario.':'Adultos con neumonía adquirida en la comunidad, sin urea disponible.',fields:curbFields(withUrea),sources:[sources.curb],calculate(v){if(Number(v.dbp)>Number(v.sbp))throw Error('Revisá la presión arterial: diastólica mayor que sistólica.');const parts=[['Confusión',Number(v.confusion)],...(withUrea?[['Urea >7 mmol/L',Number(v.urea)>7?1:0]]:[]),['FR ≥30',Number(v.rr)>=30?1:0],['PAS <90 o PAD ≤60',Number(v.sbp)<90||Number(v.dbp)<=60?1:0],['Edad ≥65',Number(v.age)>=65?1:0]];const r=total(parts,withUrea?5:4,'Interpretar con comorbilidades, fragilidad, oxigenación y juicio clínico. No decide por sí solo el sitio de atención.');r.extra.push(['Estrato',withUrea?(r.score<=1?'Bajo':r.score===2?'Intermedio':'Alto'):(r.score===0?'Bajo':r.score<=2?'Intermedio':'Alto')]);return r;}});
+ const afFields=[num('age','Edad (años)',18,120,1),yes('hf','Insuficiencia cardíaca'),yes('htn','Hipertensión'),yes('diabetes','Diabetes'),yes('stroke','ACV / AIT / embolia arterial previos'),yes('vascular','Enfermedad vascular')];
+ for(const female of [false,true])add({id:female?'cha2ds2-vasc':'cha2ds2-va',title:female?'CHA₂DS₂-VASc':'CHA₂DS₂-VA · ESC 2024',category:'Cardiología',population:'Adultos con fibrilación auricular. La versión VA no puntúa sexo.',fields:[...afFields,...(female?[yes('female','Sexo femenino (componente de la versión VASc)')]:[])],sources:[female?sources.vasc:sources.af],calculate:v=>total([['Edad',Number(v.age)>=75?2:Number(v.age)>=65?1:0],['IC',Number(v.hf)],['HTA',Number(v.htn)],['Diabetes',Number(v.diabetes)],['ACV/AIT/embolia',2*Number(v.stroke)],['Vascular',Number(v.vascular)],...(female?[['Sexo femenino',Number(v.female)]]:[])],female?9:8,'La elección de anticoagulación requiere contexto, contraindicaciones y decisión médica. La guía ESC 2024 utiliza CHA₂DS₂-VA; no sumar nuevamente los dos intervalos de edad.')});
+ const bledFields=[yes('htn','PAS >160 mmHg / hipertensión no controlada'),yes('renal','Diálisis, trasplante renal o creatinina ≥2,26 mg/dL'),yes('liver','Cirrosis o alteración hepática definida por la escala'),yes('stroke','ACV previo'),yes('bleeding','Sangrado mayor previo o predisposición'),yes('inr','INR lábil / tiempo en rango <60%'),yes('elder','Edad >65 años'),yes('drugs','Antiagregantes o AINE concomitantes'),yes('alcohol','Consumo de alcohol ≥8 unidades/semana')];
+ add({id:'has-bled',title:'HAS-BLED',category:'Cardiología',population:'Adultos con FA; renal y hepático puntúan por separado, al igual que fármacos y alcohol.',fields:bledFields,sources:[sources.bled],description:'Alteración hepática: hepatopatía crónica o bilirrubina >2× límite superior junto con AST/ALT/fosfatasa alcalina >3× límite superior.',calculate(v){const r=total(bledFields.map(f=>[f.label,Number(v[f.id])]),9,'Identificar y corregir factores modificables. Un puntaje alto no es, por sí solo, razón para negar anticoagulación.');r.extra.push(['Revisión',r.score>=3?'≥3: mayor riesgo de sangrado; revisión y seguimiento estrecho.':'<3: mantener evaluación individual y seguimiento.']);return r;}});
+ const peFields=[yes('dvt','Signos clínicos de TVP'),yes('alternative','TEP más probable que otro diagnóstico'),yes('tachy','Frecuencia cardíaca >100/min'),yes('immobile','Inmovilización >3 días o cirugía en 4 semanas'),yes('previous','TVP o TEP previos'),yes('hemoptysis','Hemoptisis'),yes('cancer','Cáncer en tratamiento, últimos 6 meses o paliativo')];
+ add({id:'wells-pe',title:'Wells · TEP (2 niveles)',category:'Trombosis',population:'Adultos con sospecha de TEP. No aplicar en embarazo sin vía específica.',fields:peFields,sources:[sources.wells],calculate(v){const weights=[3,3,1.5,1.5,1.5,1,1];const r=total(peFields.map((f,i)=>[f.label,Number(v[f.id])*weights[i]]),12.5,'Probabilidad clínica, no confirmación ni descarte. Continuar algoritmo diagnóstico con pruebas según contexto.');r.extra.push(['Clasificación',r.score>4?'TEP probable (>4)':'TEP improbable (≤4); no equivale a descartado.']);return r;}});
+ const dvtFields=[yes('cancer','Cáncer activo / tratado en 6 meses / paliativo'),yes('paralysis','Parálisis, paresia o yeso reciente de miembro inferior'),yes('bedrest','Reposo ≥3 días o cirugía mayor en 12 semanas con anestesia general/regional'),yes('tender','Dolor localizado sobre sistema venoso profundo'),yes('whole','Tumefacción de toda la pierna'),yes('calf','Pantorrilla ≥3 cm más grande (medir 10 cm bajo tuberosidad tibial)'),yes('edema','Edema con fóvea limitado a pierna sintomática'),yes('veins','Venas colaterales superficiales no varicosas'),yes('previous','TVP documentada previa'),yes('alternative','Otro diagnóstico al menos tan probable como TVP')];
+ add({id:'wells-dvt',title:'Wells · TVP (2 niveles)',category:'Trombosis',population:'Adultos con sospecha de TVP; no embarazo.',fields:dvtFields,sources:[sources.wells],calculate(v){const r=total(dvtFields.map((f,i)=>[f.label,Number(v[f.id])*(i===9?-2:1)]),9,'El resultado puede ser −2. Continuar el algoritmo diagnóstico; no confirma ni descarta TVP.');r.extra.push(['Clasificación',r.score>=2?'TVP probable (≥2)':'TVP improbable (<2); no equivale a descartada.']);return r;}});
+ const childFields=[num('bilirubin','Bilirrubina total (mg/dL)',0,100),num('albumin','Albúmina (g/dL)',0.1,8),num('inr','INR (sin interferencia de anticoagulación)',0.5,20),select('ascites','Ascitis',[[1,'Ausente'],[2,'Leve / controlada'],[3,'Moderada o grave / refractaria']]),select('encephalopathy','Encefalopatía',[[1,'Ausente'],[2,'Grado I–II'],[3,'Grado III–IV']])];
+ add({id:'child-pugh',title:'Child–Pugh · cirrosis',category:'Hepatología',population:'Cirrosis, variante estándar de bilirrubina; no variante colestásica.',fields:childFields,sources:[sources.child],calculate(v){const r=total([['Bilirrubina',Number(v.bilirubin)<2?1:Number(v.bilirubin)<=3?2:3],['Albúmina',Number(v.albumin)>3.5?1:Number(v.albumin)>=2.8?2:3],['INR',Number(v.inr)<1.7?1:Number(v.inr)<=2.3?2:3],['Ascitis',Number(v.ascites)],['Encefalopatía',Number(v.encephalopathy)]],15,'Interpretar con etiología y contexto; no utilizar INR alterado por anticoagulantes como reflejo aislado de función hepática.');r.extra.push(['Clase',r.score<=6?'A (5–6)':r.score<=9?'B (7–9)':'C (10–15)']);return r;}});
+ function vancoReview(lab){
+  const rows=Array.isArray(lab?.resultRows)?lab.resultRows:[];
+  const row=rows.find(r=>/vancom|vancocin|vancocinem/i.test(String(r.key||'')+' '+String(r.label||'')));
+  if(!row)return null;
+  const raw=String(row.value??'').trim(),value=Number(raw.replace(',','.')),unit=String(row.unit||'').trim();
+  const valid=/^\d+(?:[.,]\d+)?$/.test(raw)&&Number.isFinite(value)&&value>=0&&value<=1000&&/^(mg\/l|[µμu]g\/ml)$/i.test(unit);
+  const meta=lab.vancomycinTdm||{},canonicalMeta=Object.fromEntries(Object.keys(meta).sort().map(key=>[key,meta[key]]));
+  return{value:valid?value:null,display:raw+' '+unit,valid,labId:String(lab.id||''),at:String(lab.editedAt||lab.reportedAt||''),meta,key:[lab.id,lab.editedAt||lab.reportedAt,raw,unit,JSON.stringify(canonicalMeta)].join('|')};
+ }
+ function vancoAuc({currentDailyDose,measuredAuc,targetAuc,stable,method}){
+  const v={currentDailyDose,measuredAuc,targetAuc};const dose=number(v,'currentDailyDose',1,12000),auc=number(v,'measuredAuc',1,5000),target=number(v,'targetAuc',400,600);
+  if(stable!=='yes')throw Error('El cálculo proporcional requiere adulto con función renal y farmacocinética estables; no usar en lesión renal aguda, diálisis ni pediatría.');
+  if(!['bayesian','two-level'].includes(method))throw Error('Ingresá AUC24 calculada por método farmacocinético validado. Un nivel aislado no es una AUC.');
+  return{proposedDailyDose:dose*target/auc,note:'Estimación proporcional en mg/día para revisión profesional, no orden ni esquema de administración. Revisar dosis por toma, intervalo, función renal, MIC, tiempos y protocolo institucional. El objetivo AUC24 400–600 mg·h/L se refiere a infecciones graves por MRSA con MIC asumida de 1 mg/L.'};
+ }
+ return Object.freeze({list:()=>tools.slice(),calculate,validate,visible,sources,vancoReview,vancoAuc,band});
+});
+
+</script>
+<style id="hc-v288-style">
+#medPanel #labReqChips{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:5px 10px!important}
+#medPanel #labReqChips .imgStudyChoice{min-width:0;padding:7px 8px!important}
+.hc288ScaleLayout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:14px}
+.hc288ScaleList{display:flex;flex-direction:column;gap:6px;max-height:580px;overflow:auto;padding:2px}
+.hc288ScaleList button{text-align:left;white-space:normal;line-height:1.35;padding:9px}
+.hc288ScaleList button[aria-pressed=true]{border-color:#9ceaff!important;background:#0c6584!important}
+.hc288Fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,255px),1fr));gap:12px;margin:14px 0}
+.hc288Fields label{display:flex!important;flex-direction:column;gap:6px;min-width:0;line-height:1.4}
+.hc288Fields input,.hc288Fields select,#hc288ScaleSearch{box-sizing:border-box;width:100%;min-width:0;color:#eef8ff}
+.hc288Fields [hidden]{display:none!important}
+#medScales,#medScales>*{min-width:0}
+#medScales p{line-height:1.5}
+#medScales a,.hc288Vanco a{color:#9ae7ff!important}
+.hc288Result{padding:14px;border:1px solid #58b8ce;border-radius:10px;margin-top:14px;overflow-wrap:anywhere}
+.hc288Score{font-size:26px;font-weight:750;margin:0 0 8px}
+.hc288Result table{width:100%;border-collapse:collapse}.hc288Result td{padding:5px 8px;border-bottom:1px solid #2c556d}
+.hc288Error{color:#ffd1a3;padding:10px 0}
+.hc288Vanco{border:2px solid #f1ac52!important;padding:12px;border-radius:10px;background:#183e50;color:#f2f8ff;margin:8px 0 14px}
+.hc288Vanco p{margin:7px 0;line-height:1.45}.hc288Vanco textarea{width:100%;min-height:65px;box-sizing:border-box}
+.hc288VancoActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+[data-medtab].hc288VancoUnread{box-shadow:inset 0 -4px #ffa746!important}
+.censoItem.hc288VancoUnread{border-left:4px solid #ffa746!important}
+.ownScheduleCard summary{font-weight:750;cursor:pointer;padding:4px 0}
+@media(max-width:900px){.hc288ScaleLayout{grid-template-columns:1fr}.hc288ScaleList{max-height:220px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){#medPanel #labReqChips{grid-template-columns:1fr!important}.hc288ScaleList{grid-template-columns:1fr}.hc288Fields{grid-template-columns:1fr}}
+</style>
+<script id="hc-v288-ui">
+(()=>{
+ 'use strict';
+ const api=window.HospitalitoScales,$=s=>document.querySelector(s),esc=v=>escHTML(String(v??''));
+ const clinicalRoles=['medico','enfermero','bioquimico','microbiologo','imagenologo','farmaceutico','nutricionista','hemoterapia','kinesiologo','observador'];
+ const context=()=>[session?.username,localStorage.getItem(LS.backendRegistryId),selectedPatientId||'sin-paciente'].join('|');
+ const memory=new Map();
+ const gestograma=window.HospitalitoSpecialtyTools.list()[0];
+ const tools=[...api.list(),{...gestograma,id:'gestograma',category:'Obstetricia',sources:[gestograma.source],population:'FUM conocida y ciclos regulares; confirmar datación obstétrica.',calculate:values=>{const r=gestograma.calculate(values);return{parts:[],extra:r.lines,note:r.note};}},{id:'vancomycin-auc',title:'Vancomicina · revisión por AUC24',category:'Farmacología',population:'Adultos con farmacocinética estable y AUC24 ya calculada por un método validado. No calcula AUC a partir de un nivel aislado.',sources:[api.sources.vanco],fields:[{id:'currentDailyDose',label:'Dosis diaria actual (mg/día)',type:'number',min:1,max:12000,step:'any'},{id:'measuredAuc',label:'AUC24 medida / estimada (mg·h/L)',type:'number',min:1,max:5000,step:'any'},{id:'targetAuc',label:'AUC24 objetivo individual (400–600 mg·h/L)',type:'number',min:400,max:600,step:'any'},{id:'method',label:'Método con el que se obtuvo la AUC24',type:'select',options:[{value:'bayesian',label:'Modelo bayesiano validado'},{value:'two-level',label:'Farmacocinética validada con dos niveles'}]},{id:'stable',label:'Adulto estable, sin lesión renal aguda ni diálisis',type:'select',options:[{value:'yes',label:'Sí; condiciones verificadas por el profesional'},{value:'no',label:'No / no confirmado'}]}],calculate:values=>{const r=api.vancoAuc(values);if(r.proposedDailyDose>12000)throw Error('La estimación queda fuera del intervalo de esta herramienta. Revisar datos y consultar Farmacia clínica.');return{parts:[],extra:[['Dosis diaria teórica para revisión',r.proposedDailyDose.toFixed(1)+' mg/día']],note:r.note};}}];
+ function calculate(tool,values){if(tool.id==='gestograma')return tool.calculate(values);api.validate(tool,values);return tool.calculate(values);}
+ function renderScales(){
+  const root=$('#medScales');if(!root)return;
+  if(!clinicalRoles.includes(session?.role)){root.replaceChildren();return;}
+  const key=context();if(root.dataset.hc288Context===key&&root.childElementCount)return;
+  root.dataset.hc288Context=key;
+  let state=memory.get(key);if(!state){state={selected:'nihss',query:'',values:{}};memory.set(key,state);if(memory.size>40)memory.delete(memory.keys().next().value);}
+  root.innerHTML='<p>Calculadoras clínicas · '+tools.length+' herramientas disponibles. Los datos se completan manualmente y el resultado se puede copiar a la evolución. No se guardan ni se cambian tratamientos automáticamente.</p><div class="hc288ScaleLayout"><div><label for="hc288ScaleSearch">Buscar escala</label><input id="hc288ScaleSearch" type="search" placeholder="NIHSS, TIMI, APACHE…" value="'+esc(state.query)+'"><div id="hc288ScaleList" class="hc288ScaleList" style="margin-top:10px"></div></div><div id="hc288ScaleForm" class="card"></div></div>';
+  const list=root.querySelector('#hc288ScaleList'),host=root.querySelector('#hc288ScaleForm');
+  function paintList(){
+   const q=apiNormalize(state.query),found=tools.filter(t=>apiNormalize(t.title+' '+t.category).includes(q));
+   list.innerHTML=found.length?found.map(t=>'<button type="button" class="btn" data-hc288-scale="'+esc(t.id)+'" aria-pressed="'+(t.id===state.selected)+'"><b>'+esc(t.title)+'</b><br><small>'+esc(t.category)+'</small></button>').join(''):'<p>Sin coincidencias.</p>';
+   list.querySelectorAll('button').forEach(b=>b.onclick=()=>{state.selected=b.dataset.hc288Scale;paintList();paintForm()});
+  }
+  function paintForm(){
+   const tool=tools.find(t=>t.id===state.selected)||tools[0],values=state.values[tool.id]||(state.values[tool.id]={});
+   host.innerHTML='<h3 style="margin-top:0">'+esc(tool.title)+'</h3><p>'+esc(tool.population||'')+'</p>'+(tool.description?'<p class="muted">'+esc(tool.description)+'</p>':'')+'<form id="hc288Calculator" novalidate><div class="hc288Fields">'+tool.fields.map(f=>{
+    if(values[f.id]===undefined)values[f.id]=f.defaultToday?isoNowLocalFull().slice(0,10):f.value??'';
+    const attrs='id="hc288Field-'+esc(f.id)+'" name="'+esc(f.id)+'"',value=values[f.id];
+    return '<label data-hc288-field="'+esc(f.id)+'" for="hc288Field-'+esc(f.id)+'">'+esc(f.label)+(f.type==='select'?'<select '+attrs+'><option value="">— Seleccionar —</option>'+f.options.map(o=>'<option value="'+esc(o.value)+'" '+(String(value)===String(o.value)?'selected':'')+'>'+esc(o.value!==''&&/^-?\d+(\.\d+)?$/.test(o.value)?o.label:o.label)+'</option>').join('')+'</select>':'<input '+attrs+' type="'+esc(f.type==='date'?'date':f.type==='number'?'number':'text')+'" value="'+esc(value)+'" '+['min','max','step'].filter(k=>f[k]!==undefined).map(k=>k+'="'+esc(f[k])+'"').join(' ')+'>')+'</label>';
+   }).join('')+'</div><button type="submit" class="btn primary">Calcular resultado</button> <button type="button" class="btn" id="hc288ResetScale">Limpiar esta escala</button><div id="hc288ScaleResult" role="status" aria-live="polite"></div></form><p>'+tool.sources.map(s=>'<a target="_blank" rel="noopener noreferrer" href="'+esc(s.url)+'">'+esc(s.title)+'</a>').join(' · ')+'</p>';
+   const form=host.querySelector('form'),result=host.querySelector('#hc288ScaleResult');
+   function visibility(){for(const f of tool.fields){const field=host.querySelector('[data-hc288-field="'+f.id+'"]');field.hidden=!api.visible(f,values);}}
+   visibility();
+   for(const kind of ['input','change'])form.addEventListener(kind,event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();result.className='';visibility();}});
+   host.querySelector('#hc288ResetScale').onclick=()=>{state.values[tool.id]={};paintForm()};
+   form.onsubmit=event=>{event.preventDefault();try{
+    const r=calculate(tool,values);result.className='hc288Result';
+    result.innerHTML=(r.score!==undefined?'<div class="hc288Score">'+esc(r.score)+' / '+esc(r.max)+' puntos</div>':'')+(r.parts?.length?'<details><summary>Ver puntos por componente</summary><table>'+r.parts.map(p=>'<tr><td>'+esc(p[0])+'</td><td>'+esc(p[1])+'</td></tr>').join('')+'</table></details>':'')+(r.extra||[]).map(p=>'<p><b>'+esc(p[0])+':</b> '+esc(p[1])+'</p>').join('')+'<p>'+esc(r.note||'')+'</p><button class="btn small" type="button" id="hc288CopyScale">Copiar resultado</button><span id="hc288CopyScaleStatus" style="margin-left:8px"></span>';
+    result.querySelector('button').onclick=async()=>{const text=tool.title+' · '+dmyhmFromISODateTime(isoNowLocalFull())+'\n'+(r.score!==undefined?'Puntaje: '+r.score+'/'+r.max+'\n':'')+[...(r.parts||[]),...(r.extra||[])].map(p=>p[0]+': '+p[1]).join('\n')+'\n'+(r.note||'');try{await navigator.clipboard.writeText(text);$('#hc288CopyScaleStatus').textContent='Copiado';}catch(_){$('#hc288CopyScaleStatus').textContent='Seleccioná el texto y copialo manualmente.';}};
+   }catch(error){result.className='hc288Error';result.textContent=error.message||'Revisá los datos.';}};
+  }
+  root.querySelector('#hc288ScaleSearch').oninput=event=>{state.query=event.target.value;paintList()};paintList();paintForm();
+ }
+ function apiNormalize(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+ const panelBase=renderMedPanel;renderMedPanel=function(){const r=panelBase.apply(this,arguments);const root=$('#medScales');if(root){root.style.display=medTab==='escalas'?'':'none';if(medTab==='escalas'){$('#medPanelTitle').textContent='Escalas';renderScales();}}return r;};
+ window.hc288RenderScales=renderScales;
+ function foldSchedules(){document.querySelectorAll('div.ownScheduleCard').forEach(card=>{
+  const details=document.createElement('details'),summary=document.createElement('summary');details.className=card.className;summary.textContent='Mis días y horarios de atención';
+  const key='hc288.schedule.'+(session?.username||'')+'.'+(localStorage.getItem(LS.backendRegistryId)||'');details.open=localStorage.getItem(key)==='open';
+  card.firstElementChild?.remove();details.append(summary);while(card.firstChild)details.append(card.firstChild);details.addEventListener('toggle',()=>localStorage.setItem(key,details.open?'open':'closed'));card.replaceWith(details);
+ });}
+ const consultBase=renderConsultoriosMedico;renderConsultoriosMedico=function(){const r=consultBase.apply(this,arguments);foldSchedules();return r;};foldSchedules();
+ const vancoName='Vancocinemia (vancomicina)';
+ if(!LAB_PANEL_LIST.includes(vancoName))LAB_PANEL_LIST.push(vancoName);
+ LAB_PROFILES[vancoName]=[{key:'vancocinemia',label:'Vancocinemia',unit:'mg/L',ref:'Interpretar según tipo y horario de muestra, función renal y exposición AUC24.'}];
+ const tdmFields=[['sampleKind','Tipo de muestra','select'],['sampleAt','Fecha y hora de extracción','datetime-local'],['lastDoseStart','Inicio de la última dosis recibida antes de la muestra','datetime-local'],['lastDoseEnd','Fin de esa infusión','datetime-local'],['doseMg','Dosis administrada (mg)','number'],['intervalHours','Intervalo entre dosis (h)','number']];
+ function metaHTML(meta={}){return '<div class="hc288Fields">'+tdmFields.map(([id,label,type])=>'<label>'+esc(label)+(type==='select'?'<select data-hc288-tdm="'+id+'">'+[['unknown','No informado'],['trough','Valle / antes de la próxima dosis'],['post','Posinfusión'],['random','Aleatoria']].map(([v,l])=>'<option value="'+v+'" '+((meta[id]||'unknown')===v?'selected':'')+'>'+l+'</option>').join('')+'</select>':'<input data-hc288-tdm="'+id+'" type="'+type+'" '+(type==='number'?'min="0" step="any"':'')+' value="'+esc(meta[id]||'')+'">')+'</label>').join('')+'</div>';}
+ function readMeta(root){const out={};for(const input of root.querySelectorAll('[data-hc288-tdm]'))out[input.dataset.hc288Tdm]=input.value.trim();return out;}
+ function validateMeta(meta){for(const key of ['doseMg','intervalHours'])if(meta[key]&&!/^\d+(?:[.,]\d+)?$/.test(meta[key]))throw Error('Revisá dosis e intervalo de la muestra.');if(meta.lastDoseStart&&meta.lastDoseEnd&&meta.lastDoseEnd<meta.lastDoseStart)throw Error('El fin de infusión no puede ser anterior al inicio.');}
+ function metaText(meta){return '\n[Monitorización de vancomicina]\n'+tdmFields.map(([id,label])=>label+': '+(id==='sampleKind'?({unknown:'No informado',trough:'Valle',post:'Posinfusión',random:'Aleatoria'}[meta[id]]||'No informado'):(meta[id]||'No informado'))).join('\n')+'\n[/Monitorización de vancomicina]';}
+ function stripMeta(text){return String(text||'').replace(/\n?\[Monitorización de vancomicina\][\s\S]*?\[\/Monitorización de vancomicina\]/g,'');}
+ const labOpenBase=openLabRequest;openLabRequest=function(pid,rid){const r=labOpenBase.apply(this,arguments);if($('#labModalContent [data-lab-result-key="vancocinemia"]')){const box=document.createElement('details');box.id='hc288TdmMeta';box.open=true;box.className='card';box.innerHTML='<summary>Datos de la muestra de vancomicina</summary><p>La concentración se informa en mg/L (equivale a µg/mL). Registrá los horarios disponibles para su interpretación y revisión médica.</p>'+metaHTML();$('#labFreeNote')?.closest('.field')?.before(box);}return r;};
+ window.hc288ReadLabMeta=rows=>{if(!rows.some(r=>/vancocinem|vancom/i.test(r.key+' '+r.label)))return undefined;const root=$('#hc288TdmMeta');return root?readMeta(root):{sampleKind:'unknown'};};
+ window.hc288AppendLabMeta=result=>{if(result.vancomycinTdm)result.resultText=stripMeta(result.resultText)+metaText(result.vancomycinTdm);};
+ document.addEventListener('click',event=>{
+  if(event.target.closest('#btnSendLab')&&$('#hc288TdmMeta')){try{validateMeta(readMeta($('#hc288TdmMeta')));}catch(error){event.preventDefault();event.stopImmediatePropagation();alert(error.message);}}
+  const edit=event.target.closest('[data-lab-edit]');if(edit){const rid=edit.dataset.labEdit;setTimeout(()=>{
+   const root=document.getElementById('labResultEdit_'+rid),res=getClinical()?.[selectedPatientId]?.labResults?.find(r=>r.id===rid),reading=api.vancoReview(res);if(!root||!reading||root.querySelector('[data-hc288-edit-tdm]'))return;
+   const box=document.createElement('div');box.dataset.hc288EditTdm='';box.className='card';box.innerHTML='<b>Corregir concentración y datos de vancomicina</b><label>Vancocinemia (mg/L)<input data-hc288-vanco-value value="'+esc(res.resultRows.find(r=>/vancocinem|vancom/i.test(r.key+' '+r.label))?.value||'')+'"></label>'+metaHTML(res.vancomycinTdm);root.prepend(box);
+  },0);}
+  const save=event.target.closest('[data-lab-save-edit]');if(save){const root=document.getElementById('labResultEdit_'+save.dataset.labSaveEdit)?.querySelector('[data-hc288-edit-tdm]');if(root)try{validateMeta(readMeta(root));if(!root.querySelector('[data-hc288-vanco-value]').value.trim())throw Error('Completá la concentración corregida.');}catch(error){event.preventDefault();event.stopImmediatePropagation();alert(error.message);}}
+ },true);
+ window.hc288PrepareEditedLab=(res,text)=>{
+  const root=document.getElementById('labResultEdit_'+res.id)?.querySelector('[data-hc288-edit-tdm]');if(!root)return text;
+  const row=res.resultRows?.find(r=>/vancocinem|vancom/i.test(r.key+' '+r.label));if(!row)return text;
+  const meta=readMeta(root),value=root.querySelector('[data-hc288-vanco-value]').value.trim();
+  res.vancomycinTdmHistory=Array.isArray(res.vancomycinTdmHistory)?res.vancomycinTdmHistory:[];res.vancomycinTdmHistory.push({at:res.editedAt||res.reportedAt,value:row.value,unit:row.unit,meta:res.vancomycinTdm||{}});
+  row.value=value;row.unit='mg/L';res.vancomycinTdm=meta;
+  const line='Vancocinemia: '+value+' mg/L',clean=stripMeta(text);return (/^\s*Vancocinemia\s*:/im.test(clean)?clean.replace(/^\s*Vancocinemia\s*:.*$/im,line):clean+'\n'+line)+metaText(meta);
+ };
+ function activeVanco(cur){return(cur?.prescripciones?.infusionesContinuas||[]).filter(item=>item.active!==false&&!item.suspendedAt&&!item.finishedAt&&/vancom|vancocin/i.test(String(item.drugName||'')+' '+String(item.drugId||'')));}
+ const time=value=>{const ms=Date.parse(String(value||''));return Number.isFinite(ms)?ms:0;};
+ function reviewFor(pid,snapshot){const cur=(snapshot||getClinical())?.[pid];if(!cur)return null;const meds=activeVanco(cur);if(!meds.length)return null;const readings=(cur.labResults||[]).map(api.vancoReview).filter(Boolean).sort((a,b)=>time(b.at)-time(a.at));const reading=readings[0];if(!reading)return null;const pending=meds.filter(item=>(!time(reading.at)||time(reading.at)>=time(item.createdAt))&&!(item.vancomycinReviews||[]).some(r=>r.resultKey===reading.key));return pending.length?{reading,meds:pending,cur}:null;}
+ function vancoPanel(){
+  const root=$('#medPres'),pid=selectedPatientId;root?.querySelector('#hc288VancoReview')?.remove();if(!root||!pid||session?.role!=='medico')return;
+  const review=reviewFor(pid);if(!review)return;const {reading,meds}=review;
+  const card=document.createElement('section');card.id='hc288VancoReview';card.className='hc288Vanco';card.innerHTML='<b>Vancocinemia informada · revisar tratamiento</b><p><b>'+esc(reading.display)+'</b> · '+esc(dmyhmFromISODateTime(reading.at))+'</p><p>Muestra: '+esc({trough:'Valle',post:'Posinfusión',random:'Aleatoria'}[reading.meta.sampleKind]||'No informada')+' · Extracción: '+esc(dmyhmFromISODateTime(reading.meta.sampleAt)||'No informada')+'</p>'+(!reading.valid?'<p>No se reconoce un valor numérico o una unidad compatible. Verificar el informe con Laboratorio.</p>':'')+'<p>Revisá dosis, intervalo, horarios de muestra e infusión y función renal. Para infecciones graves por MRSA se prioriza monitorización por AUC24; una concentración aislada no permite un ajuste fiable.</p><div class="hc288VancoActions"><button class="btn" type="button" data-hc288-open-auc>Revisión por AUC24</button></div>'+meds.map(item=>'<div class="card" data-hc288-review-rx="'+esc(item.id)+'"><b>'+esc(item.drugName||'Vancomicina')+'</b><p>'+esc(item.preparationText||item.observations||'Revisar la prescripción activa')+'</p><label>Conclusión médica de la revisión<textarea data-hc288-review-note placeholder="Ajuste indicado y motivo, o fundamento para mantener el esquema"></textarea></label><div class="hc288VancoActions"><button class="btn primary" type="button" data-hc288-edit-rx="'+esc(item.id)+'">Revisar / editar prescripción</button><button class="btn" type="button" data-hc288-mark-reviewed="'+esc(item.id)+'">Registrar revisión de este informe</button></div><p data-hc288-review-status role="status"></p></div>').join('');root.prepend(card);
+  card.querySelector('[data-hc288-open-auc]').onclick=()=>{medTab='escalas';const key=context();memory.set(key,{selected:'vancomycin-auc',query:'',values:memory.get(key)?.values||{}});const scales=$('#medScales');if(scales)scales.dataset.hc288Context='';renderMed();};
+  card.querySelectorAll('[data-hc288-edit-rx]').forEach(button=>button.onclick=()=>{const id=button.dataset.hc288EditRx;const original=[...root.querySelectorAll('[data-pr-action="edit-scheduled"]')].find(b=>b.dataset.prId===id);if(original)original.click();else button.closest('[data-hc288-review-rx]').querySelector('[data-hc288-review-status]').textContent='Abrí la fecha actual del plan y usá Editar en la prescripción de vancomicina.';});
+  card.querySelectorAll('[data-hc288-mark-reviewed]').forEach(button=>button.onclick=()=>{
+   if(session?.role!=='medico'||window.hc284LicenseMode?.()==='ro'||selectedPatientId!==pid)return;
+   const box=button.closest('[data-hc288-review-rx]'),note=box.querySelector('textarea').value.trim(),status=box.querySelector('[data-hc288-review-status]');if(!note){status.textContent='Registrá la conclusión y el motivo de la revisión.';return;}
+   const current=reviewFor(pid);if(!current||current.reading.key!==reading.key){status.textContent='Llegó un informe nuevo o corregido. Actualizá antes de registrar la revisión.';return;}
+   const cl=getClinical(),item=cl[pid]?.prescripciones?.infusionesContinuas?.find(i=>i.id===button.dataset.hc288MarkReviewed);if(!item)return;
+   item.vancomycinReviews=Array.isArray(item.vancomycinReviews)?item.vancomycinReviews:[];if(!item.vancomycinReviews.some(r=>r.resultKey===reading.key))item.vancomycinReviews.push({id:uid('vanco-review'),resultKey:reading.key,resultId:reading.labId,reviewedAt:isoNowLocalFull(),reviewedBy:session.username,note});item.updatedAt=isoNowLocalFull();setClinical(cl);window.hc224MarkClinicalFieldDirty?.(pid,'prescripciones');hcBackendScheduleUrgentPush?.();logAction('Revisó vancocinemia y tratamiento: '+note,pid);renderPrescripciones();decorateVanco();
+  });
+ }
+ function decorateVanco(){
+  const doctor=session?.role==='medico',snapshot=doctor?getClinical():{},pending=doctor&&selectedPatientId&&!!reviewFor(selectedPatientId,snapshot);
+  document.querySelectorAll('[data-medtab="prescripciones"]').forEach(b=>b.classList.toggle('hc288VancoUnread',!!pending));
+  document.querySelectorAll('#medCenso .censoItem').forEach(el=>{const pid=typeof hcDoctorPatientIdFromCensoItem==='function'?hcDoctorPatientIdFromCensoItem(el):'';el.classList.toggle('hc288VancoUnread',!!(doctor&&pid&&reviewFor(pid,snapshot)));});
+ }
+ const rxBase=renderPrescripciones;renderPrescripciones=function(){const r=rxBase.apply(this,arguments);vancoPanel();decorateVanco();return r;};
+ const censoBase=renderMedCenso;renderMedCenso=function(){const r=censoBase.apply(this,arguments);decorateVanco();return r;};
+ const alertsBase=hcDoctorRefreshAlertsUI;hcDoctorRefreshAlertsUI=function(){const r=alertsBase.apply(this,arguments);decorateVanco();return r;};
+ window.hc288VancoReviewFor=reviewFor;
+ window.hc288Tools=tools;
+ if(medTab==='escalas')renderScales();if(medTab==='prescripciones')vancoPanel();decorateVanco();
 })();
 </script>
 
