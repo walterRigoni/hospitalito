@@ -21,5 +21,11 @@ const c=vm.createContext({console,crypto:globalThis.crypto,TextEncoder,Uint8Arra
  await vm.runInContext('writeRows(client,"fixture",[med])',c);rx=tables.hc_state[0].payload.value.infusionesContinuas;assert(rx.some(x=>x.id==='amlodipina-test'));assert.equal(rx.find(x=>x.id==='old').pendingNurseAlert,false);assert.equal(rx.find(x=>x.id==='old').administrationRecords.length,1);
  tables.hc_state.push({institution_id:'fixture',bucket:'pharmacyDrugs',record_id:'main',payload:{value:['catalog']},sync_seq:99});
  const care=await vm.runInContext('changes(client,"fixture",0,120,true)',c);assert(!care.rows.some(x=>x.bucket==='pharmacyDrugs'));assert(care.rows.some(x=>x.bucket==='clinical'));
- console.log('PASS concurrent medical+nursing saves, stale replica replay, administration preservation, CAS retry and isolated care reception');
+ const current=clone(tables.hc_state[0].payload.value.infusionesContinuas);
+ c.review={bucket:'clinical',record_id:'p_fixture::prescripciones',payload:{value:{infusionesContinuas:current.map(item=>item.id==='old'?{...item,updatedAt:'2026-10-19T12:00:00',vancomycinReviews:[{id:'review1',resultKey:'fixture-result',reviewedAt:'2026-10-19T12:00:00',note:'Revisión ficticia'}]}:item)}},deleted:false,sort_index:0,writer:'medico'};
+ c.nurseLater={bucket:'clinical',record_id:'p_fixture::prescripciones',payload:{value:{infusionesContinuas:current.map(item=>item.id==='old'?{...item,updatedAt:'2026-10-19T12:00:01',administrationRecords:[...item.administrationRecords,{id:'adm2',slotKey:'old|slot2',administeredAt:'2026-10-19T12:00:01'}]}:item)}},deleted:false,sort_index:0,writer:'enfermero'};
+ await Promise.all([vm.runInContext('writeRows(client,"fixture",[review])',c),vm.runInContext('writeRows(client,"fixture",[nurseLater])',c)]);
+ await vm.runInContext('writeRows(client,"fixture",[nurse])',c);
+ const reviewed=tables.hc_state[0].payload.value.infusionesContinuas.find(item=>item.id==='old');assert.equal(reviewed.vancomycinReviews.length,1);assert.equal(reviewed.administrationRecords.length,2);assert(tables.hc_state[0].payload.value.infusionesContinuas.some(item=>item.id==='amlodipina-test'));
+ console.log('PASS concurrent medical+nursing saves, stale replay, CAS retry, isolated reception and vancomycin review preserved beside a new administration');
 })().catch(e=>{console.error(e);process.exit(1)});
