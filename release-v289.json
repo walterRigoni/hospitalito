@@ -1,7 +1,7 @@
 {
   "version": "v289",
-  "sha256": "e20154ae25a09e5a7df99d45b75158fcf85e0b0327857b8b81e7a57f243dbede",
-  "bytes": 3469315,
+  "sha256": "412c0945b176fd05b2b1b355300c23a47184d3da91af3fd722e7f6a9148d14c4",
+  "bytes": 3471326,
   "baseSha256": "d0538083dd5ce8467c3aaee816fc7687043d44a2e7e28257f850fcd1052c5793",
   "checks": [
     "clinical-sync",
@@ -20,6 +20,7 @@
     "live-legacy-and-blocks",
     "live-native-schedule",
     "live-staff-ui",
-    "live-profile-preferences"
+    "live-profile-preferences",
+    "live-inbox-ui"
   ]
 }

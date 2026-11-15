@@ -34,6 +34,8 @@ Se ejecutaron pruebas del servidor real con dos clientes, dos instituciones y cu
 
 La interfaz se probó en escritorio y celular, incluyendo los 16 pares de tema, fuentes, menú, pantalla completa de Miembros, búsqueda, horarios libres/ocupados, urgencia y conservación del formulario al bloquearse. Se leyó una imagen de DNI expresamente ficticia con el OCR real del navegador; no se transmitió al servidor. El acceso WebAuthn se probó con un autenticador virtual, firma real verificada, restricción de origen y desafíos de un solo uso. Las cuentas, membresías, instituciones y sesiones ficticias quedaron deshabilitadas al finalizar.
 
+La bandeja ambulatoria y los resultados del cliente se comprueban cada ocho segundos mientras están abiertos. Se probó que una solicitud entrante avisa sin borrar el texto de un informe en edición, que guardar el borrador permite actualizar la bandeja y que un informe publicado aparece en el Portal sin reabrir la pantalla. `tests/portal-live-updates.cjs` reproduce esas comprobaciones sin cuentas reales.
+
 Las comprobaciones previas de sincronización clínica, historia, borradores, avisos, permisos y escalas también pasaron. `release-v289.json` registra la huella del HTML entregado. Las pruebas no constituyen una certificación clínica ni una garantía de disponibilidad o latencia de servicios externos.
 
 Pruebas de navegador reproducibles con Node y Playwright: instalar Playwright y su Chromium; ejecutar `node tests/portal-ui.cjs` y `node tests/portal-ocr.cjs` desde la raíz. Puede indicarse un ejecutable existente con `BROWSER_EXECUTABLE`. Las capturas se escriben en `test-artifacts/`. Las pruebas con credenciales temporales del servidor no se publican.

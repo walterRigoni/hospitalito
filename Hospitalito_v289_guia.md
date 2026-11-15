@@ -48,7 +48,7 @@ La agenda combina horarios semanales, modificaciones posteriores de la agenda de
 
 Médico, Bioquímica, Microbiología e Imágenes tienen acceso a **Ambulatorios**. El médico emite la solicitud para un cliente verificado de la institución. El servicio correspondiente redacta el informe, puede adjuntar PDF o imagen de hasta 5 MB y elige **Guardar borrador** o **Publicar al cliente**.
 
-Un borrador nuevo no es visible para el cliente. Al corregir un informe ya publicado, el cliente continúa viendo la última versión publicada hasta que se publique la corrección. Se comprueba la revisión del informe para evitar que una pantalla atrasada sobrescriba otra edición. Los adjuntos se entregan mediante enlaces privados breves y se vuelve a comprobar el permiso al solicitarlos.
+La bandeja y los resultados del cliente se comprueban cada ocho segundos mientras están abiertos. Si hay un informe en edición, los avisos de cambios no borran lo que se está escribiendo; se ofrece Actualizar bandeja después de guardar. Un borrador nuevo no es visible para el cliente. Al corregir un informe ya publicado, el cliente continúa viendo la última versión publicada hasta que se publique la corrección. Se comprueba la revisión del informe para evitar que una pantalla atrasada sobrescriba otra edición. Los adjuntos se entregan mediante enlaces privados breves y se vuelve a comprobar el permiso al solicitarlos.
 
 El cliente sólo recibe sus informes publicados y los datos permitidos de su ficha institucional verificada. Los resultados y resúmenes históricos disponibles dependen de que la institución haya vinculado la ficha correcta y de que esos registros existan.
 
