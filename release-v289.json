@@ -1,0 +1,25 @@
+{
+  "version": "v289",
+  "sha256": "e20154ae25a09e5a7df99d45b75158fcf85e0b0327857b8b81e7a57f243dbede",
+  "bytes": 3469315,
+  "baseSha256": "d0538083dd5ce8467c3aaee816fc7687043d44a2e7e28257f850fcd1052c5793",
+  "checks": [
+    "clinical-sync",
+    "history",
+    "doctor-alerts",
+    "service-permissions",
+    "clinical-scales",
+    "drafts-ui",
+    "clinical-regression-ui",
+    "portal-ui",
+    "portal-ocr-synthetic",
+    "webauthn-client",
+    "live-scoped-identity",
+    "live-client-report-isolation",
+    "live-concurrent-booking",
+    "live-legacy-and-blocks",
+    "live-native-schedule",
+    "live-staff-ui",
+    "live-profile-preferences"
+  ]
+}

@@ -1,18 +1,19 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v288**, basada en v287.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v289**, basada en v288.
 
-- [Abrir la aplicación](https://walterRigoni.github.io/hospitalito/)
-- [Archivo HTML v288](https://walterRigoni.github.io/hospitalito/Hospitalito_v288.html)
-- [Guía de las mejoras](Hospitalito_v288_guia.md)
-- [Implementación y pruebas de Escalas](ESCALAS.md)
+- [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
+- [Descargar el HTML v289](https://walterrigoni.github.io/hospitalito/Hospitalito_v289.html)
+- [Guía v289](Hospitalito_v289_guia.md)
+- [Arquitectura del Portal y comprobaciones](PORTAL.md)
+- [Escalas clínicas conservadas](ESCALAS.md)
 
-El módulo **Escalas** reemplaza el panel de herramientas por especialidad de Consultorios. Incluye 18 herramientas con fuentes y validaciones: NIHSS, Glasgow, variantes TIMI, GRACE clásico, APACHE II, SOFA, qSOFA, CURB-65, CRB-65, CHA₂DS₂-VA/VASc, HAS-BLED, Wells TEP/TVP, Child–Pugh, gestograma y revisión de vancomicina por AUC24. Los cálculos son locales, sin guardado clínico automático ni decisiones terapéuticas autónomas.
+v289 incorpora el Portal de clientes, registro con lectura local de DNI y verificación institucional, agendas publicadas voluntariamente, reservas y bloqueos comprobados en el servidor e informes ambulatorios de Laboratorio, Microbiología e Imágenes. Cuenta reúne la navegación personal y agrega colores, iluminación y fuentes separados.
 
-Consultorios permite plegar los horarios. Laboratorio distribuye las solicitudes en dos columnas y agrega vancocinemia, contexto de muestra y revisión médica de órdenes activas ante un resultado nuevo o corregido. Un nivel aislado no cambia automáticamente la dosis. Se conserva la sincronización y el servidor de v287. La X de búsqueda, internaciones anteriores, dieta y portales institucionales se mantienen.
+Las instituciones y los profesionales deben publicar expresamente sus datos y horarios. Una identidad aprobada en una institución no habilita otra. Los clientes sólo reciben sus resultados publicados y datos permitidos de su ficha verificada. Los documentos están en un depósito privado; no se incluyen historias, DNI ni credenciales privadas en los archivos publicados.
 
-Las internaciones anteriores se consultan con la botonera clínica habitual en una vista violeta, aislada de las cachés editables. Prescripciones abre en el cierre o último día conocido y permite revisar fechas previas. Se conserva el aviso cuando una copia histórica está incompleta. La dieta muestra su indicación completa en prescripciones, el resumen lateral y el adjunto de Evolución. Los portales de imágenes se guardan por institución y recuerdan la última elección.
+Los turnos del Portal quedan pendientes de confirmación y reservan el horario internamente. Los turneros externos todavía no están conectados: se combinan únicamente las agendas, los turnos y los bloqueos registrados en Hospitalito. La ubicación se usa con permiso y no se inventan distancias cuando faltan coordenadas.
 
-Se conservan el acceso inicial del administrador, logos, servicios y camas, rol Contador, contabilidad y sincronización clínica. Los cobros siguen desactivados hasta configurar precios, cuentas y credenciales del proveedor. Las liquidaciones internas no son comprobantes fiscales. TURN y la integración de IA continúan pendientes de configuración/desarrollo.
+Se conserva la sincronización clínica, los borradores, la historia por internación, dieta, avisos al médico, portales de imágenes, 18 herramientas de Escalas y la revisión médica de vancomicina por AUC. Los cobros continúan desactivados hasta configurar los acuerdos y proveedores. Las liquidaciones internas no son comprobantes fiscales. TURN e integración de IA continúan pendientes.
 
-`supabase` conserva funciones y migraciones; `tests` contiene comprobaciones de historia, prescripciones, sincronización, permisos y cobros sin pagos reales. Las credenciales permanentes permanecen en el servidor.
+`supabase` contiene funciones y migraciones. `tests` conserva comprobaciones de historia, sincronización, permisos y cálculos y agrega pruebas de interfaz del Portal con datos ficticios. Las pruebas reales del servidor se hicieron con cuentas ficticias aisladas, deshabilitadas al finalizar.

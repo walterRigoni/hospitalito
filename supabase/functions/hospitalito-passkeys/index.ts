@@ -19,7 +19,7 @@ async function consumeChallenge(c:any,id:string,kind:string,username:string,rawT
 function publicUser(u:any){const p=u.profile||{};return {username:u.username,name:u.name||u.username,role:u.default_role||'medico',email:u.email||'',active:u.active!==false,isGlobalAdmin:!!u.is_global_admin,mustChangePassword:!!u.must_change_password,...Object.fromEntries(['phone','specialty','licenseNumber','professionalTitle','photo','signature','signatureUpdatedAt','uiTheme','preferences'].map(k=>[k,p[k]??(k==='preferences'?{}:'')]))};}
 async function issueSession(c:any,user:any){const raw=token(),now=new Date();const r=await c.from('hc_auth_sessions').insert({token_hash:await hash(raw),username:user.username,expires_at:new Date(Date.now()+24*3600000).toISOString(),last_seen_at:now.toISOString()});if(r.error)throw r.error;let institutions:any[]=[];
  if(user.is_global_admin){const r=await c.from('hc_auth_institutions').select('*').eq('active',true);if(r.error)throw r.error;institutions=r.data.map((i:any)=>({id:String(i.id),name:i.name,displayName:i.display_name||'',role:'superadmin',dataInstitutionId:String(i.data_institution_id||i.id),active:true,logoData:i.logo_data||''}));}
- else{const r=await c.from('hc_auth_memberships').select('role,institution_id,hc_auth_institutions(*)').eq('username',user.username).eq('active',true);if(r.error)throw r.error;institutions=(r.data||[]).filter((m:any)=>m.hc_auth_institutions?.active!==false).map((m:any)=>({id:String(m.institution_id),name:m.hc_auth_institutions.name,displayName:m.hc_auth_institutions.display_name||'',role:m.role,dataInstitutionId:String(m.hc_auth_institutions.data_institution_id||m.institution_id),active:true,logoData:m.hc_auth_institutions.logo_data||''}));if(!institutions.length)throw Error('La cuenta no tiene instituciones habilitadas.');}
+ else{const r=await c.from('hc_auth_memberships').select('role,institution_id,hc_auth_institutions(*)').eq('username',user.username).eq('active',true);if(r.error)throw r.error;institutions=(r.data||[]).filter((m:any)=>m.hc_auth_institutions?.active!==false).map((m:any)=>({id:String(m.institution_id),name:m.hc_auth_institutions.name,displayName:m.hc_auth_institutions.display_name||'',role:m.role,dataInstitutionId:String(m.hc_auth_institutions.data_institution_id||m.institution_id),active:true,logoData:m.hc_auth_institutions.logo_data||''}));if(user.default_role!=='cliente'&&!institutions.length)throw Error('La cuenta no tiene instituciones habilitadas.');}
  return {ok:true,token:raw,user:publicUser(user),institutions};
 }
 Deno.serve(async(req:Request)=>{
@@ -47,3 +47,5 @@ Deno.serve(async(req:Request)=>{
   throw Error('Acción no permitida.');
  }catch(e){return reply({ok:false,error:String((e as any)?.message||e)},400);}
 });
+
+
