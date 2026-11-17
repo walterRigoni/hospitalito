@@ -1,0 +1,19 @@
+{
+  "version": "v296",
+  "bytes": 3568018,
+  "sha256": "9ea22b8b810ffc7237f0167064b17cb453b3a2cdc168ee29c43eea082603c868",
+  "checks": [
+    "52 inline scripts parsed",
+    "8 save/edit flow tests",
+    "14 existing telemedicine logic tests",
+    "photo validation and final version tests",
+    "transactional SQL: free reservations, conflicts, paid transition, immutable free visits, 24h and 12h reminders, deduplication, cancellations and grants",
+    "live directory: professional photo available and trial enabled",
+    "reminder cron enabled every minute"
+  ],
+  "limitations": [
+    "Browser UI and real camera-to-camera call not tested in this environment",
+    "Reminder delivery is in-app only; no external messaging service configured"
+  ],
+  "trial": "Only providers without a linked seller account; existing free reservations never retroactively charged"
+}
