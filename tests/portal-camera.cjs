@@ -1,6 +1,6 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const root=path.dirname(__dirname),site='https://walterrigoni.github.io/hospitalito/',checks=[];
-const check=(value,name)=>{assert.ok(value,name);checks.push(name);};
+const check=(value,name)=>{assert.ok(value,name);checks.push(name);globalThis.hc292CameraChecks=checks.slice();};
 module.exports=async function run(options={}){
  let playwright=options.playwright;if(!playwright){try{playwright=require('playwright');}catch{playwright=require(require.resolve('playwright',{paths:[path.dirname(process.execPath),path.resolve(path.dirname(process.execPath),'..')]}));}}
  const browser=await playwright.chromium.launch({executablePath:options.executablePath,headless:true,args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']});
@@ -47,7 +47,7 @@ module.exports=async function run(options={}){
   check(replaced!==first&&await page.evaluate(()=>!__previousPicker.isConnected),'Reopening creates a fresh picker and replaces same-named photos');
   check(await page.evaluate(url=>__revoked.includes(url),first),'Replacing a photograph releases its previous preview');
   await choose(front,'album',null);check(await front.locator('.hc290PhotoPreview img').getAttribute('src')===replaced,'Cancelling album selection preserves the chosen photograph');
-  await front.locator('summary').click();await choose(front,'files',red,'foto-reciente.heic','image/heic');
+  await front.locator('.hc291PhotoHelp summary').click();await choose(front,'files',red,'foto-reciente.heic','image/heic');
   check(await front.locator('.hc290PhotoPreview').isVisible(),'An image outside the old MIME whitelist reaches browser decoding');
   const valid=await front.locator('.hc290PhotoPreview img').getAttribute('src');
   await front.locator('[data-photo-source="files"]').setInputFiles({name:'incorrecto.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});
@@ -67,7 +67,7 @@ module.exports=async function run(options={}){
   await page.evaluate(()=>{window.__getUserMedia=navigator.mediaDevices.getUserMedia;navigator.mediaDevices.getUserMedia=undefined;});
   const nativeFallback=page.waitForEvent('filechooser');await front.locator('[data-open-camera]').click();const fallbackPicker=await nativeFallback;
   check(await fallbackPicker.element().getAttribute('capture')==='environment','Browsers without webcam APIs open native rear-camera capture');
-  await fallbackPicker.setFiles({name:'captura-nativa.png',mimeType:'image/png',buffer:red});await front.locator('.hc290PhotoStatus').filter({hasText:'Foto lista.'}).waitFor();
+  const beforeNative=await front.locator('.hc290PhotoPreview img').getAttribute('src');await fallbackPicker.setFiles({name:'captura-nativa.png',mimeType:'image/png',buffer:red});await page.waitForFunction(previous=>document.querySelector('[data-document-side=front] .hc290PhotoPreview img').src!==previous,beforeNative);await front.locator('.hc290PhotoStatus').filter({hasText:'Foto lista.'}).waitFor();
   await page.evaluate(()=>{navigator.mediaDevices.getUserMedia=__getUserMedia;__cameraMode='delayed';});await front.locator('[data-open-camera]').click();await page.waitForFunction(()=>typeof __releaseCamera==='function');
   await front.locator('[data-close-camera]').click();await page.evaluate(()=>__releaseCamera());
   await page.waitForFunction(()=>__streams.at(-1).getTracks().every(t=>t.readyState==='ended'));
@@ -92,3 +92,4 @@ module.exports=async function run(options={}){
  }finally{await browser.close();}
 };
 if(require.main===module)module.exports({executablePath:process.env.BROWSER_EXECUTABLE||undefined}).then(result=>console.log(JSON.stringify(result))).catch(error=>{console.error(error.stack);process.exitCode=1});
+

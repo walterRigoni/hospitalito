@@ -1,0 +1,21 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{stripTypeScriptTypes}=require('node:module');
+const root=path.dirname(__dirname),source=fs.readFileSync(path.join(root,'supabase/functions/hospitalito-telemed/logic.ts'),'utf8'),js=stripTypeScriptTypes(source,{mode:'strip'}).replace(/^export /gm,'');
+const logic=vm.runInNewContext('(function(){'+js+';return{split,weekly,cleanProfile,validCheckout}})()'),checks=[];
+function test(name,fn){fn();checks.push(name)}
+test('Exact cent split',()=>{const s=logic.split(105099,1750);assert.equal(s.platform_cents+s.provider_cents,105099);assert.equal(s.platform_cents,18392)});
+test('Reject NaN',()=>assert.throws(()=>logic.split(NaN,1000)));
+test('Reject fractional cent prices',()=>assert.throws(()=>logic.split(100.5,1000)));
+test('Reject negative prices',()=>assert.throws(()=>logic.split(-100,1000)));
+test('Reject missing commission',()=>assert.throws(()=>logic.split(1000,0)));
+test('Reject excessive commission',()=>assert.throws(()=>logic.split(1000,10000)));
+test('Reject invalid weekly window',()=>assert.throws(()=>logic.weekly({days:{1:{active:true,start:'12:00',end:'08:00'}}})));
+test('Reject malformed clock',()=>assert.throws(()=>logic.weekly({days:{1:{active:true,start:'25:00',end:'26:00'}}})));
+const p={specialty:'Cardiología',credential:'FICTICIA',public_visible:true,modes:{telemedicine:{enabled:true,weekly:{days:{1:{active:true,start:'08:00',end:'12:00'}}},rates:[{minutes:15,amount_cents:1000000},{minutes:30,amount_cents:1800000}]}}};
+test('Valid independent profile',()=>assert.equal(logic.cleanProfile(p,'medico').modes.telemedicine.rates.length,2));
+test('Client cannot publish professional profile',()=>assert.throws(()=>logic.cleanProfile(p,'cliente')));
+test('Require declared professional license',()=>assert.throws(()=>logic.cleanProfile({...p,credential:''},'medico')));
+test('Require office address',()=>assert.throws(()=>logic.cleanProfile({...p,modes:{office:p.modes.telemedicine}},'medico')));
+test('Reject duplicate plans',()=>assert.throws(()=>logic.cleanProfile({...p,modes:{telemedicine:{...p.modes.telemedicine,rates:[{minutes:15,amount_cents:1000},{minutes:15,amount_cents:2000}]}}},'medico')));
+test('Restrict checkout host',()=>{assert(logic.validCheckout('https://www.mercadopago.com.ar/checkout/v1/a'));assert(!logic.validCheckout('https://www.mercadopago.com.ar.evil.example/checkout'));assert(!logic.validCheckout('javascript:alert(1)'))});
+module.exports={checks};
+if(require.main===module)console.log(JSON.stringify({passed:checks.length,checks}));

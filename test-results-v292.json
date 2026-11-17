@@ -1,0 +1,62 @@
+{
+  "logic": {
+    "checks": [
+      "Exact cent split",
+      "Reject NaN",
+      "Reject fractional cent prices",
+      "Reject negative prices",
+      "Reject missing commission",
+      "Reject excessive commission",
+      "Reject invalid weekly window",
+      "Reject malformed clock",
+      "Valid independent profile",
+      "Client cannot publish professional profile",
+      "Require declared professional license",
+      "Require office address",
+      "Reject duplicate plans",
+      "Restrict checkout host"
+    ]
+  },
+  "marketplace": {
+    "checks": [
+      "Medical dropdown contains the specialty catalog without published providers for every specialty",
+      "Specialty filter keeps matching professional",
+      "Role filter excludes physicians from kinesiology",
+      "Specialty dropdown adapts to professional role",
+      "Busy slot is not selectable",
+      "Office view separates deposit and balance due after attendance",
+      "Reservation requires explicit terms acceptance",
+      "Chosen slot and accepted quote enables reservation",
+      "One reservation request after patient confirmation",
+      "No checkout before accepting the actual deposit",
+      "Institutional search also uses a real dropdown",
+      "Separate weekly availability for telemedicine and office",
+      "Separate 15/30/45/60 minute prices for each mode",
+      "Profile save uses integer cents and weekly schedules",
+      "No uncaught browser errors: "
+    ],
+    "errors": [],
+    "productionRequests": 0
+  },
+  "video": {
+    "checks": [
+      "Two isolated participants exchange real simulated audio and video over WebRTC",
+      "Microphone control mutes the outgoing track",
+      "Camera control disables the outgoing track",
+      "Client reconnect negotiates a new session",
+      "Exhausted server entitlement pauses audio and video",
+      "Continuation prompt is shown without any automatic charge",
+      "Video room fits 320/390/768 pixel widths",
+      "Leaving the room stops all camera and microphone tracks",
+      "Other participant sees server finalization and releases the room",
+      "No uncaught browser errors"
+    ],
+    "realCamerasUsed": 0,
+    "productionRequests": 0
+  },
+  "serverChecks": 22,
+  "cameraChecks": 30,
+  "ocr": "real synthetic small type recognized: name, DNI, DOB",
+  "realCamerasUsed": 0,
+  "productionPayments": 0
+}

@@ -1,0 +1,9 @@
+{
+  "version": "v292",
+  "bytes": 3559341,
+  "sha256": "3cd0101392e1b3d65c8b4a4ad850ee7b7dda2b74d38b34ca75967515b74759f0",
+  "checks": [
+    "inline-script-syntax-52"
+  ],
+  "payments": "disabled_pending_owner_configuration"
+}
