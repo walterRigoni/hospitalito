@@ -1,12 +1,14 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v290**, basada en v289.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v291**, basada en v290.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Descargar el HTML v290](https://walterrigoni.github.io/hospitalito/Hospitalito_v290.html)
-- [Guía v290](Hospitalito_v290_guia.md)
+- [Descargar el HTML v291](https://walterrigoni.github.io/hospitalito/Hospitalito_v291.html)
+- [Guía v291](Hospitalito_v291_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
+
+v291 agrega **Usar cámara**, con captura directa, preferencia por la cámara trasera y cierre automático al terminar. **Elegir del álbum** abre un selector nuevo cada vez y admite todos los formatos de imagen que pueda abrir el navegador. **Buscar en archivos** permite localizar fotos recientes que el álbum del dispositivo no muestre. El orden y la disponibilidad del álbum dependen del sistema y sus permisos.
 
 v290 mejora el registro del paciente: frente y dorso del DNI con vista previa, cambio y eliminación de fotos, lectura con mensajes claros cuando faltan datos y fotografías privadas en **Cuenta → Datos personales**. El registro acepta correo o usuario y conserva el formulario ante errores.
 

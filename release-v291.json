@@ -1,0 +1,10 @@
+{
+  "version": "v291",
+  "sha256": "a5c845ecab653d3020bb7d083c87689e1cc61559da357312ceee0a26b2f71bff",
+  "bytes": 3500833,
+  "baseSha256": "80b84501873e0bb39eda6aefac4b53f1b11e1320bc9ae842864d3d0c1704a486",
+  "checks": [
+    "inline-script-syntax-49",
+    "portal-camera-30-checks"
+  ]
+}
