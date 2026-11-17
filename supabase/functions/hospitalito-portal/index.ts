@@ -37,22 +37,56 @@ async function upload(c:any,file:any,prefix:string,imageOnly=false){const f=file
 function safeDate(value:any){const s=text(value,10);if(!/^\d{4}-\d{2}-\d{2}$/.test(s)||!Number.isFinite(Date.parse(s+'T12:00:00Z'))||new Date(s+'T12:00Z').toISOString().slice(0,10)!==s)throw Error('Fecha inválida.');return s;}
 function cleanWeekly(raw:any){const days:any={};for(let d=0;d<7;d++){const item=raw?.days?.[d]||raw?.days?.[d===0?7:d]||{};const start=text(item.start||'08:00',5),end=text(item.end||'12:00',5),minutes=Number(item.minutes||30);if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)||item.active&&start>=end||![10,15,20,30,40,60].includes(minutes))throw Error('Revisá los horarios.');days[d]={active:!!item.active,start,end,minutes};}return{days,updatedAt:new Date().toISOString()};}
 function cleanPosition(p:any){const latitude=p.latitude===''||p.latitude==null?null:Number(p.latitude),longitude=p.longitude===''||p.longitude==null?null:Number(p.longitude);if(latitude!==null&&(!Number.isFinite(latitude)||Math.abs(latitude)>90)||longitude!==null&&(!Number.isFinite(longitude)||Math.abs(longitude)>180)||(latitude===null)!==(longitude===null))throw Error('Coordenadas inválidas.');return{latitude,longitude};}
+function identityError(code:string,message:string){return Object.assign(new Error(message),{code});}
+const literalLike=(value:string)=>value.replace(/[\\%_]/g,c=>'\\'+c);
+function validUsername(username:string){return /^[a-z0-9][a-z0-9_.+@-]{2,99}$/.test(username)&&(!username.includes('@')||/^[^@\s]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(username))&&!['admin','hospitalito'].includes(username);}
 async function register(c:any,b:any,req:Request){
- const ip=text(req.headers.get('x-forwarded-for')||'unknown',200).split(',')[0];const rate=ok(await c.rpc('hc289_rate_hit',{p_key:await hash('signup:'+ip),p_limit:8,p_seconds:3600}));if(!rate)throw Error('Demasiados intentos. Reintentá más tarde.');
- const username=text(b.username,80).toLowerCase(),password=String(b.password||''),legal_name=text(b.name,150),dni=text(b.dni,20).replace(/\D/g,''),dob=safeDate(b.dob);
- if(!/^[a-z0-9][a-z0-9_.-]{2,59}$/.test(username)||['admin','hospitalito'].includes(username))throw Error('Elegí un usuario de 3 a 60 caracteres, sin espacios.');
- if(password.length<10||password.length>200)throw Error('Usá una contraseña de 10 a 200 caracteres.');if(!legal_name||!/^\d{6,9}$/.test(dni)||dob>'2100-01-01'||dob>new Date().toISOString().slice(0,10)||dob<'1900-01-01')throw Error('Revisá nombre, DNI y nacimiento.');
- if(b.confirmedData!==true)throw Error('Confirmá los datos leídos y la finalidad de la verificación.');
- const existing=ok(await c.from('hc_auth_users').select('username').ilike('username',username).limit(1));if(existing.length)throw Error('Ese usuario no está disponible.');
- let saved:any=null,created=false;
+ const username=text(b.username,101).toLowerCase(),password=String(b.password||''),legal_name=text(b.name,150),dni=text(b.dni,20).replace(/\D/g,''),dob=safeDate(b.dob);
+ if(!validUsername(username))throw identityError('INVALID_USERNAME','Escribí un correo válido o un usuario de 3 a 100 caracteres, sin espacios.');
+ if(password.length<10||password.length>200)throw Error('Usá una contraseña de 10 a 200 caracteres.');
+ if(!legal_name||!/^\d{6,9}$/.test(dni)||dob>new Date().toISOString().slice(0,10)||dob<'1900-01-01')throw Error('Revisá nombre, DNI y nacimiento.');
+ if(b.confirmedData!==true)throw Error('Confirmá tus datos y el uso de las fotos para verificar tu identidad.');
+ if(!b.document?.data)throw identityError('MISSING_FRONT','Agregá la foto del frente del DNI.');
+ if(!b.documentBack?.data)throw identityError('MISSING_BACK','Agregá también la foto del dorso del DNI.');
+ fileData(b.document,true);fileData(b.documentBack,true);
+ if(b.document.data===b.documentBack.data)throw Error('Las dos fotos son iguales. Agregá el frente y el dorso del DNI.');
+ const ip=text(req.headers.get('x-forwarded-for')||'unknown',200).split(',')[0];
+ const rate=ok(await c.rpc('hc289_rate_hit',{p_key:await hash('signup:'+ip),p_limit:8,p_seconds:3600}));if(!rate)throw Error('Demasiados intentos. Reintentá más tarde.');
+ // A username is a literal value: underscores and percent signs are not wildcards.
+ const existing=ok(await c.from('hc_auth_users').select('username').ilike('username',literalLike(username)).limit(1));
+ if(existing.length)throw identityError('USERNAME_TAKEN','Ese correo o usuario ya tiene una cuenta. Iniciá sesión o elegí otro.');
+ const institutionId=text(b.institutionId);if(institutionId)await institution(c,institutionId);
+ const saved:Array<any>=[];let created=false;
  try{
- saved=await upload(c,b.document,'identity/'+username,true);const salt=crypto.getRandomValues(new Uint8Array(16)),iterations=210000,key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const derived=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations},key,256);
- ok(await c.from('hc_auth_users').insert({username,name:legal_name,default_role:'cliente',profile:{preferences:{showSyncStatus:false}},password_salt:hex(salt),password_hash:hex(new Uint8Array(derived)),password_iterations:iterations,active:true,legacy_migrated:true}));created=true;
- ok(await c.from('hc_portal_clients').insert({username,legal_name,dni,dob,document_path:saved.path}));
- if(b.institutionId){await institution(c,text(b.institutionId));ok(await c.from('hc_portal_verifications').insert({username,institution_id:text(b.institutionId)}));}
- await audit(c,{username},'register',text(b.institutionId),username,{identity:'pending'});return{ok:true,username,pending:true};
- }catch(error){if(created){await c.from('hc_portal_verifications').delete().eq('username',username);await c.from('hc_portal_clients').delete().eq('username',username);await c.from('hc_auth_users').delete().eq('username',username);}if(saved)await c.storage.from(BUCKET).remove([saved.path]);throw error;}
+   saved.push(await upload(c,b.document,'identity/'+username+'/front',true));
+   saved.push(await upload(c,b.documentBack,'identity/'+username+'/back',true));
+   const salt=crypto.getRandomValues(new Uint8Array(16)),iterations=210000,key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);
+   const derived=await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt,iterations},key,256);
+   ok(await c.from('hc_auth_users').insert({username,name:legal_name,email:username.includes('@')?username:'',default_role:'cliente',profile:{preferences:{showSyncStatus:false}},password_salt:hex(salt),password_hash:hex(new Uint8Array(derived)),password_iterations:iterations,active:true,legacy_migrated:true}));created=true;
+   // Keep the original front column for existing accounts and clients. The reverse is server-owned profile metadata.
+   ok(await c.from('hc_portal_clients').insert({username,legal_name,dni,dob,document_path:saved[0].path,profile:{email:username.includes('@')?username:'',identityDocuments:{front:saved[0],back:saved[1]}}}));
+   if(institutionId)ok(await c.from('hc_portal_verifications').insert({username,institution_id:institutionId}));
+   await audit(c,{username},'register',institutionId,username,{identity:'pending',documentSides:['front','back']});
+   return{ok:true,username,pending:true};
+ }catch(error){
+   if(created){await c.from('hc_portal_verifications').delete().eq('username',username);await c.from('hc_portal_clients').delete().eq('username',username);await c.from('hc_auth_users').delete().eq('username',username);}
+   if(saved.length)await c.storage.from(BUCKET).remove(saved.map(f=>f.path));
+   if((error as any)?.code==='23505'&&!created)throw identityError('USERNAME_TAKEN','Ese correo o usuario ya tiene una cuenta. Iniciá sesión o elegí otro.');
+   throw error;
+ }
 }
+async function identityDocuments(c:any,username:string){
+ const p=ok(await c.from('hc_portal_clients').select('document_path,profile').eq('username',username).single());
+ const paths=[{side:'front',path:p.document_path},{side:'back',path:p.profile?.identityDocuments?.back?.path}].filter(f=>f.path);
+ const documents=await Promise.all(paths.map(async entry=>{
+   const file=ok(await c.storage.from(BUCKET).download(entry.path));
+   if(!/^image\/(jpeg|png|webp)$/.test(file.type))throw Error('La foto guardada no tiene un formato admitido.');
+   const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=16000)binary+=String.fromCharCode(...bytes.slice(i,i+16000));
+   return{side:entry.side,data:'data:'+file.type+';base64,'+btoa(binary)};
+ }));
+ return{ok:true,documents,data:documents.find(f=>f.side==='front')?.data||''};
+}
+
 async function profile(c:any,a:any){client(a);const p=ok(await c.from('hc_portal_clients').select('username,legal_name,dni,dob,profile,created_at').eq('username',a.username).single());const links=ok(await c.from('hc_portal_verifications').select('institution_id,status,patient_id,reviewed_at,note').eq('username',a.username));return{ok:true,client:p,verifications:links};}
 async function verified(c:any,username:string,inst:string){const link=ok(await c.from('hc_portal_verifications').select('*').eq('username',username).eq('institution_id',inst).maybeSingle());if(link?.status!=='verified')throw Error('Identidad pendiente de verificación en esta institución.');return link;}
 async function directory(c:any){
@@ -95,16 +129,17 @@ const reportRoles:any={lab:'bioquimico',micro:'microbiologo',image:'imagenologo'
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:CORS});if(req.method!=='POST')return response({ok:false,error:'Método no permitido.'},405);
  try{
- pub(req);const raw=await req.text();if(raw.length>7500000)throw Error('Solicitud demasiado grande.');const b=JSON.parse(raw||'{}'),action=text(b.action),c=db();
+ pub(req);const raw=await req.text();if(raw.length>14500000)throw Error('Solicitud demasiado grande.');const b=JSON.parse(raw||'{}'),action=text(b.action),c=db();
  if(action==='register')return response(await register(c,b,req));
  if(action==='directory')return response(await directory(c));
  const inst=text(b.institutionId),a=await actor(c,text(b.token,300),inst);
  if(action==='me')return response(await profile(c,a));
+ if(action==='myIdentityDocuments'){client(a);const result=await identityDocuments(c,a.username);await audit(c,a,'view_own_identity','',a.username);return response(result);}
  if(action==='clientData')return response(await clientData(c,a));
  if(action==='updateClientProfile'){client(a);const p=b.profile||{},position=cleanPosition(p);const old=ok(await c.from('hc_portal_clients').select('profile').eq('username',a.username).single());ok(await c.from('hc_portal_clients').update({profile:{...old.profile,address:text(p.address),phone:text(p.phone,80),email:text(p.email,200),...position},updated_at:new Date().toISOString()}).eq('username',a.username));return response(await profile(c,a));}
  if(action==='requestVerification'){client(a);await institution(c,inst);const existing=ok(await c.from('hc_portal_verifications').select('status').eq('username',a.username).eq('institution_id',inst).maybeSingle());if(existing?.status==='verified')return response({ok:true});ok(await c.from('hc_portal_verifications').upsert({username:a.username,institution_id:inst,status:'pending',note:''},{onConflict:'username,institution_id'}));return response({ok:true});}
  if(action==='pendingClients'){admin(a);await institution(c,inst);const links=ok(await c.from('hc_portal_verifications').select('*').eq('institution_id',inst).order('created_at',{ascending:false}).limit(150));const names=links.map((l:any)=>l.username),clients=names.length?ok(await c.from('hc_portal_clients').select('username,legal_name,dni,dob,profile').in('username',names)):[];const patients=await stateValue(c,(await institution(c,inst)).data_institution_id,'patients');return response({ok:true,clients:links.map((l:any)=>({...l,client:clients.find((p:any)=>p.username===l.username),matches:(Array.isArray(patients)?patients:[]).filter((p:any)=>String(p.dni||'').replace(/\D/g,'')===clients.find((x:any)=>x.username===l.username)?.dni).map((p:any)=>({id:p.id,name:[p.lastName,p.firstNames].filter(Boolean).join(', ')}))}))});}
- if(action==='identityDocument'){admin(a);await institution(c,inst);const link=ok(await c.from('hc_portal_verifications').select('username').eq('username',text(b.username)).eq('institution_id',inst).maybeSingle());if(!link)throw Error('No hay solicitud de verificación para esta institución.');const p=ok(await c.from('hc_portal_clients').select('document_path').eq('username',link.username).single());const file=ok(await c.storage.from(BUCKET).download(p.document_path));await audit(c,a,'view_identity',inst,link.username);const bytes=new Uint8Array(await file.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=16000)binary+=String.fromCharCode(...bytes.slice(i,i+16000));return response({ok:true,data:'data:'+file.type+';base64,'+btoa(binary)});}
+ if(action==='identityDocument'){admin(a);await institution(c,inst);const link=ok(await c.from('hc_portal_verifications').select('username').eq('username',text(b.username)).eq('institution_id',inst).maybeSingle());if(!link)throw Error('No hay solicitud de verificación para esta institución.');const result=await identityDocuments(c,link.username);await audit(c,a,'view_identity',inst,link.username);return response(result);}
  if(action==='verifyIdentity'){admin(a);const i=await institution(c,inst),username=text(b.username),p=ok(await c.from('hc_portal_clients').select('dni').eq('username',username).single());const existing=ok(await c.from('hc_portal_verifications').select('username').eq('username',username).eq('institution_id',inst).maybeSingle());if(!existing)throw Error('El cliente debe solicitar la verificación en esta institución.');const status=['verified','rejected','revoked'].includes(b.status)?b.status:'verified',patientId=text(b.patientId,160);if(status==='verified'&&b.identityChecked!==true)throw Error('Confirmá la verificación de identidad realizada.');if(!text(b.note))throw Error('Registrá el fundamento de la verificación.');if(patientId){const rows=await stateValue(c,i.data_institution_id,'patients'),patient=(Array.isArray(rows)?rows:[]).find((r:any)=>String(r.id)===patientId);if(!patient||String(patient.dni||'').replace(/\D/g,'')!==p.dni)throw Error('La ficha elegida no coincide con el DNI verificado.');}ok(await c.from('hc_portal_verifications').update({status,patient_id:patientId,reviewed_by:a.username,reviewed_at:new Date().toISOString(),note:text(b.note,2000)}).eq('username',username).eq('institution_id',inst));await audit(c,a,'identity_'+status,inst,username,{patientId});return response({ok:true});}
  if(action==='institutionSettings'){admin(a);const i=await institution(c,inst),settings=ok(await c.from('hc_portal_institutions').select('*').eq('institution_id',inst).maybeSingle());return response({ok:true,institution:{id:i.id,name:i.display_name||i.name},settings});}
  if(action==='saveInstitutionSettings'){admin(a);await institution(c,inst);const p=b.settings||{};if(p.enabled&&!text(p.address))throw Error('Indicá la dirección de la institución antes de publicarla.');ok(await c.from('hc_portal_institutions').upsert({institution_id:inst,enabled:!!p.enabled,address:text(p.address),phone:text(p.phone,80),...cleanPosition(p),external_connected:false,updated_at:new Date().toISOString()}));await audit(c,a,'institution_directory',inst);return response({ok:true});}
@@ -123,5 +158,5 @@ Deno.serve(async(req:Request)=>{
  if(action==='saveReport'){staff(a);const order=ok(await c.from('hc_portal_orders').select('*').eq('id',text(b.id)).single());if(order.institution_id!==inst||a.role!==reportRoles[order.kind])throw Error('Sólo el servicio correspondiente puede informar.');await verified(c,order.username,inst);const body=text(b.text,50000),files:Array<any>=Array.isArray(b.keepFiles)?[...(order.report_files||[]),...(order.draft_files||[])].filter((f:any,i:number,all:any[])=>b.keepFiles.includes(f.path)&&all.findIndex(x=>x.path===f.path)===i):[];let added:any=null,committed=false;try{if(b.file){added=await upload(c,b.file,'reports/'+order.id);files.push(added);}if(!body&&!files.length)throw Error('El informe está vacío.');const result=ok(await c.rpc('hc289_save_report',{p_order:order.id,p_revision:Number(b.revision),p_author:a.username,p_text:body,p_files:files,p_publish:b.publish===true}));committed=true;await audit(c,a,b.publish?'publish_report':'draft_report',inst,order.id,{revision:result.revision});return response({ok:true,order:result});}catch(error){if(added&&!committed)await c.storage.from(BUCKET).remove([added.path]);throw error;}}
  if(action==='reportFile'){const order=ok(await c.from('hc_portal_orders').select('*').eq('id',text(b.id)).single());if(a.role==='cliente'){if(order.username!==a.username||order.status!=='published')throw Error('Informe no disponible.');await verified(c,a.username,order.institution_id);}else{staff(a);if(order.institution_id!==inst)throw Error('Informe de otra institución.');}const f=order.report_files?.[Number(b.index)];if(!f)throw Error('Archivo no disponible.');const url=ok(await c.storage.from(BUCKET).createSignedUrl(f.path,60));await audit(c,a,'download_report',order.institution_id,order.id);return response({ok:true,url:url.signedUrl,name:f.name});}
  throw Error('Acción no disponible.');
- }catch(error){const msg=String((error as any)?.message||error);return response({ok:false,error:msg},/Sesión|sesión|acceso|autorizad/i.test(msg)?403:400);}
+ }catch(error){const msg=String((error as any)?.message||error);return response({ok:false,error:msg,code:['USERNAME_TAKEN','INVALID_USERNAME','MISSING_FRONT','MISSING_BACK'].includes((error as any)?.code)?(error as any).code:undefined},/Sesión|sesión|acceso|autorizad/i.test(msg)?403:400);}
 });

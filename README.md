@@ -1,14 +1,16 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v289**, basada en v288.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v290**, basada en v289.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Descargar el HTML v289](https://walterrigoni.github.io/hospitalito/Hospitalito_v289.html)
-- [Guía v289](Hospitalito_v289_guia.md)
+- [Descargar el HTML v290](https://walterrigoni.github.io/hospitalito/Hospitalito_v290.html)
+- [Guía v290](Hospitalito_v290_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
 
-v289 incorpora el Portal de clientes, registro con lectura local de DNI y verificación institucional, agendas publicadas voluntariamente, reservas y bloqueos comprobados en el servidor e informes ambulatorios de Laboratorio, Microbiología e Imágenes. Cuenta reúne la navegación personal y agrega colores, iluminación y fuentes separados.
+v290 mejora el registro del paciente: frente y dorso del DNI con vista previa, cambio y eliminación de fotos, lectura con mensajes claros cuando faltan datos y fotografías privadas en **Cuenta → Datos personales**. El registro acepta correo o usuario y conserva el formulario ante errores.
+
+La v289 incorporó el Portal de clientes, registro con lectura local de DNI y verificación institucional, agendas publicadas voluntariamente, reservas y bloqueos comprobados en el servidor e informes ambulatorios de Laboratorio, Microbiología e Imágenes. Cuenta reúne la navegación personal y agrega colores, iluminación y fuentes separados.
 
 Las instituciones y los profesionales deben publicar expresamente sus datos y horarios. Una identidad aprobada en una institución no habilita otra. Los clientes sólo reciben sus resultados publicados y datos permitidos de su ficha verificada. Los documentos están en un depósito privado; no se incluyen historias, DNI ni credenciales privadas en los archivos publicados.
 

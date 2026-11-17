@@ -87,7 +87,7 @@ Deno.serve(async(req:Request)=>{
     if(action==='authenticateUser'){
       const q=String(b.username||'').trim(),password=String(b.password||'');if(!q||!password)throw new Error('Completá usuario y contraseña.');
       if(q.toLowerCase()==='admin')throw new Error('El admin semilla es una herramienta local. Ingresá con admin/admin y vinculá este equipo a una institución.');
-      const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q).limit(1).maybeSingle();if(error)throw error;
+      const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();if(error)throw error;
       if(user?.active&&user.password_hash){if(!await verifyPassword(password,user))throw new Error('Usuario o contraseña incorrectos.');const s=await createAuthSession(c,user.username),insts=await memberships(c,user.username);if(!user.is_global_admin&&user.default_role!=='cliente'&&!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');return reply({ok:true,...s,user:publicUser(user),institutions:insts,migrated:false})}
       return reply(await migrateLegacyUser(c,q,password));
     }

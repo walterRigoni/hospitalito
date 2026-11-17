@@ -1,0 +1,15 @@
+{
+  "version": "v290",
+  "sha256": "80b84501873e0bb39eda6aefac4b53f1b11e1320bc9ae842864d3d0c1704a486",
+  "bytes": 3493257,
+  "baseSha256": "412c0945b176fd05b2b1b355300c23a47184d3da91af3fd722e7f6a9148d14c4",
+  "checks": [
+    "inline-script-syntax-49",
+    "identity-parser-11-cases",
+    "registration-dom-18-checks",
+    "portal-registration-23-checks",
+    "live-missing-front-and-back-validation",
+    "live-private-document-access-denied",
+    "live-directory-and-auth-availability"
+  ]
+}

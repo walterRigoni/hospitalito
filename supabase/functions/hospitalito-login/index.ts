@@ -47,7 +47,7 @@ Deno.serve(async(req:Request)=>{
     if(q.toLowerCase()==='admin')throw new Error('El admin semilla es una herramienta local. Ingresá con admin/admin y vinculá este equipo a una institución.');
     const c=db();
     const t0=performance.now();
-    const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q).limit(1).maybeSingle();
+    const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();
     if(error)throw error;if(!user||user.active===false)throw new Error('Usuario o contraseña incorrectos.');
     if(!user.password_hash||!user.password_salt)throw new Error('La cuenta todavía no tiene credenciales Supabase migradas.');
     const t1=performance.now();
