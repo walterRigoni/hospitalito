@@ -1,0 +1,8 @@
+/* Institution and patient banners share the measured patient height. */
+#medPanel #instHdrBar{box-sizing:border-box;height:var(--hc301-patient-height,72px);min-height:0;padding:4px 8px}
+#instHdrBar .hc283Brand{height:100%;min-height:0;gap:10px!important}
+#instHdrBar .hc283InstitutionLogo{height:100%!important;width:auto!important;max-width:25%!important;min-width:0;object-fit:contain}
+#instHdrBar .hc283ProgramLogo,#instHdrBar .hc283ProgramFallback{max-height:100%;max-width:36px;object-fit:contain}
+#instHdrBar .hc283BrandInfo{align-self:center;overflow:hidden}
+#instHdrBar .l1,#instHdrBar .l2,#instHdrBar .l3{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:0;line-height:1.2}
+#instHdrBar .l1{font-size:13px}#instHdrBar .l2{font-size:11px}#instHdrBar .l3{font-size:10px}

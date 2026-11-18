@@ -1,0 +1,2 @@
+/* No fixed logo height can enlarge the institution banner. */
+(()=>{const patient=document.getElementById('pacHdrBar'),panel=document.getElementById('medPanel');if(!patient||!panel)return;let height=0;function fit(){const next=Math.ceil(patient.getBoundingClientRect().height);if(next>0&&next!==height){height=next;panel.style.setProperty('--hc301-patient-height',next+'px');}}if(window.ResizeObserver)new ResizeObserver(fit).observe(patient);window.addEventListener('resize',fit);fit();})();
