@@ -67,9 +67,11 @@ Deno.serve(async(req:Request)=>{
       institutions=(membershipsResult.data||[]).filter((i:any)=>i.active!==false).map((i:any)=>({id:String(i.id),name:String(i.name||i.display_name||i.id),displayName:String(i.display_name||''),description:String(i.description||''),role:'superadmin',dataInstitutionId:String(i.data_institution_id||i.id),active:true,logoData:String(i.logo_data||'')}));
     }else{
       institutions=(membershipsResult.data||[]).filter((x:any)=>x.hc_auth_institutions?.active!==false).map((x:any)=>({id:String(x.institution_id),name:String(x.hc_auth_institutions?.name||x.institution_id),displayName:String(x.hc_auth_institutions?.display_name||''),description:String(x.hc_auth_institutions?.description||''),role:String(x.role||user.default_role||'medico'),dataInstitutionId:String(x.hc_auth_institutions?.data_institution_id||x.institution_id),active:true,logoData:String(x.hc_auth_institutions?.logo_data||'')}));
-      if(user.default_role!=='cliente'&&!institutions.length)throw new Error('La cuenta no tiene instituciones habilitadas.');
+      if(!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia'].includes(user.default_role)&&!institutions.length)throw new Error('La cuenta no tiene instituciones habilitadas.');
     }
     const t3=performance.now();
     return reply({ok:true,token,expiresAt:expires.toISOString(),user:publicUser(user),institutions,migrated:false,loginPath:'fast-v1',timingMs:{lookup:Math.round(t1-t0),password:Math.round(t2-t1),sessionAndMemberships:Math.round(t3-t2),total:Math.round(performance.now()-started)}});
   }catch(e){return reply({ok:false,error:String((e as any)?.message||e),loginPath:'fast-v1',elapsedMs:Math.round(performance.now()-started)},400)}
 });
+
+

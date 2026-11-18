@@ -88,7 +88,7 @@ Deno.serve(async(req:Request)=>{
       const q=String(b.username||'').trim(),password=String(b.password||'');if(!q||!password)throw new Error('Completá usuario y contraseña.');
       if(q.toLowerCase()==='admin')throw new Error('El admin semilla es una herramienta local. Ingresá con admin/admin y vinculá este equipo a una institución.');
       const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();if(error)throw error;
-      if(user?.active&&user.password_hash){if(!await verifyPassword(password,user))throw new Error('Usuario o contraseña incorrectos.');const s=await createAuthSession(c,user.username),insts=await memberships(c,user.username);if(!user.is_global_admin&&user.default_role!=='cliente'&&!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');return reply({ok:true,...s,user:publicUser(user),institutions:insts,migrated:false})}
+      if(user?.active&&user.password_hash){if(!await verifyPassword(password,user))throw new Error('Usuario o contraseña incorrectos.');const s=await createAuthSession(c,user.username),insts=await memberships(c,user.username);if(!user.is_global_admin&&!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia'].includes(user.default_role)&&!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');return reply({ok:true,...s,user:publicUser(user),institutions:insts,migrated:false})}
       return reply(await migrateLegacyUser(c,q,password));
     }
 
@@ -163,3 +163,5 @@ Deno.serve(async(req:Request)=>{
     return reply({ok:false,error:'Acción no reconocida.'},400);
   }catch(e){const msg=String((e as any)?.message||e);const auth=/sesión vencida|no tenés acceso|sólo para Hospitalito|exclusiva del admin semilla/i.test(msg);return reply({ok:false,error:msg},auth?401:400)}
 });
+
+

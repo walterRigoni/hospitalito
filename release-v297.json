@@ -1,0 +1,21 @@
+{
+  "version": "v297",
+  "bytes": 3581651,
+  "sha256": "ea147126c6816847945b289c7db8c1e116d0cc23833f888aec463ec6b0096307",
+  "validation": [
+    "53 inline scripts parsed",
+    "12 multi-location/profile validation tests",
+    "7 private API authorization tests",
+    "7 real password-derivation login handler tests using fictitious identities",
+    "Workspace chooser routing tests",
+    "Transactional SQL: two office locations, gaps, conflicts, immutable location, note versions, unauthorized writers, full-payment office split and payment confirmation",
+    "Public directory HTTP check; bank data hidden unless explicitly published",
+    "Reminder cron remains active; all SQL fixtures rolled back"
+  ],
+  "limitations": [
+    "Full interactive browser flow and a real two-device call remain unverified",
+    "Real payouts require Marketplace credentials, linked seller account and configured Hospitalito recipient",
+    "PDF templates are drafts requiring medical review and signature before patient publication"
+  ],
+  "storage": "Private clinical notes are separate from institutional clinical buckets"
+}
