@@ -1,0 +1,19 @@
+{
+  "version": "v298",
+  "bytes": 3593420,
+  "sha256": "5a1e8fa9847e39c8cfaab510fa71c0c00a52137e157f6bccffc737bc17746fb5",
+  "checks": [
+    "54 inline scripts parsed",
+    "Existing form controls and handlers retained; presentation only"
+  ],
+  "changes": [
+    "Compact weekly rows and rates",
+    "Green active days and times",
+    "Collapsible professional and bank details",
+    "Bank link button next to account status",
+    "Selected-day editor on narrow screens"
+  ],
+  "limitations": [
+    "Interactive browser layout not verified in this environment"
+  ]
+}
