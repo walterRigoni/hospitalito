@@ -2,11 +2,12 @@ export const roles=['medico','enfermero','kinesiologo','nutricionista','bioquimi
 export const str=(v:unknown,n=500)=>String(v??'').trim().slice(0,n);
 export function integer(v:unknown,min:number,max:number){const n=Number(v);if(!Number.isSafeInteger(n)||n<min||n>max)throw Error('Número fuera del rango permitido');return n;}
 export function split(amount:number,bps:number){integer(amount,100,100000000);integer(bps,1,9999);const platform=Math.round(amount*bps/10000);if(platform<1||platform>=amount)throw Error('Comisión incompatible con el precio');return {amount_cents:amount,platform_cents:platform,provider_cents:amount-platform};}
+export function coordinates(raw:any){const empty=(x:any)=>x===null||x===undefined||x==='';if(empty(raw.latitude)&&empty(raw.longitude))return{latitude:null,longitude:null};if(empty(raw.latitude)||empty(raw.longitude)||![raw.latitude,raw.longitude].every((x:any)=>['string','number'].includes(typeof x)&&String(x).trim()!==''))throw Error('Completá ambas coordenadas del consultorio');const latitude=Number(raw.latitude),longitude=Number(raw.longitude);if(!Number.isFinite(latitude)||Math.abs(latitude)>90||!Number.isFinite(longitude)||Math.abs(longitude)>180)throw Error('Ubicación GPS inválida');return{latitude,longitude};}
 export function weekly(raw:any,address=''){
  const days:any={};const time=/^([01]\d|2[0-3]):[0-5]\d$/;
  for(let i=0;i<7;i++){
   const d=raw?.days?.[i]||{},active=d.active===true;
-  let windows=(Array.isArray(d.windows)?d.windows:[{start:d.start||'08:00',end:d.end||'12:00',address}]).map((w:any)=>({start:str(w.start,5),end:str(w.end,5),address:str(w.address||address,500),location:str(w.location,160)}));
+  let windows=(Array.isArray(d.windows)?d.windows:[{start:d.start||'08:00',end:d.end||'12:00',address}]).map((w:any)=>({start:str(w.start,5),end:str(w.end,5),address:str(w.address||address,500),location:str(w.location,160),...coordinates(w)}));
   if(windows.length>8)throw Error('Máximo ocho bloques por día');
   for(const w of windows)if(!time.test(w.start)||!time.test(w.end)||w.start>=w.end)throw Error('Revisá el inicio y el fin de cada bloque');
   windows.sort((a:any,b:any)=>a.start.localeCompare(b.start));
@@ -32,5 +33,6 @@ export function cleanProfile(p:any,role:string){
 }
 export function validCheckout(url:unknown){return /^https:\/\/(?:www\.|sandbox\.)?mercadopago\.com\.ar\//.test(String(url||''));}
 export const normalize=(s:unknown)=>str(s,200).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+
 
 

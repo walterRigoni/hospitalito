@@ -13,4 +13,6 @@ test('Bank details require explicit visibility',()=>assert.equal(cleanProfile({.
 test('No client role accepted',()=>assert.throws(()=>cleanProfile(p,'cliente')));
 test('Reject missing price',()=>assert.throws(()=>cleanProfile({...p,modes:{office:{...p.modes.office,rates:[]}}},'medico')));
 test('Reject fractional cents',()=>assert.throws(()=>cleanProfile({...p,modes:{office:{...p.modes.office,rates:[{minutes:15,amount_cents:1.5}]}}},'medico')));
+test('Preserve each office GPS point, including zero',()=>{const profile=JSON.parse(JSON.stringify(p));const w=profile.modes.office.weekly.days[1].windows;Object.assign(w[0],{latitude:-31.4,longitude:-64.2});Object.assign(w[1],{latitude:0,longitude:0});const out=cleanProfile(profile,'medico').modes.office.weekly.days[1].windows;assert.equal(out[0].latitude,-31.4);assert.equal(out[1].longitude,0);});
+test('Reject unpaired office coordinates',()=>{const profile=JSON.parse(JSON.stringify(p));profile.modes.office.weekly.days[1].windows[0].longitude=0;assert.throws(()=>cleanProfile(profile,'medico'));});
 console.log(n+' validation checks passed');

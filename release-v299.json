@@ -1,0 +1,16 @@
+{
+  "version": "v299",
+  "bytes": 3603377,
+  "sha256": "11963b74d32c25ea10d1badf22dca51f3e33be34d2f14169e2712571df7be845",
+  "checks": [
+    "55 inline scripts parsed",
+    "GPS: no automatic permission request, success, denial, timeout, unavailable/invalid location, HTTPS, zero coordinates, distance and map links",
+    "Shift dialog: required close works, dismissed prompt stays closed until a new login/day/institution, symbol controls present",
+    "14 professional schedule validation checks and 7 private API authorization tests",
+    "Transactional SQL: per-office coordinates returned, zero coordinates retained and direct RPC permissions unchanged"
+  ],
+  "limitations": [
+    "Device GPS hardware and browser permissions must be tested on the user device",
+    "Distance ordering requires coordinates saved by the professional for the office; address-only locations still offer a map link"
+  ]
+}
