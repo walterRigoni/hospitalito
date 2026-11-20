@@ -23,7 +23,7 @@ const {chromium}=require('playwright'),http=require('node:http');
  await page.goto('http://127.0.0.1:'+server.address().port,{waitUntil:'load'});
  await page.waitForTimeout(1500);
  const checks=await page.evaluate(async()=>{
-  const results=[];function ok(name,value){if(!value)throw Error(name);results.push(name);}
+  const results=[];function ok(name,value){if(!value)throw Error(name+'; completed: '+results.join(', '));results.push(name);}
   localStorage.clear();
   session={username:'test306',name:'Profesional de prueba',role:'medico',institutionId:'test306'};
   saveJSON(LS.session,session);
@@ -46,7 +46,7 @@ const {chromium}=require('playwright'),http=require('node:http');
   document.querySelector('[data-hc306-mealdiet="0"]').value='Hiposódica';document.querySelector('#nutReqTiming').value='urgent';document.querySelector('#btnSaveNutReq').click();
   const nut=getClinical().p306.nutritionRequests.at(-1);ok('meals persisted',nut.meals.length===4);ok('meal prescription',getClinical().p306.prescripciones.infusionesContinuas.some(r=>String(r.text||r.freeText||r.preparationText).includes('Desayuno')));
   const latest=hcEnsureClinicalPatient('p306');latest.cur.microRequests=[{id:'micro306',createdAt:isoNowLocalFull(),items:[{name:'Hemocultivo',detail:'Prueba'}]}];latest.cl.p306=latest.cur;setClinical(latest.cl);
-  session.role='microbiologo';openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado parcial';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Colonias en crecimiento';document.querySelector('#btnSendLab').click();
+  session.role='microbiologo';medTab='micro';renderMed();openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado parcial';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Colonias en crecimiento';document.querySelector('#btnSendLab').click();
   let micro=getClinical().p306.microResults[0];ok('partial report',!micro.isDefinitive&&micro.entries[0].reportType==='parcial');
   openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado definitivo';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Crecimiento identificado';document.querySelector('#btnSendLab').click();micro=getClinical().p306.microResults[0];ok('definitive report',micro.isDefinitive&&micro.entries.length===2);
   ok('print status',buildMicroResultPretty(micro).includes('DEFINITIVO'));
@@ -62,6 +62,6 @@ const {chromium}=require('playwright'),http=require('node:http');
  console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
  const layout=await page.evaluate(()=>{document.body.classList.add('hcMobile');const h=document.querySelector('#hc306ClinicalHeader');return {sticky:getComputedStyle(h).position,width:document.documentElement.scrollWidth,viewport:innerWidth,light:document.body.dataset.hc289Mode,back:getComputedStyle(document.querySelector('#hc300GlobalExit')).right};});
- assert.equal(layout.sticky,'sticky');assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
+ assert.equal(layout.sticky,'sticky');assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);console.log('SCREENSHOT306 '+(await page.screenshot()).toString('base64'));
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);process.exitCode=1});

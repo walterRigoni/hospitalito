@@ -50763,6 +50763,10 @@ body[data-hc289-mode=light] :is(.hc275MedicationNameAlert,.hc275DoseAlert){backg
 @media(max-width:600px){.hc306Meal{grid-template-columns:120px minmax(0,1fr)}.hc306Meal>input:last-child{grid-column:1/-1}.hc306Dialog>section{padding:12px}.hc306Dialog footer{position:sticky;bottom:0;background:var(--hc-theme-surface);padding:8px 0}}
 @media print{#hc300GlobalExit{display:none!important}#hc306ClinicalHeader{position:static!important}}
 
+/* The page owns mobile vertical scrolling, so sticky headers have one scroll ancestor. */
+body.hcMobile #appMed,body.hcMobile #medPanel{height:auto!important;overflow:visible!important}
+body.hcMobile,html:has(body.hcMobile){overflow-x:clip!important}
+
 </style>
 <script id="hc-v306-ui">
 
@@ -50816,6 +50820,21 @@ window.addEventListener('pageshow',()=>setTimeout(restoreRoute,100));
 const logoutBase=logout;logout=window.logout=function(){remember();pending=null;restored='';return logoutBase.apply(this,arguments);};
 function scaleRecords(pid){return (getClinical()?.[pid]?.calculatedScales||[]).filter(x=>!x.deletedAt).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));}
 function scaleText(tool,result,at){return tool.title+' · '+dmyhmFromISODateTime(at)+'\n'+(result.score!==undefined?'Puntaje: '+result.score+'/'+result.max+'\n':'')+[...(result.parts||[]),...(result.extra||[])].map(p=>p[0]+': '+p[1]).join('\n')+'\n'+(result.note||'');}
+
+// Merge culture entries by ID, including updates saved within the same second.
+const clinicalMergeBase=hcMergeClinicalPatientRecord;
+hcMergeClinicalPatientRecord=window.hcMergeClinicalPatientRecord=function(local,remote){
+ const merged=clinicalMergeBase.apply(this,arguments),records=new Map();
+ for(const row of [...(local?.microResults||[]),...(remote?.microResults||[])]){
+  if(!row)continue;const id=String(row.id||row.requestId||'');if(!id)continue;const previous=records.get(id);
+  if(!previous){records.set(id,{...row,entries:[...(row.entries||[])]});continue;}
+  const latest=new Date(row.updatedAt||row.startedAt||'').getTime()>=new Date(previous.updatedAt||previous.startedAt||'').getTime()?row:previous;
+  const entries=[...new Map([...(previous.entries||[]),...(row.entries||[])].map(e=>[e.id||[e.at,e.by,e.stage,e.growth,e.note].join('|'),e])).values()].sort((a,b)=>String(a.at||'').localeCompare(String(b.at||''))||Number(a.stage==='Resultado definitivo')-Number(b.stage==='Resultado definitivo'));
+  records.set(id,{...previous,...latest,entries,isDefinitive:previous.isDefinitive||row.isDefinitive||entries.some(e=>e.reportType==='definitivo'||e.stage==='Resultado definitivo')});
+ }
+ if(records.size)merged.microResults=[...records.values()];return merged;
+};
+
 window.hc306SaveScale=(pid,tool,values,result)=>{
  if(!pid||pid!==String(selectedPatientId)||!findPatient(pid))throw Error('Seleccioná al paciente antes de guardar esta escala.');
  if(!['medico','enfermero','bioquimico','microbiologo','imagenologo','farmaceutico'].includes(session?.role))throw Error('Tu perfil puede calcular y copiar este resultado.');

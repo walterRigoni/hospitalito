@@ -36,3 +36,7 @@ body[data-hc289-mode=light] :is(#medScales a,.hc288Vanco a){color:#075a88!import
 body[data-hc289-mode=light] :is(.hc275MedicationNameAlert,.hc275DoseAlert){background:#fff0c2!important;color:#713e00!important}
 @media(max-width:600px){.hc306Meal{grid-template-columns:120px minmax(0,1fr)}.hc306Meal>input:last-child{grid-column:1/-1}.hc306Dialog>section{padding:12px}.hc306Dialog footer{position:sticky;bottom:0;background:var(--hc-theme-surface);padding:8px 0}}
 @media print{#hc300GlobalExit{display:none!important}#hc306ClinicalHeader{position:static!important}}
+
+/* The page owns mobile vertical scrolling, so sticky headers have one scroll ancestor. */
+body.hcMobile #appMed,body.hcMobile #medPanel{height:auto!important;overflow:visible!important}
+body.hcMobile,html:has(body.hcMobile){overflow-x:clip!important}
