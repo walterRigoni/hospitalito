@@ -1,12 +1,14 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v291**, basada en v290.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v306**, basada en v305.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Descargar el HTML v291](https://walterrigoni.github.io/hospitalito/Hospitalito_v291.html)
-- [Guía v291](Hospitalito_v291_guia.md)
+- [Descargar el HTML v306](https://walterrigoni.github.io/hospitalito/Hospitalito_v306.html)
+- [Guía v306](Hospitalito_v306_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
+
+v306 conserva el módulo y paciente al retomar la sesión, reconoce jornadas nocturnas, ofrece activación directa de huella/rostro/PIN, compacta Cuenta y Prescripciones, mejora el tema Claro y mantiene fijos los membretes y la botonera. Permite guardar escalas por paciente y adjuntarlas a Evolución junto con informes parciales y definitivos de Microbiología. Nutrición incluye programación por comidas. Se verifica con datos ficticios en escritorio y celular.
 
 v291 agrega **Usar cámara**, con captura directa, preferencia por la cámara trasera y cierre automático al terminar. **Elegir del álbum** abre un selector nuevo cada vez y admite todos los formatos de imagen que pueda abrir el navegador. **Buscar en archivos** permite localizar fotos recientes que el álbum del dispositivo no muestre. El orden y la disponibilidad del álbum dependen del sistema y sus permisos.
 

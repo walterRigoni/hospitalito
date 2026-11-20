@@ -1,0 +1,262 @@
+[
+  {
+    "before": "  function todayShift(){const id=shiftId();return activity().find(x=>String(x?.id||\"\")===id||(\n    x?.kind===\"work_shift\"&&String(x?.user||\"\")===userName()&&String(x?.dateLocal||\"\")===localDate()&&(!x?.institutionDataId||String(x.institutionDataId)===dataInstitution())\n  ))||null;}",
+    "after": "  function todayShift(){\n    let saved=null;try{saved=JSON.parse(localStorage.getItem('hc306.shift.'+dataInstitution()+'.'+userName())||'null');}catch{}\n    const rows=[...activity(),...(saved?[saved]:[])].filter(x=>x?.kind==='work_shift'&&String(x.user||'')===userName()&&(!x.institutionDataId||String(x.institutionDataId)===dataInstitution())).sort((a,b)=>String(a.updatedAt||a.ts||'').localeCompare(String(b.updatedAt||b.ts||'')));\n    const latest=[...new Map(rows.map(x=>[x.id,x])).values()],now=Date.now();\n    return latest.find(x=>{const start=new Date(x.startDateTime||((x.startDate||x.dateLocal)+'T'+x.startTime)).getTime();let end=new Date(x.endDateTime||((x.endDate||x.dateLocal)+'T'+x.endTime)).getTime();if(x.crossesMidnight&&!x.endDate&&!x.endDateTime)end+=86400000;return start<=now&&now<end;})||latest.find(x=>String(x.id)===shiftId()||String(x.dateLocal)===localDate())||null;\n  }",
+    "all": false
+  },
+  {
+    "before": "try{setActivity(acts);hcBackendScheduleUrgentPush?.();}",
+    "after": "try{setActivity(acts);localStorage.setItem('hc306.shift.'+dataInstitution()+'.'+userName(),JSON.stringify(rec));hcBackendScheduleUrgentPush?.();}",
+    "all": false
+  },
+  {
+    "before": "const id=shiftId();let idx=acts.findIndex",
+    "after": "const id=todayShift()?.id||shiftId(startDate);let idx=acts.findIndex",
+    "all": false
+  },
+  {
+    "before": "const idleMinutes=()=>{const n=Number(localStorage.getItem(idleKey())||5);return [2,5,10,15].includes(n)?n:5;};",
+    "after": "const idleMinutes=()=>{const raw=localStorage.getItem(idleKey()),n=raw===null?0:Number(raw);return [0,2,5,10,15,30,60].includes(n)?n:0;};",
+    "all": false
+  },
+  {
+    "before": "function checkIdle(){if(!session)return;",
+    "after": "function checkIdle(){if(!session||document.hidden)return;",
+    "all": false
+  },
+  {
+    "before": "Date.now()-lastActivity>=idleMinutes()*60000",
+    "after": "(idleMinutes()>0&&Date.now()-lastActivity>=idleMinutes()*60000)",
+    "all": false
+  },
+  {
+    "before": "${[2,5,10,15].map(n=>`<option value=\"${n}\" ${n===idleMinutes()?'selected':''}>${n} minutos</option>`).join('')}",
+    "after": "${[0,2,5,10,15,30,60].map(n=>`<option value=\"${n}\" ${n===idleMinutes()?'selected':''}>${n?n+' minutos':'Mantener sesión en este dispositivo'}</option>`).join('')}",
+    "all": false
+  },
+  {
+    "before": "['pointerdown','keydown','input','touchstart'].forEach(ev",
+    "after": "['pointerdown','keydown','input','touchstart','scroll'].forEach(ev",
+    "all": false
+  },
+  {
+    "before": "document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkIdle();});window.addEventListener('focus',checkIdle);",
+    "after": "document.addEventListener('visibilitychange',()=>{if(!document.hidden){touched();checkIdle();}});window.addEventListener('focus',()=>{if(!document.hidden){touched();checkIdle();}});",
+    "all": false
+  },
+  {
+    "before": "if(!locked&&Date.now()-lastActivity>300000)",
+    "after": "if(!locked&&Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username)||0)>0&&Date.now()-lastActivity>Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username))*60000)",
+    "all": false
+  },
+  {
+    "before": "La sesión se bloquea tras 5 minutos sin actividad. Volvé a ingresar tu contraseña para continuar.",
+    "after": "La sesión se mantiene en este dispositivo al cambiar de aplicación. Podés salir desde Cuenta → SALIR.",
+    "all": false
+  },
+  {
+    "before": "authenticatorAttachment:'platform',userVerification:'required'",
+    "after": "userVerification:'required'",
+    "all": true
+  },
+  {
+    "before": "const c=await navigator.credentials.create({publicKey:pk});if(!c)throw Error('Activación cancelada.');",
+    "after": "const c=await window.hc306CreateCredential(pk,root);if(!c)throw Error('Activación cancelada.');",
+    "all": false
+  },
+  {
+    "before": "const credential=await navigator.credentials.create({publicKey:pk});",
+    "after": "const credential=await window.hc306CreateCredential(pk,box);",
+    "all": false
+  },
+  {
+    "before": "const user=q('#loginUser')?.value||q('#username')?.value||q('#inpUser')?.value;",
+    "after": "const user=(q('#loginUser')?.value||q('#username')?.value||q('#inpUser')?.value||localStorage.getItem('hc306.lastUsername')||'').trim();",
+    "all": false
+  },
+  {
+    "before": "const entries=[['Mis ámbitos','private-workspaces']",
+    "after": "const entries=[['Chat','chat'],['Ambulatorios','outpatient'],['Telemedicina institucional','institution-tele'],['Huella, rostro o PIN','security'],['Mis ámbitos','private-workspaces']",
+    "all": false
+  },
+  {
+    "before": "(id!=='private-workspaces'||(!client&&window.hc297IsProfessional?.(U())))",
+    "after": "(!['chat','outpatient','institution-tele','security'].includes(id)||(!client&&({chat:q('#hc232ChatTop'),outpatient:q('#hc289OutpatientTop'),'institution-tele':q('#hc292ProTop'),security:session&&!session.localSeed}[id])))&&(id!=='private-workspaces'||(!client&&window.hc297IsProfessional?.(U())))",
+    "all": false
+  },
+  {
+    "before": "if(id==='logout')proxy('btnLogout');",
+    "after": "if(id==='security'){window.hc280OpenSecurity();return;}if(id==='chat'){proxy('hc232ChatTop');return;}if(id==='outpatient'){proxy('hc289OutpatientTop');return;}if(id==='institution-tele'){proxy('hc292ProTop');return;}if(id==='logout')proxy('btnLogout');",
+    "all": false
+  },
+  {
+    "before": "<div style=\"margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;\">\n            <button class=\"btn small\" id=\"btnAttSV\"",
+    "after": "<div id=\"hc306EvoAttachments\" style=\"margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;\">\n            <button class=\"btn small\" id=\"btnAttSV\"",
+    "all": false
+  },
+  {
+    "before": "  // defaults EF\n",
+    "after": "  const attachments=wrap.querySelector('#hc306EvoAttachments');\n  attachments?.insertAdjacentHTML('beforeend','<button type=\"button\" class=\"btn small\" id=\"btnAttSCALES\">Adjuntar escalas calculadas</button><span id=\"hc306AttachSummary\" role=\"status\"></span>');\n  wrap.querySelector('.evoSplit > .card')?.append(attachments);\n  wrap.querySelector('#btnAttSCALES').onclick=()=>window.hc306ChooseScales(pid);\n  // defaults EF\n",
+    "all": false
+  },
+  {
+    "before": "  updateAttachButtons();\n\n  // libre",
+    "after": "  if(recOrNull?.data)for(const [key,field] of Object.entries({sv:'attachSV',bal:'attachBAL',lab:'attachLAB',mic:'attachMIC',inv:'attachINV',rx:'attachRX',pr:'attachPR',scales:'attachSCALES'}))window.__evoAttach[key]=recOrNull.data[field]||'';\n  updateAttachButtons();\n\n  // libre",
+    "all": false
+  },
+  {
+    "before": "      attachSV: window.__evoAttach?.sv || \"\",",
+    "after": "      attachSCALES: window.__evoAttach?.scales || \"\",\n      attachSV: window.__evoAttach?.sv || \"\",",
+    "all": false
+  },
+  {
+    "before": "const prettyText = `EVOLUCIÓN (TEXTO LIBRE)\\n\\n${text}`;",
+    "after": "const attachments=window.hc306AttachmentData();\n    const prettyText = `EVOLUCIÓN (TEXTO LIBRE)\\n\\n${text}`+window.hc306AttachmentText(attachments);",
+    "all": false
+  },
+  {
+    "before": "data:{ ...old.data, text },",
+    "after": "data:{ ...old.data, text, ...attachments },",
+    "all": false
+  },
+  {
+    "before": "data:{ text },",
+    "after": "data:{ text, ...attachments },",
+    "all": false
+  },
+  {
+    "before": "\"monitoringRecords\",",
+    "after": "\"monitoringRecords\",\"calculatedScales\",",
+    "all": true
+  },
+  {
+    "before": "'labResults','microResults']);",
+    "after": "'labResults','microResults','calculatedScales']);",
+    "all": false
+  },
+  {
+    "before": "Los datos se completan manualmente y el resultado se puede copiar a la evolución. No se guardan ni se cambian tratamientos automáticamente.",
+    "after": "Completá los datos, calculá y usá Guardar en este paciente. Las escalas guardadas se pueden adjuntar desde Evolución.",
+    "all": false
+  },
+  {
+    "before": "  const key=context();if(root.dataset.hc288Context===key&&root.childElementCount)return;",
+    "after": "  const key=context();if(root.dataset.hc288Context===key&&root.childElementCount){window.hc306RenderScaleHistory?.();return;}",
+    "all": false
+  },
+  {
+    "before": "let state=memory.get(key);if(!state){state={selected:'nihss',query:'',values:{}};memory.set(key,state);",
+    "after": "let state=memory.get(key);if(!state){try{state=JSON.parse(sessionStorage.getItem('hc306.scaleForm.'+key)||'null');}catch{}state||={selected:'nihss',query:'',values:{}};memory.set(key,state);",
+    "all": false
+  },
+  {
+    "before": "values[event.target.name]=event.target.value;result.replaceChildren();",
+    "after": "values[event.target.name]=event.target.value;try{sessionStorage.setItem('hc306.scaleForm.'+key,JSON.stringify(state));}catch{}result.replaceChildren();",
+    "all": false
+  },
+  {
+    "before": "result.querySelector('button').onclick=async()=>{const text=",
+    "after": "const save=document.createElement('button');save.type='button';save.className='btn primary';save.id='hc306SaveScale';save.textContent='Guardar en este paciente';save.disabled=!selectedPatientId||!['medico','enfermero','bioquimico','microbiologo','imagenologo','farmaceutico'].includes(session?.role);result.append(save);const capturedPid=String(selectedPatientId||'');save.onclick=()=>{try{window.hc306SaveScale(capturedPid,tool,values,r);save.disabled=true;save.textContent='Guardada en este paciente';}catch(e){alert(e.message);}};\n    result.querySelector('button').onclick=async()=>{const text=",
+    "all": false
+  },
+  {
+    "before": "paintList();paintForm();\n }\n function apiNormalize",
+    "after": "paintList();paintForm();window.hc306RenderScaleHistory?.();\n }\n function apiNormalize",
+    "all": false
+  },
+  {
+    "before": ".filter(it => it && !hcIsDeletedPrescriptionItem(it));\n      servicePatients.push",
+    "after": ".filter(it => window.hc306IsCurrentPrescription(it));\n      servicePatients.push",
+    "all": false
+  },
+  {
+    "before": "          renderMed();\n        }\n      }catch(_){}\n    }, 30000);",
+    "after": "          window.hc306RefreshPrescriptions?.();\n        }\n      }catch(_){}\n    }, 30000);",
+    "all": false
+  },
+  {
+    "before": "${hc264RequestTimingHTML(\"nutReq\")}",
+    "after": "${window.hc306NutritionMealsHTML?.()||\"\"}${hc264RequestTimingHTML(\"nutReq\")}",
+    "all": false
+  },
+  {
+    "before": "const id = uid(\"nutreq\"); const text = `${type}",
+    "after": "const meals=window.hc306ReadNutritionMeals(root);if(!meals)return;const id = uid(\"nutreq\"); const text = `${type}",
+    "all": false
+  },
+  {
+    "before": "${note ? \" • \" + note : \"\"}`; cur.nutritionRequests.push({ id, type, features,",
+    "after": "${note ? \" • \" + note : \"\"}${meals.length ? \" • Comidas: \"+meals.map(x=>x.name+(x.time?\" \"+x.time:\"\")+(x.diet?\": \"+x.diet:\"\")).join(\"; \") : \"\"}`; cur.nutritionRequests.push({ id, type, features, meals,",
+    "all": false
+  },
+  {
+    "before": "<b>${escHTML(r.type)}</b> • ${escHTML((r.features||[])",
+    "after": "<b>${escHTML(r.type)}</b>${window.hc306NutritionMealsText?.(r)||\"\"} • ${escHTML((r.features||[])",
+    "all": false
+  },
+  {
+    "before": "btnSave.textContent = \"Guardar evolución\";\n  modal.style.display",
+    "after": "btnSave.textContent = \"Guardar informe\";\n  modal.style.display",
+    "all": false
+  },
+  {
+    "before": "const definitive = ($(\"#microDefFlag\")?.value || \"no\") === \"si\";",
+    "after": "const definitive = stage === \"Resultado definitivo\";",
+    "all": false
+  },
+  {
+    "before": "      stage,\n      growth,",
+    "after": "      stage,\n      reportType: definitive ? \"definitivo\" : \"parcial\",\n      growth,",
+    "all": false
+  },
+  {
+    "before": "  lines.push(\"INFORME DE MICROBIOLOGÍA\");",
+    "after": "  lines.push(\"INFORME DE MICROBIOLOGÍA — \"+microResultStatusText(res).toUpperCase());",
+    "all": false
+  },
+  {
+    "before": "if(e.stage) lines.push(`Etapa: ${e.stage}`);",
+    "after": "if(e.stage) lines.push(`Informe: ${e.reportType || (e.stage===\"Resultado definitivo\"?\"definitivo\":\"parcial\")} — ${e.stage}`);",
+    "all": false
+  },
+  {
+    "before": "target.isDefinitive = definitive;",
+    "after": "target.isDefinitive = definitive;",
+    "all": false
+  },
+  {
+    "before": "    cl2[pid] = cur2;\n    setClinical(cl2);\n\n    logAction(`informó microbiología",
+    "after": "    cl2[pid] = cur2;\n    setClinical(cl2);\n    hcBackendScheduleUrgentPush?.();\n\n    logAction(`informó microbiología",
+    "all": false
+  },
+  {
+    "before": "    <div id=\"instHdrBar\" class=\"instBar\"></div>",
+    "after": "    <div id=\"hc306ClinicalHeader\">\n    <div id=\"instHdrBar\" class=\"instBar\"></div>",
+    "all": false
+  },
+  {
+    "before": "    <h3 class=\"panelTitle\" id=\"medPanelTitle\">Ingreso</h3>",
+    "after": "    </div>\n    <h3 class=\"panelTitle\" id=\"medPanelTitle\">Ingreso</h3>",
+    "all": false
+  },
+  {
+    "before": "const CURRENT_VERSION = 288;",
+    "after": "const CURRENT_VERSION = 306;",
+    "all": false
+  },
+  {
+    "before": "<title>Hospitalito v305",
+    "after": "<title>Hospitalito v306",
+    "all": false
+  },
+  {
+    "before": "hc305Version\">v305",
+    "after": "hc305Version\">v306",
+    "all": false
+  },
+  {
+    "before": ".filter(it => window.hc306IsCurrentPrescription(it));",
+    "after": ".filter(it => window.hc306IsCurrentPrescription ? window.hc306IsCurrentPrescription(it) : it && !hcIsDeletedPrescriptionItem(it) && !hcIsTerminalPrescriptionItem(it));",
+    "all": false
+  }
+]
