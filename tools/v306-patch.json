@@ -238,5 +238,25 @@
     "before": "    <h3 class=\"panelTitle\" id=\"medPanelTitle\">Ingreso</h3>",
     "after": "    </div>\n    <h3 class=\"panelTitle\" id=\"medPanelTitle\">Ingreso</h3>",
     "all": false
+  },
+  {
+    "before": "const CURRENT_VERSION = 288;",
+    "after": "const CURRENT_VERSION = 306;",
+    "all": false
+  },
+  {
+    "before": "<title>Hospitalito v305",
+    "after": "<title>Hospitalito v306",
+    "all": false
+  },
+  {
+    "before": "hc305Version\">v305",
+    "after": "hc305Version\">v306",
+    "all": false
+  },
+  {
+    "before": ".filter(it => window.hc306IsCurrentPrescription(it));",
+    "after": ".filter(it => window.hc306IsCurrentPrescription ? window.hc306IsCurrentPrescription(it) : it && !hcIsDeletedPrescriptionItem(it) && !hcIsTerminalPrescriptionItem(it));",
+    "all": false
   }
 ]
