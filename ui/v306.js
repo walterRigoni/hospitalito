@@ -133,6 +133,7 @@ renderPrescripciones=window.renderPrescripciones=function(){
 };
 let lastTasks='';window.hc306RefreshPrescriptions=()=>{
  if(document.hidden||window.hc280EditorActive?.()||hcBackendShouldProtectUIRefresh())return;
+ const clock=q('#medPres .presDailyClock');if(clock)clock.textContent='Plan activo: '+hcCurrentMedicationPlanDate()+' (06 a 04 h) • Ahora: '+dmyhmFromISODateTime(isoNowLocalFull());
  const cl=getClinical(),items=selectedPatientId?cl[selectedPatientId]?.prescripciones?.infusionesContinuas||[]:Object.values(cl).flatMap(c=>c?.prescripciones?.infusionesContinuas||[]);
  const tasks=JSON.stringify([hcNursePrescriptionTasks(items),items.map(i=>[i.id,window.hc306IsCurrentPrescription(i)])]);forceRx=tasks!==lastTasks;lastTasks=tasks;try{renderPrescripciones();}finally{forceRx=false;}
 };

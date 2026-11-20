@@ -10,7 +10,14 @@ const storage=new Map(),ctx=vm.createContext({Date:FakeDate,Map,JSON,Number,acti
 vm.runInContext(fn('todayShift'),ctx);assert.equal(vm.runInContext('todayShift().id',ctx),rows[0].id);
 storage.set('hc306.shift.inst.user',JSON.stringify(rows[0]));rows=[];assert.equal(vm.runInContext('todayShift().endTime',ctx),'08:00');
 ctx.dataInstitution=()=> 'other';assert.equal(vm.runInContext('todayShift()',ctx),null);
-console.log('PASS 58 scripts; overnight shifts, catalogue reload receipt and institution isolation');
+
+const ui=fs.readFileSync(path.join(__dirname,'../ui/v306.js'),'utf8'),mergeStart=ui.indexOf('const clinicalMergeBase='),mergeEnd=ui.indexOf('window.hc306SaveScale=',mergeStart);
+const mergeContext=vm.createContext({window:{},hcMergeClinicalPatientRecord:(a,b)=>({...a,...b})});vm.runInContext(ui.slice(mergeStart,mergeEnd),mergeContext);
+const culture={id:'culture',updatedAt:'2026-11-20T12:00:00',entries:[]},partial={...culture,entries:[{id:'partial',at:culture.updatedAt,stage:'Resultado parcial'}]},definitive={...culture,isDefinitive:true,entries:[{id:'final',at:culture.updatedAt,stage:'Resultado definitivo'}]};
+assert.equal(mergeContext.hcMergeClinicalPatientRecord({microResults:[culture]},{microResults:[partial]}).microResults[0].entries.length,1);
+const both=mergeContext.hcMergeClinicalPatientRecord({microResults:[partial]},{microResults:[definitive]}).microResults[0];assert.equal(both.entries.length,2);assert(both.isDefinitive);
+console.log('PASS 58 scripts; overnight shifts, institution isolation and concurrent same-second culture reports');
+
 if(process.env.HC306_BROWSER!=='1')process.exit(0);
 const {chromium}=require('playwright'),http=require('node:http');
 (async()=>{
@@ -50,7 +57,9 @@ const {chromium}=require('playwright'),http=require('node:http');
   let micro=getClinical().p306.microResults[0];ok('partial report',!micro.isDefinitive&&micro.entries[0].reportType==='parcial');
   openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado definitivo';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Crecimiento identificado';document.querySelector('#btnSendLab').click();micro=getClinical().p306.microResults[0];ok('definitive report',micro.isDefinitive&&micro.entries.length===2);
   ok('print status',buildMicroResultPretty(micro).includes('DEFINITIVO'));
-  session.role='medico';medTab='prescripciones';renderMed();const first=document.querySelector('#medPres').firstElementChild;renderPrescripciones();ok('stable DOM',first===document.querySelector('#medPres').firstElementChild);
+  session.role='medico';const rx=hcEnsureClinicalPatient('p306');rx.cur.prescripciones.infusionesContinuas.push({id:'inf306',drugId:'noradrenalina',drugName:'Noradrenalina',type:'infusion_continua',via:'EV',regularidad:'continua',active:true,rateMlH:10,mlHour:10,volumeMl:100,totalAmount:4,totalAmountUnit:'mg',weightKg:70,startedAt:isoNowLocalFull(),createdAt:isoNowLocalFull()});rx.cl.p306=rx.cur;setClinical(rx.cl);medTab='prescripciones';renderMed();const first=document.querySelector('#medPres').firstElementChild;renderPrescripciones();ok('stable DOM',first===document.querySelector('#medPres').firstElementChild);
+  const infusion=document.querySelector('[data-pr-item-id="inf306"]');ok('infusion rate arrows',!!infusion?.querySelector('[data-pr-action="dose-up"]')&&!!infusion?.querySelector('[data-pr-action="dose-down"]'));
+  const pencil=infusion.querySelector('.hc306RxEdit'),pause=infusion.querySelector('.hcRxCompactControls [data-pr-action="pause"]');ok('compact actions',!!pencil&&getComputedStyle(pause).display==='none');pencil.click();ok('pencil opens actions',getComputedStyle(pause).display!=='none');pencil.click();
   ok('current order filter',window.hc306IsCurrentPrescription({id:'a',active:true})&&!window.hc306IsCurrentPrescription({id:'b',suspendedAt:isoNowLocalFull()})&&!window.hc306IsCurrentPrescription({id:'c',finishedAt:isoNowLocalFull()}));
   window.hc306RememberRoute();const route=JSON.parse(localStorage.getItem('hc306.route.test306|test306'));ok('route persisted',route.patient==='p306'&&route.tab==='prescripciones');
   ok('sticky group',document.querySelectorAll('#hc306ClinicalHeader > #instHdrBar,#hc306ClinicalHeader > #pacHdrBar,#hc306ClinicalHeader > .medModuleTabs').length===3);
