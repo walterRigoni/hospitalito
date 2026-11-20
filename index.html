@@ -50804,7 +50804,7 @@ window.hc306CreateCredential=(publicKey,host)=>new Promise((resolve,reject)=>{
 let restoring=false,restored='',routeTimer,seenSession='',pending=null;
 function readRoute(){try{return JSON.parse(localStorage.getItem('hc306.route.'+scope())||'null');}catch{return null;}}
 function remember(){
- if(!session||restoring||window.hc289ClientSession||pending)return;
+ if(!session||restoring||window.hc289ClientSession||pending||restored!==scope())return;
  const state={username:actor(),institution:institution(),patient:String(selectedPatientId||''),tab:medTab,filter:q('#medAreaFilter')?.value||'Todo',pageY:scrollY,panelY:q('#medPanel')?.scrollTop||0,tabX:q('.medModuleTabs')?.scrollLeft||0,evoEditing:['new','edit'].includes(evoUIState)};
  if(q('#medPres'))state.pres=Object.fromEntries(Object.entries(q('#medPres').dataset).filter(([key])=>/^pr|pharmacy/.test(key)));
  try{localStorage.setItem('hc306.route.'+scope(),JSON.stringify(state));localStorage.setItem('hc306.lastUsername',actor());}catch{}
