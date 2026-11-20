@@ -47,3 +47,5 @@ body[data-hc289-mode=light] #medPanel :is(.hcRxCompactDrug,.hcRxCompactPrep,.hcR
 body[data-hc289-mode=light] #medPanel .prListItem.freeTextRxItem .freeTextRxText{background:#fff!important;color:#15212c!important}
 body[data-hc289-mode=light] #medPanel .freeTextRxItem span[style*="color:#68d391"]{background:#dff4e8!important;color:#12603c!important}
 body[data-hc289-mode=light] #medPanel .freeTextRxItem span[style*="color:#7dd3fc"]{background:#dfedf8!important;color:#155576!important}
+
+body[data-hc289-mode=light] #medPanel :is(.hc275NutritionTitle,.hcRxVasoactiveDose){color:#075178!important}

@@ -67,7 +67,7 @@ const {chromium}=require('playwright'),http=require('node:http');
   window.hc306ChooseMicro('p306');ok('report version selector',document.querySelectorAll('.hc306Dialog input[type=checkbox]').length===2);document.querySelector('.hc306Dialog [data-close]').click();
   localStorage.setItem('hc289.visual.test306',JSON.stringify({color:'default',mode:'light',font:'default'}));window.hc289ApplyVisual();
   const diet=document.querySelector('.freeTextRxItem .freeTextRxText'),dietColor=getComputedStyle(diet).color,dietSurface=getComputedStyle(diet).backgroundColor;
-  ok('light prescription text',dietColor==='rgb(21, 33, 44)'&&dietSurface==='rgb(255, 255, 255)');
+  ok('light prescription text',dietColor==='rgb(21, 33, 44)'&&dietSurface==='rgb(255, 255, 255)');ok('light diet title',getComputedStyle(document.querySelector('.hc275NutritionTitle')).color==='rgb(7, 81, 120)');
   return results;
  });
  console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));
