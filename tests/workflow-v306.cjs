@@ -66,6 +66,8 @@ const {chromium}=require('playwright'),http=require('node:http');
   ok('default persistent session',window.hc280Access.idleMinutes()===0);
   window.hc306ChooseMicro('p306');ok('report version selector',document.querySelectorAll('.hc306Dialog input[type=checkbox]').length===2);document.querySelector('.hc306Dialog [data-close]').click();
   localStorage.setItem('hc289.visual.test306',JSON.stringify({color:'default',mode:'light',font:'default'}));window.hc289ApplyVisual();
+  const diet=document.querySelector('.freeTextRxItem .freeTextRxText'),dietColor=getComputedStyle(diet).color,dietSurface=getComputedStyle(diet).backgroundColor;
+  ok('light prescription text',dietColor==='rgb(21, 33, 44)'&&dietSurface==='rgb(255, 255, 255)');
   return results;
  });
  console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));

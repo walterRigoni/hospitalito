@@ -50767,6 +50767,13 @@ body[data-hc289-mode=light] :is(.hc275MedicationNameAlert,.hc275DoseAlert){backg
 body.hcMobile #appMed,body.hcMobile #medPanel{height:auto!important;overflow:visible!important}
 body.hcMobile,html:has(body.hcMobile){overflow-x:clip!important}
 
+/* Override legacy navy prescription surfaces in the light palette. */
+body[data-hc289-mode=light] #medPanel :is(.prListItem,.prListItem>div,.prListItem>div>div,.hcRxCompactMain,.hcRxCompactGrid,.hcRxMedicationGrid){background:#fff!important;color:#15212c!important}
+body[data-hc289-mode=light] #medPanel :is(.hcRxCompactDrug,.hcRxCompactPrep,.hcRxCompactRoute,.hcRxCompactMlh,.hcRxMedicationVia,.hcRxCompactSchedule,.freeTextRxMeta,.freeTextRxText){color:#15212c!important}
+body[data-hc289-mode=light] #medPanel .prListItem.freeTextRxItem .freeTextRxText{background:#fff!important;color:#15212c!important}
+body[data-hc289-mode=light] #medPanel .freeTextRxItem span[style*="color:#68d391"]{background:#dff4e8!important;color:#12603c!important}
+body[data-hc289-mode=light] #medPanel .freeTextRxItem span[style*="color:#7dd3fc"]{background:#dfedf8!important;color:#155576!important}
+
 </style>
 <script id="hc-v306-ui">
 
