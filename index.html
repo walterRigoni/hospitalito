@@ -6309,6 +6309,7 @@ html::-webkit-scrollbar-corner{
   </div>
 
   <div id="medPanel" class="card">
+    <div id="hc306ClinicalHeader">
     <div id="instHdrBar" class="instBar"></div>
     <div id="pacHdrBar" class="instBar pacBar" style="margin-top:8px;"></div>
 
@@ -6334,6 +6335,7 @@ html::-webkit-scrollbar-corner{
       <button class="tab" data-medtab="epicrisis" type="button">Epicrisis</button>
     </div>
 
+    </div>
     <h3 class="panelTitle" id="medPanelTitle">Ingreso</h3>
 
     <!-- Contenidos por tab -->
@@ -13510,7 +13512,7 @@ function evoRenderEditor(recOrNull){
             <textarea id="evo_ef"></textarea>
           </div>
 
-          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+          <div id="hc306EvoAttachments" style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn small" id="btnAttSV" type="button">Adjuntar últimos signos vitales</button>
             <button class="btn small" id="btnAttBAL" type="button">Adjuntar últimos balances 24hs</button>
             <button class="btn small" id="btnAttLAB" type="button">Adjuntar últimos resultados de laboratorio</button>
@@ -13550,6 +13552,10 @@ function evoRenderEditor(recOrNull){
     </div>
   `;
 
+  const attachments=wrap.querySelector('#hc306EvoAttachments');
+  attachments?.insertAdjacentHTML('beforeend','<button type="button" class="btn small" id="btnAttSCALES">Adjuntar escalas calculadas</button><span id="hc306AttachSummary" role="status"></span>');
+  wrap.querySelector('.evoSplit > .card')?.append(attachments);
+  wrap.querySelector('#btnAttSCALES').onclick=()=>window.hc306ChooseScales(pid);
   // defaults EF
   const ef = $("#evo_ef");
   if(ef) ef.value = (recOrNull?.data?.ef || (typeof EX_FIS_DEFAULT!=="undefined" ? EX_FIS_DEFAULT : "Normal."));
@@ -13604,6 +13610,7 @@ function evoRenderEditor(recOrNull){
     toggleARM();
     if($("#evo_diuresis24h")) $("#evo_diuresis24h").value = getDiuresis24hFromBalances(pid).total || "0";
   }
+  if(recOrNull?.data)for(const [key,field] of Object.entries({sv:'attachSV',bal:'attachBAL',lab:'attachLAB',mic:'attachMIC',inv:'attachINV',rx:'attachRX',pr:'attachPR',scales:'attachSCALES'}))window.__evoAttach[key]=recOrNull.data[field]||'';
   updateAttachButtons();
 
   // libre
@@ -13729,6 +13736,7 @@ $("#btnAttPR").onclick = ()=>{
 
       ef: ($("#evo_ef").value||"").trim(),
 
+      attachSCALES: window.__evoAttach?.scales || "",
       attachSV: window.__evoAttach?.sv || "",
       attachBAL: window.__evoAttach?.bal || "",
       attachLAB: window.__evoAttach?.lab || "",
@@ -13794,7 +13802,8 @@ $("#btnAttPR").onclick = ()=>{
     const text = ($("#evo_free").value||"").trim();
     if(!text) return alert("La evolución está vacía.");
 
-    const prettyText = `EVOLUCIÓN (TEXTO LIBRE)\n\n${text}`;
+    const attachments=window.hc306AttachmentData();
+    const prettyText = `EVOLUCIÓN (TEXTO LIBRE)\n\n${text}`+window.hc306AttachmentText(attachments);
     const nowIso = isoNowLocalFull();
 
     if(isEditing){
@@ -13803,7 +13812,7 @@ $("#btnAttPR").onclick = ()=>{
         ...old,
         id: old.id || evoLegacyStableId(old),
         kind:"libre",
-        data:{ ...old.data, text },
+        data:{ ...old.data, text, ...attachments },
         prettyText,
         updatedAt: nowIso
       };
@@ -13811,7 +13820,7 @@ $("#btnAttPR").onclick = ()=>{
       arr.push({
         id: uid("evo"),
         kind:"libre",
-        data:{ text },
+        data:{ text, ...attachments },
         prettyText,
         author:{ id: me.id, name: me.name },
         createdAt: nowIso,
@@ -15719,7 +15728,7 @@ function buildMicroRequestPretty(req){
 
 function buildMicroResultPretty(res){
   const lines = [];
-  lines.push("INFORME DE MICROBIOLOGÍA");
+  lines.push("INFORME DE MICROBIOLOGÍA — "+microResultStatusText(res).toUpperCase());
   lines.push(`Fecha/Hora inicio: ${dmyhmFromISODateTime(res?.startedAt || "")}`);
   lines.push(`Última actualización: ${dmyhmFromISODateTime(res?.updatedAt || "")}`);
   lines.push(`Usuario: ${res?.updatedByName || res?.startedByName || "—"}`);
@@ -15738,7 +15747,7 @@ function buildMicroResultPretty(res){
   evos.forEach((e, i)=>{
     lines.push("");
     lines.push(`${i + 1}) ${dmyhmFromISODateTime(e.at || "")} • ${e.byName || "—"}`);
-    if(e.stage) lines.push(`Etapa: ${e.stage}`);
+    if(e.stage) lines.push(`Informe: ${e.reportType || (e.stage==="Resultado definitivo"?"definitivo":"parcial")} — ${e.stage}`);
     if(e.growth) lines.push(`Crecimiento: ${e.growth}`);
     if(e.microorganism) lines.push(`Microorganismo: ${e.microorganism}`);
     if(e.antibiogram) lines.push(`Antibiograma: ${e.antibiogram}`);
@@ -15833,7 +15842,7 @@ function openMicroRequest(pid, reqId){
   if(!modal || !content || !btnSave || !btnClose) return;
 
   if(barTitle) barTitle.textContent = "Carga de resultados de microbiología";
-  btnSave.textContent = "Guardar evolución";
+  btnSave.textContent = "Guardar informe";
   modal.style.display = "flex";
 
   content.innerHTML = `
@@ -15935,7 +15944,7 @@ const microorganism = [
   return val ? `${name}: ${val}` : "";
 }).filter(Boolean).join(" | ");
     const note = ($("#microNote")?.value || "").trim();
-    const definitive = ($("#microDefFlag")?.value || "no") === "si";
+    const definitive = stage === "Resultado definitivo";
 
     if(!growth && !microorganism && !antibiogram && !note){
       alert("Cargá al menos un dato de evolución microbiológica.");
@@ -15952,6 +15961,7 @@ const microorganism = [
       by: me.username,
       byName: me.name,
       stage,
+      reportType: definitive ? "definitivo" : "parcial",
       growth,
       microorganism,
       antibiogram,
@@ -15965,6 +15975,7 @@ const microorganism = [
 
     cl2[pid] = cur2;
     setClinical(cl2);
+    hcBackendScheduleUrgentPush?.();
 
     logAction(`informó microbiología de ${buildPatientDisplayName(findPatient(pid))}`, pid);
 
@@ -18068,8 +18079,8 @@ function renderNUT(){
   cur.nutritionEvolutions = Array.isArray(cur.nutritionEvolutions) ? cur.nutritionEvolutions : [];
   const reqs = cur.nutritionRequests.filter(x=>!x.deletedAt).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
   const evos = cur.nutritionEvolutions.filter(x=>!x.deletedAt).sort((a,b)=>String(b.createdAt||"").localeCompare(String(a.createdAt||"")));
-  root.innerHTML = `<div class="labTwoCols"><div class="card moduleTinyCard"><div class="labSectionTitle">Solicitud nutricional</div>${isMedico ? `<div class="field"><label>Tipo</label><select id="nutType">${NUTRITION_TYPES.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="field" style="margin-top:8px;"><label>Características</label><div class="imgStudyOptions">${NUTRITION_FEATURES.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-nut-feature value="${hcEscAttr(x)}"><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="row" style="margin-top:8px;"><div class="field"><label>Velocidad bomba enteral/parenteral (ml/h)</label><input id="nutRate" type="number" min="0" step="1" placeholder="Ej: 40" /></div><div class="field"><label>Volumen/objetivo diario</label><input id="nutVolume" placeholder="Ej: 1000 ml/día" /></div></div><div class="field" style="margin-top:8px;"><label>Indicaciones / observaciones</label><textarea id="nutNote" class="ta1" placeholder="Motivo clínico y objetivos nutricionales"></textarea></div>${hc264RequestTimingHTML("nutReq")}<div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:12px;">Solo lectura.</div>`}<div style="margin-top:10px;"><div class="labSectionTitle">Solicitudes</div>${reqs.length ? reqs.map(r=>`<div class="moduleListItem imgRequestCard ${hcImageTimingClass(r)}"><span class="imgPriorityBadge ${hcImageTimingClass(r)}">${escHTML(hcImageTimingLabel(r))}</span><br><b>${escHTML(r.type)}</b> • ${escHTML((r.features||[]).join(", ") || "Sin características")}${r.rateMlH ? ` • <b>${escHTML(r.rateMlH)} ml/h</b>` : ""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="white-space:pre-wrap; margin-top:5px;">${escHTML(r.note)}</div>` : ""}</div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes.</div>`}</div></div><div class="card moduleTinyCard"><div class="labSectionTitle">Nutrición: evolución / contenidos</div>${isNut ? `<div class="field"><label>Evolución o indicación del nutricionista</label><textarea id="nutEvoTxt" placeholder="Tolerancia, cambios de fórmula, objetivos, recomendaciones..."></textarea></div><div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutEvo" type="button">Guardar evolución</button></div>` : `<div class="muted" style="font-size:12px;">Solo el personal de Nutrición puede cargar evoluciones. El médico dispone de lectura.</div>`}<div style="margin-top:10px;">${evos.length ? evos.map(e=>`<div class="moduleListItem"><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div><div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}</div></div></div>`;
-  $("#btnSaveNutReq")?.addEventListener("click", ()=>{ if(!isMedico)return; let requestTiming;try{requestTiming=hc264ReadRequestTiming(root,"nutReq");}catch(error){return alert(error.message);} const latest=hcEnsureClinicalPatient(pid); const cl=latest.cl,cur=latest.cur;cur.nutritionRequests ||= []; const type = $("#nutType")?.value || "Vía oral"; const features = Array.from(root.querySelectorAll("[data-nut-feature]:checked")).map(o=>o.value); const rate = ($("#nutRate")?.value || "").trim(); const volume = ($("#nutVolume")?.value || "").trim(); const note = ($("#nutNote")?.value || "").trim(); const id = uid("nutreq"); const text = `${type}${features.length ? " • " + features.join(", ") : ""}${rate ? " • bomba " + rate + " ml/h" : ""}${volume ? " • " + volume : ""}${note ? " • " + note : ""}`; cur.nutritionRequests.push({ id, type, features, ...requestTiming, rateMlH: rate, volume, note, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name }); hcEnsurePresArray(cur); cur.prescripciones.infusionesContinuas.unshift(hcTextPrescriptionFromModule({prefix:"Nutrición", text, linkedId:id})); hcEnsurePrescriptionDailySnapshot(pid, cl); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó nutrición para ${buildPatientDisplayName(p)}`, pid); hc264ClearRequestDraft(root,"nut",pid); renderNUT(); });
+  root.innerHTML = `<div class="labTwoCols"><div class="card moduleTinyCard"><div class="labSectionTitle">Solicitud nutricional</div>${isMedico ? `<div class="field"><label>Tipo</label><select id="nutType">${NUTRITION_TYPES.map(x=>`<option value="${hcEscAttr(x)}">${escHTML(x)}</option>`).join("")}</select></div><div class="field" style="margin-top:8px;"><label>Características</label><div class="imgStudyOptions">${NUTRITION_FEATURES.map(x=>`<label class="imgStudyChoice"><input type="checkbox" data-nut-feature value="${hcEscAttr(x)}"><span>${escHTML(x)}</span></label>`).join("")}</div></div><div class="row" style="margin-top:8px;"><div class="field"><label>Velocidad bomba enteral/parenteral (ml/h)</label><input id="nutRate" type="number" min="0" step="1" placeholder="Ej: 40" /></div><div class="field"><label>Volumen/objetivo diario</label><input id="nutVolume" placeholder="Ej: 1000 ml/día" /></div></div><div class="field" style="margin-top:8px;"><label>Indicaciones / observaciones</label><textarea id="nutNote" class="ta1" placeholder="Motivo clínico y objetivos nutricionales"></textarea></div>${window.hc306NutritionMealsHTML?.()||""}${hc264RequestTimingHTML("nutReq")}<div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutReq" type="button">Guardar solicitud</button></div>` : `<div class="muted" style="font-size:12px;">Solo lectura.</div>`}<div style="margin-top:10px;"><div class="labSectionTitle">Solicitudes</div>${reqs.length ? reqs.map(r=>`<div class="moduleListItem imgRequestCard ${hcImageTimingClass(r)}"><span class="imgPriorityBadge ${hcImageTimingClass(r)}">${escHTML(hcImageTimingLabel(r))}</span><br><b>${escHTML(r.type)}</b>${window.hc306NutritionMealsText?.(r)||""} • ${escHTML((r.features||[]).join(", ") || "Sin características")}${r.rateMlH ? ` • <b>${escHTML(r.rateMlH)} ml/h</b>` : ""}<div class="moduleMeta">${escHTML(dmyhmFromISODateTime(r.createdAt||""))} • ${escHTML(r.createdByName||"—")}</div>${r.note ? `<div style="white-space:pre-wrap; margin-top:5px;">${escHTML(r.note)}</div>` : ""}</div>`).join("") : `<div class="muted" style="font-size:12px;">Sin solicitudes.</div>`}</div></div><div class="card moduleTinyCard"><div class="labSectionTitle">Nutrición: evolución / contenidos</div>${isNut ? `<div class="field"><label>Evolución o indicación del nutricionista</label><textarea id="nutEvoTxt" placeholder="Tolerancia, cambios de fórmula, objetivos, recomendaciones..."></textarea></div><div style="margin-top:8px;"><button class="btn primary" id="btnSaveNutEvo" type="button">Guardar evolución</button></div>` : `<div class="muted" style="font-size:12px;">Solo el personal de Nutrición puede cargar evoluciones. El médico dispone de lectura.</div>`}<div style="margin-top:10px;">${evos.length ? evos.map(e=>`<div class="moduleListItem"><div class="moduleMeta">${escHTML(dmyhmFromISODateTime(e.createdAt||""))} • ${escHTML(e.createdByName||"—")}</div><div style="white-space:pre-wrap; margin-top:5px;">${escHTML(e.text||"")}</div></div>`).join("") : `<div class="muted" style="font-size:12px;">Sin evoluciones.</div>`}</div></div></div>`;
+  $("#btnSaveNutReq")?.addEventListener("click", ()=>{ if(!isMedico)return; let requestTiming;try{requestTiming=hc264ReadRequestTiming(root,"nutReq");}catch(error){return alert(error.message);} const latest=hcEnsureClinicalPatient(pid); const cl=latest.cl,cur=latest.cur;cur.nutritionRequests ||= []; const type = $("#nutType")?.value || "Vía oral"; const features = Array.from(root.querySelectorAll("[data-nut-feature]:checked")).map(o=>o.value); const rate = ($("#nutRate")?.value || "").trim(); const volume = ($("#nutVolume")?.value || "").trim(); const note = ($("#nutNote")?.value || "").trim(); const meals=window.hc306ReadNutritionMeals(root);if(!meals)return;const id = uid("nutreq"); const text = `${type}${features.length ? " • " + features.join(", ") : ""}${rate ? " • bomba " + rate + " ml/h" : ""}${volume ? " • " + volume : ""}${note ? " • " + note : ""}${meals.length ? " • Comidas: "+meals.map(x=>x.name+(x.time?" "+x.time:"")+(x.diet?": "+x.diet:"")).join("; ") : ""}`; cur.nutritionRequests.push({ id, type, features, meals, ...requestTiming, rateMlH: rate, volume, note, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name }); hcEnsurePresArray(cur); cur.prescripciones.infusionesContinuas.unshift(hcTextPrescriptionFromModule({prefix:"Nutrición", text, linkedId:id})); hcEnsurePrescriptionDailySnapshot(pid, cl); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`solicitó nutrición para ${buildPatientDisplayName(p)}`, pid); hc264ClearRequestDraft(root,"nut",pid); renderNUT(); });
   $("#btnSaveNutEvo")?.addEventListener("click", ()=>{ if(!isNut) return alert("Solo el personal de Nutrición puede cargar evoluciones."); const text = ($("#nutEvoTxt")?.value || "").trim(); if(!text) return alert("Escribí una evolución."); cur.nutritionEvolutions.push({id:uid("nutevo"), text, createdAt:isoNowLocalFull(), createdBy:me.username, createdByName:me.name}); cl[pid]=cur; setClinical(cl); hcBackendMarkLocalSavedSoon(); hcBackendScheduleUrgentPush(); logAction(`guardó evolución de Nutrición de ${buildPatientDisplayName(p)}`, pid); renderNUT(); });
 }
 
@@ -18960,7 +18971,7 @@ function renderPrescripciones(){
     window.hcHydrationTimer = setInterval(()=>{
       try{
         if(typeof medTab !== "undefined" && medTab === "prescripciones"){
-          renderMed();
+          window.hc306RefreshPrescriptions?.();
         }
       }catch(_){}
     }, 30000);
@@ -24777,7 +24788,7 @@ function patientHasPendingNurseAlert(patientId){
       if(serviceFilter !== "TODO" && area.toUpperCase() !== serviceFilter) return;
       const cur = cl[p.id] || {};
       const items = hcPrescriptionItemsForPlanDate(cur?.prescripciones || {}, servicePlanDate)
-        .filter(it => it && !hcIsDeletedPrescriptionItem(it));
+        .filter(it => window.hc306IsCurrentPrescription(it));
       servicePatients.push({patient:p, area, cama, items});
     });
 
@@ -35396,7 +35407,7 @@ const HC_V189_MODULE_LABELS = {
 const HC_V189_MODULE_ORDER = [
   "epicrisisFull","ingresoFull","evolucionesFull","prescripciones",
   "signosVitales","balances","invasiones","nursingReports","surgicalSheets",
-  "monitoringRecords","labRequests","labResults","microRequests","microResults",
+  "monitoringRecords","calculatedScales","labRequests","labResults","microRequests","microResults",
   "imageRequests","imageResults","nutritionRequests","nutritionEvolutions",
   "hemotherapyRequests","hemotherapyEvolutions","kinesiologiaRequests",
   "kinesiologiaEvolutions","otros"
@@ -35579,7 +35590,7 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
 
   [
     "evolucionesFull","signosVitales","balances","invasiones","nursingReports",
-    "surgicalSheets","monitoringRecords","labRequests","labResults","microRequests",
+    "surgicalSheets","monitoringRecords","calculatedScales","labRequests","labResults","microRequests",
     "microResults","imageRequests","imageResults","nutritionRequests",
     "nutritionEvolutions","hemotherapyRequests","hemotherapyEvolutions",
     "kinesiologiaRequests","kinesiologiaEvolutions"
@@ -35610,7 +35621,7 @@ function hcV189BuildAdmissionSnapshot(patientId,admission,archiveEntry={}){
   const known = new Set([
     "ingresoFull","ingreso","ingresosPrev","evolucionesFull","evoluciones",
     "prescripciones","signosVitales","balances","balanceDetalles","invasiones",
-    "nursingReports","surgicalSheets","monitoringRecords","labRequests","labResults",
+    "nursingReports","surgicalSheets","monitoringRecords","calculatedScales","labRequests","labResults",
     "microRequests","microResults","imageRequests","imageResults","nutritionRequests",
     "nutritionEvolutions","hemotherapyRequests","hemotherapyEvolutions",
     "kinesiologiaRequests","kinesiologiaEvolutions","epicrisisFull","consentimientos","epicrisisTransfers","ambulatorio"
@@ -41230,7 +41241,7 @@ bootWithBackend();
       const arrayKeys = [
         "evolucionesFull","evoluciones","ingresosPrev",
         "signosVitales","balances","invasiones","nursingReports",
-        "surgicalSheets","monitoringRecords",
+        "surgicalSheets","monitoringRecords","calculatedScales",
         "labRequests","labResults","microRequests","microResults",
         "imageRequests","imageResults",
         "nutritionRequests","nutritionEvolutions",
@@ -42780,7 +42791,7 @@ const HC221_PATIENT_SYNC_URL="https://frbuhczonftjtvmviehw.supabase.co/functions
 const HC221_CORE_CLINICAL_FIELDS=[
   "ingresoFull","ingresosPrev","evolucionesFull","clinicalMedia","prescripciones",
   "signosVitales","balances","balanceDetalles","invasiones",
-  "nursingReports","surgicalSheets","monitoringRecords",
+  "nursingReports","surgicalSheets","monitoringRecords","calculatedScales",
   "labRequests","labResults","microRequests","microResults",
   "imageRequests",
   "nutritionRequests","nutritionEvolutions",
@@ -45608,9 +45619,12 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
   let shiftRequired=false,shiftOpen=false,promptTimer=null,promptWaitCount=0,shiftDismissed=null;
   function shiftDismissKey(){return userName()+"|"+dataInstitution()+"|"+localDate()+"|"+String(session?.globalToken||"");}
   function shiftId(date=localDate()){return `workshift:${dataInstitution()||"local"}:${userName()}:${date}`;}
-  function todayShift(){const id=shiftId();return activity().find(x=>String(x?.id||"")===id||(
-    x?.kind==="work_shift"&&String(x?.user||"")===userName()&&String(x?.dateLocal||"")===localDate()&&(!x?.institutionDataId||String(x.institutionDataId)===dataInstitution())
-  ))||null;}
+  function todayShift(){
+    let saved=null;try{saved=JSON.parse(localStorage.getItem('hc306.shift.'+dataInstitution()+'.'+userName())||'null');}catch{}
+    const rows=[...activity(),...(saved?[saved]:[])].filter(x=>x?.kind==='work_shift'&&String(x.user||'')===userName()&&(!x.institutionDataId||String(x.institutionDataId)===dataInstitution())).sort((a,b)=>String(a.updatedAt||a.ts||'').localeCompare(String(b.updatedAt||b.ts||'')));
+    const latest=[...new Map(rows.map(x=>[x.id,x])).values()],now=Date.now();
+    return latest.find(x=>{const start=new Date(x.startDateTime||((x.startDate||x.dateLocal)+'T'+x.startTime)).getTime();let end=new Date(x.endDateTime||((x.endDate||x.dateLocal)+'T'+x.endTime)).getTime();if(x.crossesMidnight&&!x.endDate&&!x.endDateTime)end+=86400000;return start<=now&&now<end;})||latest.find(x=>String(x.id)===shiftId()||String(x.dateLocal)===localDate())||null;
+  }
   function serviceList(){const base=ROLE_SERVICES[String(session?.role||"")]||["UTI","UCO","UCE","Clínica médica","Guardia Central","Consultorios","Otro servicio"];return ["medico","enfermero","kinesiologo","nutricionista","bioquimico","microbiologo","imagenologo","hemoterapia"].includes(String(session?.role||""))?Array.from(new Set([...base,"Telemedicina"])):base;}
   function addTopButton(id,text,afterId){
     if(document.getElementById(id))return document.getElementById(id);
@@ -45659,7 +45673,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
     if(!services.length)return fail("Elegí al menos un servicio.");if(!duty)return fail("Elegí la modalidad de trabajo.");if(!startDate||!start||!endDate||!end)return fail("Indicá fecha y hora de ingreso y de salida.");
     const startMs=new Date(`${startDate}T${start}:00`).getTime(),endMs=new Date(`${endDate}T${end}:00`).getTime();
     if(!Number.isFinite(startMs)||!Number.isFinite(endMs)||endMs<=startMs)return fail("La fecha/hora de salida debe ser posterior a la fecha/hora de ingreso.");
-    const acts=activity().slice();const id=shiftId();let idx=acts.findIndex(x=>String(x?.id||"")===id);if(idx<0)idx=acts.findIndex(x=>x?.kind==="work_shift"&&String(x?.user||"")===userName()&&String(x?.dateLocal||"")===localDate());
+    const acts=activity().slice();const id=todayShift()?.id||shiftId(startDate);let idx=acts.findIndex(x=>String(x?.id||"")===id);if(idx<0)idx=acts.findIndex(x=>x?.kind==="work_shift"&&String(x?.user||"")===userName()&&String(x?.dateLocal||"")===localDate());
     const old=idx>=0?acts[idx]:null,now=isoNow();
     const crossesMidnight=endDate!==startDate;
     const snapshot={services:services.slice(),dutyType:duty,startDate,startTime:start,endDate,endTime:end,changedAt:now,changedBy:userName()};
@@ -45667,7 +45681,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
     if(old)history.push({services:Array.isArray(old.services)?old.services:[],dutyType:old.dutyType||"",startDate:old.startDate||old.dateLocal||"",startTime:old.startTime||"",endDate:old.endDate||old.dateLocal||"",endTime:old.endTime||"",changedAt:old.lastModifiedAt||old.ts||old.createdAt||"",changedBy:old.user||userName()});
     const rec={...(old||{}),id,kind:"work_shift",dateLocal:startDate,user:userName(),name:session?.name||userName(),role:session?.role||"",institutionId:String(session?.institutionId||""),institutionDataId:dataInstitution(),institutionName:String(session?.institutionName||""),services,dutyType:duty,startDate,startTime:start,endDate,endTime:end,startDateTime:`${startDate}T${start}:00`,endDateTime:`${endDate}T${end}:00`,crossesMidnight,createdAt:old?.createdAt||now,lastModifiedAt:now,updatedAt:now,ts:now,history:history.slice(-30),message:`Jornada laboral: ${services.join(", ")} · ${shiftLabel(duty)} · ${startDate} ${start} → ${endDate} ${end}.`};
     if(idx>=0)acts[idx]=rec;else acts.push(rec);
-    try{setActivity(acts);hcBackendScheduleUrgentPush?.();}catch(e){console.error("v229 jornada",e);return fail("No se pudo guardar la jornada en este dispositivo.");}
+    try{setActivity(acts);localStorage.setItem('hc306.shift.'+dataInstitution()+'.'+userName(),JSON.stringify(rec));hcBackendScheduleUrgentPush?.();}catch(e){console.error("v229 jornada",e);return fail("No se pudo guardar la jornada en este dispositivo.");}
     shiftRequired=false;closeShift();refreshAccountShiftCard();if($("#hc229AccountingModal")?.classList.contains("show"))renderAccounting();
     try{toast?.(old?"Jornada actualizada":"Jornada registrada");}catch(_){ }
   }
@@ -48786,7 +48800,7 @@ body.hc280IsLocked .topbar,body.hc280IsLocked #appMed,body.hc280IsLocked #appAdm
 (()=>{
 'use strict';
 window.HC_DEMO_VERSION='v280';document.title='Hospitalito · HC Demo v280 · Supabase';
-window.hc280HistoryFields=new Set(['evolucionesFull','ingresosPrev','nursingReports','labResults','microResults']);
+window.hc280HistoryFields=new Set(['evolucionesFull','ingresosPrev','nursingReports','labResults','microResults','calculatedScales']);
 const q=s=>document.querySelector(s),scope=()=>String(localStorage.getItem(LS.backendRegistryId)||session?.institutionId||''),actor=()=>String(session?.username||'');
 const visible=e=>!!(e&&e.isConnected&&e.style.display!=='none'&&e.getClientRects().length);
 window.hc280EditorActive=function(module=''){
@@ -48861,7 +48875,7 @@ async function acceptLogin(a){if(a.user?.role==='cliente'){await window.hc289Ent
 let lastActivity=Date.now(),lastActor='',lockedUser='',lockedInst='',busy=false;
 window.hc280Locked=false;
 const idleKey=()=>`hc.v280.idle.${session?.username||''}`,lastKey=()=>`hc.v280.activity.${session?.username||''}`;
-const idleMinutes=()=>{const n=Number(localStorage.getItem(idleKey())||5);return [2,5,10,15].includes(n)?n:5;};
+const idleMinutes=()=>{const raw=localStorage.getItem(idleKey()),n=raw===null?0:Number(raw);return [0,2,5,10,15,30,60].includes(n)?n:0;};
 function touched(){if(!session||window.hc280Locked)return;lastActivity=Date.now();localStorage.setItem(lastKey(),String(lastActivity));}
 function setMessage(root,text){root.querySelector('[data-security-message]').textContent=text;}
 async function hc285RestoreSeedForUnlock(){
@@ -48889,19 +48903,19 @@ function lock(){if(!session||window.hc280Locked)return;window.hc280PersistDrafts
  root.querySelector('[data-unlock-password]').onclick=()=>unlock(false);root.querySelector('[data-unlock-device]').onclick=()=>unlock(true);q('#hc280UnlockPassword').onkeydown=e=>{if(e.key==='Enter')unlock(false);};root.querySelector('[data-lock-exit]').onclick=()=>{root.remove();window.hc280Locked=false;document.body.classList.remove('hc280IsLocked');document.querySelectorAll('#appMed,#appAdmin,#hc231PlatformPage,#hc284AccountPage').forEach(e=>e.inert=false);logout();};q('#hc280UnlockPassword').focus();
 }
 window.hc280Lock=lock;
-function checkIdle(){if(!session)return;const name=String(session.username||'');if(name!==lastActor){lastActor=name;lastActivity=Number(localStorage.getItem(lastKey())||Date.now());}if(window.hc280Locked)return;if(localStorage.getItem(`hc.v280.locked.${name}`)==='1'||Date.now()-lastActivity>=idleMinutes()*60000)lock();}
-['pointerdown','keydown','input','touchstart'].forEach(ev=>document.addEventListener(ev,touched,{capture:true,passive:true}));
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkIdle();});window.addEventListener('focus',checkIdle);
+function checkIdle(){if(!session||document.hidden)return;const name=String(session.username||'');if(name!==lastActor){lastActor=name;lastActivity=Number(localStorage.getItem(lastKey())||Date.now());}if(window.hc280Locked)return;if(localStorage.getItem(`hc.v280.locked.${name}`)==='1'||(idleMinutes()>0&&Date.now()-lastActivity>=idleMinutes()*60000))lock();}
+['pointerdown','keydown','input','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,touched,{capture:true,passive:true}));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){touched();checkIdle();}});window.addEventListener('focus',()=>{if(!document.hidden){touched();checkIdle();}});
 window.addEventListener('storage',e=>{if(e.key===`hc.v280.locked.${session?.username}`&&e.newValue==='1')lock();if(e.key===lastKey())lastActivity=Math.max(lastActivity,Number(e.newValue||0));});
 setInterval(checkIdle,1000);
-async function openSecurity(){if(!session||session.localSeed)return;const old=q('#hc280Security');if(old){old.remove();return;}const root=document.createElement('div');root.id='hc280Security';root.className='hc280Overlay';root.style.background='rgba(2,12,24,.94)';root.innerHTML=`<div class="card"><h2>Acceso seguro</h2><p>Primero ingresá con tu contraseña. Luego vinculá la huella o el rostro que ya están registrados en este dispositivo. Hospitalito guarda una llave de acceso asociada a tu usuario.</p><details open><summary>Cómo preparar huella y reconocimiento facial</summary><p><b>Celular:</b> configurá huella, Face ID o reconocimiento admitido para llaves de acceso desde los ajustes de seguridad del teléfono. Al vincular, el teléfono solicitará la verificación.</p><p><b>Windows:</b> abrí Configuración → Cuentas → Opciones de inicio de sesión → Windows Hello. Para registrar el rostro se requiere una cámara compatible con Windows Hello; una cámara común no alcanza. También podés utilizar huella o PIN.</p><p>Si el dispositivo no tiene biometría compatible, podés continuar con el PIN del dispositivo o tu contraseña de Hospitalito. Cada equipo se vincula por separado.</p><a href="https://walterrigoni.github.io/hospitalito/" target="_blank" rel="noopener" class="btn small">Abrir la web segura de Hospitalito</a></details><label for="hc280IdleMinutes">Bloquear por inactividad</label><select id="hc280IdleMinutes">${[2,5,10,15].map(n=>`<option value="${n}" ${n===idleMinutes()?'selected':''}>${n} minutos</option>`).join('')}</select><p>${secure()?'Podés activar una llave en este navegador.':'Para activar huella, rostro o PIN, abrí la web segura de Hospitalito.'}</p><label for="hc280EnrollPassword">Confirmar contraseña</label><input id="hc280EnrollPassword" type="password" autocomplete="current-password"><label for="hc280DeviceLabel">Nombre del dispositivo</label><input id="hc280DeviceLabel" placeholder="Ej.: Mi celular" maxlength="80"><button class="btn primary" data-enroll ${secure()?'':'disabled'}>Vincular huella, rostro o PIN de este dispositivo</button><div data-passkey-list></div><p data-security-message role="status"></p><button class="btn" data-security-close>Cerrar</button><button class="btn" data-security-lock>Bloquear ahora</button></div>`;document.body.appendChild(root);
+async function openSecurity(){if(!session||session.localSeed)return;const old=q('#hc280Security');if(old){old.remove();return;}const root=document.createElement('div');root.id='hc280Security';root.className='hc280Overlay';root.style.background='rgba(2,12,24,.94)';root.innerHTML=`<div class="card"><h2>Acceso seguro</h2><p>Primero ingresá con tu contraseña. Luego vinculá la huella o el rostro que ya están registrados en este dispositivo. Hospitalito guarda una llave de acceso asociada a tu usuario.</p><details open><summary>Cómo preparar huella y reconocimiento facial</summary><p><b>Celular:</b> configurá huella, Face ID o reconocimiento admitido para llaves de acceso desde los ajustes de seguridad del teléfono. Al vincular, el teléfono solicitará la verificación.</p><p><b>Windows:</b> abrí Configuración → Cuentas → Opciones de inicio de sesión → Windows Hello. Para registrar el rostro se requiere una cámara compatible con Windows Hello; una cámara común no alcanza. También podés utilizar huella o PIN.</p><p>Si el dispositivo no tiene biometría compatible, podés continuar con el PIN del dispositivo o tu contraseña de Hospitalito. Cada equipo se vincula por separado.</p><a href="https://walterrigoni.github.io/hospitalito/" target="_blank" rel="noopener" class="btn small">Abrir la web segura de Hospitalito</a></details><label for="hc280IdleMinutes">Bloquear por inactividad</label><select id="hc280IdleMinutes">${[0,2,5,10,15,30,60].map(n=>`<option value="${n}" ${n===idleMinutes()?'selected':''}>${n?n+' minutos':'Mantener sesión en este dispositivo'}</option>`).join('')}</select><p>${secure()?'Podés activar una llave en este navegador.':'Para activar huella, rostro o PIN, abrí la web segura de Hospitalito.'}</p><label for="hc280EnrollPassword">Confirmar contraseña</label><input id="hc280EnrollPassword" type="password" autocomplete="current-password"><label for="hc280DeviceLabel">Nombre del dispositivo</label><input id="hc280DeviceLabel" placeholder="Ej.: Mi celular" maxlength="80"><button class="btn primary" data-enroll ${secure()?'':'disabled'}>Vincular huella, rostro o PIN de este dispositivo</button><div data-passkey-list></div><p data-security-message role="status"></p><button class="btn" data-security-close>Cerrar</button><button class="btn" data-security-lock>Bloquear ahora</button></div>`;document.body.appendChild(root);
  root.querySelector('[data-security-close]').onclick=()=>root.remove();root.querySelector('[data-security-lock]').onclick=()=>{root.remove();lock();};q('#hc280IdleMinutes').onchange=e=>{localStorage.setItem(idleKey(),e.target.value);touched();};
  async function list(){try{const r=await request('hospitalito-passkeys','list',{token:authToken()});const box=root.querySelector('[data-passkey-list]');box.innerHTML='<h3>Mis llaves de acceso</h3>'+r.credentials.map(x=>`<div class="hc280Notice">${escHTML(x.label)} <button type="button" class="btn small" data-revoke="${escHTML(x.id)}">Desactivar</button></div>`).join('');box.querySelectorAll('[data-revoke]').forEach(b=>b.onclick=async()=>{try{const a=await passwordAuth(session.username,q('#hc280EnrollPassword').value);await request('hospitalito-passkeys','revoke',{token:a.token,credentialId:b.dataset.revoke});setMessage(root,'Llave desactivada.');await list();}catch(e){setMessage(root,e.message);}});}catch(e){setMessage(root,e.message);}}
- root.querySelector('[data-enroll]').onclick=async function(){this.disabled=true;try{const a=await passwordAuth(session.username,q('#hc280EnrollPassword').value);if(a.user.username!==session.username)throw Error('Cuenta inválida.');const o=await request('hospitalito-passkeys','registerOptions',{token:a.token}),pk={...o.options,challenge:dec(o.options.challenge),user:{...o.options.user,id:dec(o.options.user.id)},excludeCredentials:o.options.excludeCredentials?.map(x=>({...x,id:dec(x.id)})),authenticatorSelection:{...o.options.authenticatorSelection,authenticatorAttachment:'platform',userVerification:'required'}};const c=await navigator.credentials.create({publicKey:pk});if(!c)throw Error('Activación cancelada.');await request('hospitalito-passkeys','registerVerify',{token:a.token,challengeId:o.challengeId,response:jsonCredential(c),label:q('#hc280DeviceLabel').value||'Mi dispositivo'});q('#hc280EnrollPassword').value='';setMessage(root,'Acceso con dispositivo activado.');await list();}catch(e){setMessage(root,e.name==='NotAllowedError'?'Activación cancelada. Tu acceso con contraseña sigue disponible.':e.message);}finally{this.disabled=!secure();}};
+ root.querySelector('[data-enroll]').onclick=async function(){this.disabled=true;try{const a=await passwordAuth(session.username,q('#hc280EnrollPassword').value);if(a.user.username!==session.username)throw Error('Cuenta inválida.');const o=await request('hospitalito-passkeys','registerOptions',{token:a.token}),pk={...o.options,challenge:dec(o.options.challenge),user:{...o.options.user,id:dec(o.options.user.id)},excludeCredentials:o.options.excludeCredentials?.map(x=>({...x,id:dec(x.id)})),authenticatorSelection:{...o.options.authenticatorSelection,userVerification:'required'}};const c=await window.hc306CreateCredential(pk,root);if(!c)throw Error('Activación cancelada.');await request('hospitalito-passkeys','registerVerify',{token:a.token,challengeId:o.challengeId,response:jsonCredential(c),label:q('#hc280DeviceLabel').value||'Mi dispositivo'});q('#hc280EnrollPassword').value='';setMessage(root,'Acceso con dispositivo activado.');await list();}catch(e){setMessage(root,e.name==='NotAllowedError'?'Activación cancelada. Tu acceso con contraseña sigue disponible.':e.message);}finally{this.disabled=!secure();}};
  if(secure())await list();
 }
 window.hc280OpenSecurity=openSecurity;
-function install(){const host=q('#loginWrap');if(host&&!q('#hc280DeviceLogin')){const b=document.createElement('button');b.type='button';b.className='btn';b.id='hc280DeviceLogin';b.textContent='Ingresar con huella, rostro o PIN';b.disabled=!secure();b.title=secure()?'Usar una llave de acceso activada':'Disponible desde la web segura de Hospitalito';b.onclick=async()=>{b.disabled=true;try{const user=q('#loginUser')?.value||q('#username')?.value||q('#inpUser')?.value;if(!user)throw Error('Escribí tu usuario para usar su llave de acceso.');hcLoginMessage?.('Verificando dispositivo…','info');await acceptLogin(await authenticate(user));hcLoginMessage?.('');touched();}catch(e){hcLoginMessage?.(e.name==='NotAllowedError'?'Acceso cancelado. Podés usar tu contraseña.':e.message);}finally{b.disabled=!secure();}};host.appendChild(b);}
+function install(){const host=q('#loginWrap');if(host&&!q('#hc280DeviceLogin')){const b=document.createElement('button');b.type='button';b.className='btn';b.id='hc280DeviceLogin';b.textContent='Ingresar con huella, rostro o PIN';b.disabled=!secure();b.title=secure()?'Usar una llave de acceso activada':'Disponible desde la web segura de Hospitalito';b.onclick=async()=>{b.disabled=true;try{const user=(q('#loginUser')?.value||q('#username')?.value||q('#inpUser')?.value||localStorage.getItem('hc306.lastUsername')||'').trim();if(!user)throw Error('Escribí tu usuario para usar su llave de acceso.');hcLoginMessage?.('Verificando dispositivo…','info');await acceptLogin(await authenticate(user));hcLoginMessage?.('');touched();}catch(e){hcLoginMessage?.(e.name==='NotAllowedError'?'Acceso cancelado. Podés usar tu contraseña.':e.message);}finally{b.disabled=!secure();}};host.appendChild(b);}
  const account=q('#btnAccount');if(account&&session&&!session.localSeed&&!q('#hc280SecurityButton')){const b=document.createElement('button');b.id='hc280SecurityButton';b.type='button';b.className='btn small';b.textContent='Acceso seguro';b.onclick=openSecurity;account.parentElement.insertBefore(b,account);}
  const b=q('#hc280SecurityButton');if(b)b.style.display=session&&!session.localSeed?'':'none';
 }
@@ -49562,10 +49576,10 @@ body.hc286ArchiveOpen #medPanel>.medModuleTabs,body.hc286ArchiveOpen #medPanel>#
  function renderScales(){
   const root=$('#medScales');if(!root)return;
   if(!clinicalRoles.includes(session?.role)){root.replaceChildren();return;}
-  const key=context();if(root.dataset.hc288Context===key&&root.childElementCount)return;
+  const key=context();if(root.dataset.hc288Context===key&&root.childElementCount){window.hc306RenderScaleHistory?.();return;}
   root.dataset.hc288Context=key;
-  let state=memory.get(key);if(!state){state={selected:'nihss',query:'',values:{}};memory.set(key,state);if(memory.size>40)memory.delete(memory.keys().next().value);}
-  root.innerHTML='<p>Calculadoras clínicas · '+tools.length+' herramientas disponibles. Los datos se completan manualmente y el resultado se puede copiar a la evolución. No se guardan ni se cambian tratamientos automáticamente.</p><div class="hc288ScaleLayout"><div><label for="hc288ScaleSearch">Buscar escala</label><input id="hc288ScaleSearch" type="search" placeholder="NIHSS, TIMI, APACHE…" value="'+esc(state.query)+'"><div id="hc288ScaleList" class="hc288ScaleList" style="margin-top:10px"></div></div><div id="hc288ScaleForm" class="card"></div></div>';
+  let state=memory.get(key);if(!state){try{state=JSON.parse(sessionStorage.getItem('hc306.scaleForm.'+key)||'null');}catch{}state||={selected:'nihss',query:'',values:{}};memory.set(key,state);if(memory.size>40)memory.delete(memory.keys().next().value);}
+  root.innerHTML='<p>Calculadoras clínicas · '+tools.length+' herramientas disponibles. Completá los datos, calculá y usá Guardar en este paciente. Las escalas guardadas se pueden adjuntar desde Evolución.</p><div class="hc288ScaleLayout"><div><label for="hc288ScaleSearch">Buscar escala</label><input id="hc288ScaleSearch" type="search" placeholder="NIHSS, TIMI, APACHE…" value="'+esc(state.query)+'"><div id="hc288ScaleList" class="hc288ScaleList" style="margin-top:10px"></div></div><div id="hc288ScaleForm" class="card"></div></div>';
   const list=root.querySelector('#hc288ScaleList'),host=root.querySelector('#hc288ScaleForm');
   function paintList(){
    const q=apiNormalize(state.query),found=tools.filter(t=>apiNormalize(t.title+' '+t.category).includes(q));
@@ -49582,15 +49596,16 @@ body.hc286ArchiveOpen #medPanel>.medModuleTabs,body.hc286ArchiveOpen #medPanel>#
    const form=host.querySelector('form'),result=host.querySelector('#hc288ScaleResult');
    function visibility(){for(const f of tool.fields){const field=host.querySelector('[data-hc288-field="'+f.id+'"]');field.hidden=!api.visible(f,values);}}
    visibility();
-   for(const kind of ['input','change'])form.addEventListener(kind,event=>{if(event.target.name){values[event.target.name]=event.target.value;result.replaceChildren();result.className='';visibility();}});
+   for(const kind of ['input','change'])form.addEventListener(kind,event=>{if(event.target.name){values[event.target.name]=event.target.value;try{sessionStorage.setItem('hc306.scaleForm.'+key,JSON.stringify(state));}catch{}result.replaceChildren();result.className='';visibility();}});
    host.querySelector('#hc288ResetScale').onclick=()=>{state.values[tool.id]={};paintForm()};
    form.onsubmit=event=>{event.preventDefault();try{
     const r=calculate(tool,values);result.className='hc288Result';
     result.innerHTML=(r.score!==undefined?'<div class="hc288Score">'+esc(r.score)+' / '+esc(r.max)+' puntos</div>':'')+(r.parts?.length?'<details><summary>Ver puntos por componente</summary><table>'+r.parts.map(p=>'<tr><td>'+esc(p[0])+'</td><td>'+esc(p[1])+'</td></tr>').join('')+'</table></details>':'')+(r.extra||[]).map(p=>'<p><b>'+esc(p[0])+':</b> '+esc(p[1])+'</p>').join('')+'<p>'+esc(r.note||'')+'</p><button class="btn small" type="button" id="hc288CopyScale">Copiar resultado</button><span id="hc288CopyScaleStatus" style="margin-left:8px"></span>';
+    const save=document.createElement('button');save.type='button';save.className='btn primary';save.id='hc306SaveScale';save.textContent='Guardar en este paciente';save.disabled=!selectedPatientId||!['medico','enfermero','bioquimico','microbiologo','imagenologo','farmaceutico'].includes(session?.role);result.append(save);const capturedPid=String(selectedPatientId||'');save.onclick=()=>{try{window.hc306SaveScale(capturedPid,tool,values,r);save.disabled=true;save.textContent='Guardada en este paciente';}catch(e){alert(e.message);}};
     result.querySelector('button').onclick=async()=>{const text=tool.title+' · '+dmyhmFromISODateTime(isoNowLocalFull())+'\n'+(r.score!==undefined?'Puntaje: '+r.score+'/'+r.max+'\n':'')+[...(r.parts||[]),...(r.extra||[])].map(p=>p[0]+': '+p[1]).join('\n')+'\n'+(r.note||'');try{await navigator.clipboard.writeText(text);$('#hc288CopyScaleStatus').textContent='Copiado';}catch(_){$('#hc288CopyScaleStatus').textContent='Seleccioná el texto y copialo manualmente.';}};
    }catch(error){result.className='hc288Error';result.textContent=error.message||'Revisá los datos.';}};
   }
-  root.querySelector('#hc288ScaleSearch').oninput=event=>{state.query=event.target.value;paintList()};paintList();paintForm();
+  root.querySelector('#hc288ScaleSearch').oninput=event=>{state.query=event.target.value;paintList()};paintList();paintForm();window.hc306RenderScaleHistory?.();
  }
  function apiNormalize(value){return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
  const panelBase=renderMedPanel;renderMedPanel=function(){const r=panelBase.apply(this,arguments);const root=$('#medScales');if(root){root.style.display=medTab==='escalas'?'':'none';if(medTab==='escalas'){$('#medPanelTitle').textContent='Escalas';renderScales();}}return r;};
@@ -49699,7 +49714,7 @@ window.hc289PersonalizeRefresh=()=>{if(q('#hcSettingsNav [data-hcs-section=perso
 window.hc289Toast=message=>{let el=q('#hc289Toast');if(!el){el=document.createElement('div');el.id='hc289Toast';el.setAttribute('role','status');document.body.append(el);}el.textContent=message;el.hidden=false;clearTimeout(el.timer);el.timer=setTimeout(()=>el.hidden=true,6000);};
 function proxy(id){menu.hidden=true;const el=document.getElementById(id);if(el)el.click();}
 const menu=document.createElement('div');menu.id='hc289AccountMenu';menu.hidden=true;menu.setAttribute('role','menu');document.body.append(menu);
-const entries=[['Mis ámbitos','private-workspaces'],['Perfil','account'],['Jornada','shift'],['Miembros','members'],['Mis Instituciones','institutions'],['Notificaciones','notifications'],['Configuración','settings'],['Licencia','license'],['SALIR','logout']];
+const entries=[['Chat','chat'],['Ambulatorios','outpatient'],['Telemedicina institucional','institution-tele'],['Huella, rostro o PIN','security'],['Mis ámbitos','private-workspaces'],['Perfil','account'],['Jornada','shift'],['Miembros','members'],['Mis Instituciones','institutions'],['Notificaciones','notifications'],['Configuración','settings'],['Licencia','license'],['SALIR','logout']];
 let menuTrigger=null;
 function closeMenu(restore=false){
  menu.hidden=true;menuTrigger?.setAttribute('aria-expanded','false');
@@ -49721,13 +49736,13 @@ function positionMenu(){
 function openMenu(button){
  const client=!!window.hc289ClientSession;
  menuTrigger?.setAttribute('aria-expanded','false');menuTrigger=button;
- menu.innerHTML=entries.filter(([_,id])=>(id!=='private-workspaces'||(!client&&window.hc297IsProfessional?.(U())))&&(!client||!['shift','members','institutions','license'].includes(id))).map(([label,id])=>'<button role="menuitem" type="button" data-hc289-menu="'+id+'" '+(id==='logout'?'class="hc289Danger"':'')+'>'+(client&&id==='account'?'Datos personales':label)+'</button>').join('');
+ menu.innerHTML=entries.filter(([_,id])=>(!['chat','outpatient','institution-tele','security'].includes(id)||(!client&&({chat:q('#hc232ChatTop'),outpatient:q('#hc289OutpatientTop'),'institution-tele':q('#hc292ProTop'),security:session&&!session.localSeed}[id])))&&(id!=='private-workspaces'||(!client&&window.hc297IsProfessional?.(U())))&&(!client||!['shift','members','institutions','license'].includes(id))).map(([label,id])=>'<button role="menuitem" type="button" data-hc289-menu="'+id+'" '+(id==='logout'?'class="hc289Danger"':'')+'>'+(client&&id==='account'?'Datos personales':label)+'</button>').join('');
  button.setAttribute('aria-controls',menu.id);button.setAttribute('aria-expanded','true');menu.hidden=false;positionMenu();
 }
 window.addEventListener('resize',positionMenu);window.addEventListener('scroll',positionMenu,true);
 window.visualViewport?.addEventListener('resize',positionMenu);window.visualViewport?.addEventListener('scroll',positionMenu);
 new MutationObserver(()=>{if(menu.hidden)menuTrigger?.setAttribute('aria-expanded','false');}).observe(menu,{attributes:true,attributeFilter:['hidden']});
-menu.addEventListener('click',e=>{const id=e.target.closest('[data-hc289-menu]')?.dataset.hc289Menu;if(!id)return;closeMenu();if(window.hc289ClientSession){window.hc289ClientAccount(id);return;}if(id==='logout')proxy('btnLogout');else if(id==='shift')proxy('btnWorkShift');else if(id==='license')proxy('hc284LicenseTop');else{window.hcSettingsOpen(id==='settings'?'personalization':id);if(id==='members')setTimeout(()=>{const body=q('#hcSettingsContent');if(body&&!q('#hc289Professionals')){const b=document.createElement('button');b.id='hc289Professionals';b.className='hcSettingsBtn';b.textContent='Profesionales';b.onclick=()=>proxy('btnProfessionals');body.prepend(b);}},10);}});
+menu.addEventListener('click',e=>{const id=e.target.closest('[data-hc289-menu]')?.dataset.hc289Menu;if(!id)return;closeMenu();if(window.hc289ClientSession){window.hc289ClientAccount(id);return;}if(id==='security'){window.hc280OpenSecurity();return;}if(id==='chat'){proxy('hc232ChatTop');return;}if(id==='outpatient'){proxy('hc289OutpatientTop');return;}if(id==='institution-tele'){proxy('hc292ProTop');return;}if(id==='logout')proxy('btnLogout');else if(id==='shift')proxy('btnWorkShift');else if(id==='license')proxy('hc284LicenseTop');else{window.hcSettingsOpen(id==='settings'?'personalization':id);if(id==='members')setTimeout(()=>{const body=q('#hcSettingsContent');if(body&&!q('#hc289Professionals')){const b=document.createElement('button');b.id='hc289Professionals';b.className='hcSettingsBtn';b.textContent='Profesionales';b.onclick=()=>proxy('btnProfessionals');body.prepend(b);}},10);}});
 
 document.addEventListener('pointerdown',e=>{if(!e.target.closest('#hc289AccountMenu,#btnAccount,#hc289PortalAccount'))closeMenu();});
 document.addEventListener('click',e=>{const account=e.target.closest('#btnAccount,#hc289PortalAccount');if(account){e.preventDefault();e.stopImmediatePropagation();if(!menu.hidden&&menuTrigger===account)closeMenu();else openMenu(account);return;}const color=e.target.closest('[data-vcolor]'),mode=e.target.closest('[data-vmode]');if(color)saveVisual({color:color.dataset.vcolor});if(mode)saveVisual({mode:mode.dataset.vmode});if(e.target.closest('[data-hc289-secure]'))proxy('hc280SecurityButton');},true);
@@ -50196,13 +50211,13 @@ window.hc289Geo=geo;
 window.hc304RefreshPortal=()=>refresh();window.hc289EnterClient=async function(a){appointmentSync={institution:{loaded:false,error:''},private:{loaded:false,error:''},updatedAt:''};appointmentsTab='upcoming';appointmentRefreshTask=null;appointmentRefreshScope='';data={bookings:[],orders:[],results:[],admissions:[],privateVisits:[]};privateLoadError='';requestSerial++;session=null;selectedPatientId=null;localStorage.removeItem(LS.session);localStorage.removeItem(LS.globalAuthToken);localStorage.removeItem(LS.seedAdminToken);try{hc207SyncToken='';hc207SyncExpires=0;hcGlobalPendingAuth=null;}catch{}localStorage.removeItem(LS.globalAuthCurrentInstitution);window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));document.body.classList.add('hc289Client');q('#hc289Portal')?.remove();const portal=document.createElement('div');portal.id='hc289Portal';portal.innerHTML='<header><strong>Portal <small class="hc305Version">v305</small></strong><span class="hc289PortalWho">'+E(a.user.name)+'<br><small>@'+E(a.user.username)+'</small></span><button id="hc289PortalAccount" aria-haspopup="menu">Cuenta</button></header><nav class="hc305PortalNav" aria-label="Navegación del portal"><button type="button" class="hc289Primary" data-hc305-turnos data-hc305-nav="turnos">Mis turnos <span data-hc305-count hidden></span></button><button type="button" data-hc305-calendar data-hc305-nav="calendar">Calendario</button><button type="button" data-289-new data-hc305-nav="new">＋ Nuevo turno</button></nav><div class="hc289PortalLayout"><aside id="hc289Registry" class="hc289Registry '+(innerWidth<750?'collapsed':'')+'"><div class="hc289RegistryScroll" id="hc289RegistryContent"><h2>Registro</h2>Cargando…</div><button class="hc289Resize" aria-label="Expandir, contraer o arrastrar Registro" title="Arrastrar o pulsar">‹</button></aside><main id="hc289PortalMain" class="hc289PortalMain">Conectando con el portal…</main></div>';document.body.append(portal);for(const node of document.body.children)if(node instanceof HTMLElement&&!['hc289Portal','hc289AccountMenu','hc289Toast'].includes(node.id)&&!['STYLE','SCRIPT'].includes(node.tagName))node.inert=true;window.hc289ApplyVisual();setupSidebar();lastActivity=Date.now();locked=false;api('directory').then(d=>{directory=d;if(main()?.dataset.view==='appointments')appointmentsView();}).catch(()=>{});await refresh(true);};
 window.addEventListener('focus',()=>{if(window.hc289ClientSession&&!locked)refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window.hc289ClientSession&&!locked)refresh();});
 function setupSidebar(){const sidebar=q('#hc289Registry'),grip=q('.hc289Resize');let down=0,start=0,moved=false;grip.onpointerdown=e=>{down=e.clientX;start=sidebar.classList.contains('collapsed')?0:sidebar.offsetWidth;moved=false;grip.setPointerCapture(e.pointerId);};grip.onpointermove=e=>{if(!grip.hasPointerCapture(e.pointerId))return;const width=Math.min(500,Math.max(0,start+e.clientX-down));if(Math.abs(e.clientX-down)>5)moved=true;sidebar.classList.toggle('collapsed',width<65);sidebar.style.width=Math.max(150,width)+'px';};grip.onpointerup=e=>{grip.releasePointerCapture(e.pointerId);if(!moved)sidebar.classList.toggle('collapsed');grip.textContent=sidebar.classList.contains('collapsed')?'›':'‹';};}
-async function clientAccount(section){if(section==='logout'){await logoutClient();return;}if(section==='settings'){const el=dialog('Configuración',window.hc289Personalization()+'<hr><button id="hc289ClientPrivacy">Seguridad y contraseña</button>');window.hc289PersonalizeRefresh=()=>{const page=el.querySelector('.hcSettingsPage');if(page)page.outerHTML=window.hc289Personalization();};q('#hc289ClientPrivacy').onclick=()=>window.hc289ClientAccount('privacy');return;}if(section==='privacy'){const el=dialog('Seguridad de la cuenta','<p>La sesión se bloquea tras 5 minutos sin actividad. Volvé a ingresar tu contraseña para continuar.</p><form class="hc289Form"><label class="hc289Full">Contraseña actual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="hc289Full">Nueva contraseña<input name="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><button type="submit">Cambiar contraseña</button><p role="status"></p></form>');el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await window.hc230AuthRequest('changePassword',{token:token(),...Object.fromEntries(new FormData(e.target))});e.target.reset();el.querySelector('[role=status]').textContent='Contraseña actualizada.';},el.querySelector('[role=status]'));};return;}if(section==='notifications'){return window.hc296Notifications();}
+async function clientAccount(section){if(section==='logout'){await logoutClient();return;}if(section==='settings'){const el=dialog('Configuración',window.hc289Personalization()+'<hr><button id="hc289ClientPrivacy">Seguridad y contraseña</button>');window.hc289PersonalizeRefresh=()=>{const page=el.querySelector('.hcSettingsPage');if(page)page.outerHTML=window.hc289Personalization();};q('#hc289ClientPrivacy').onclick=()=>window.hc289ClientAccount('privacy');return;}if(section==='privacy'){const el=dialog('Seguridad de la cuenta','<p>La sesión se mantiene en este dispositivo al cambiar de aplicación. Podés salir desde Cuenta → SALIR.</p><form class="hc289Form"><label class="hc289Full">Contraseña actual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="hc289Full">Nueva contraseña<input name="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><button type="submit">Cambiar contraseña</button><p role="status"></p></form>');el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await window.hc230AuthRequest('changePassword',{token:token(),...Object.fromEntries(new FormData(e.target))});e.target.reset();el.querySelector('[role=status]').textContent='Contraseña actualizada.';},el.querySelector('[role=status]'));};return;}if(section==='notifications'){return window.hc296Notifications();}
  if(!me)await refresh();const p=me?.client||{},profile=p.profile||{},user=window.hc289ClientSession.user;const el=dialog('Datos personales','<div style="text-align:center"><span class="hc289Avatar" style="width:140px;height:140px;margin:auto">'+(image(user.photo)?'<img src="'+image(user.photo)+'" alt="Foto de perfil">':icon('user'))+'</span><h2 style="margin:16px">'+E(p.legal_name)+'</h2><p>@'+E(p.username)+' · Cliente</p></div><p>DNI '+E(p.dni)+' · Nacimiento '+E(p.dob)+'</p><p class="hc289Notice">Los cambios de identidad requieren una nueva revisión institucional.</p><section><h3>Fotos de mi DNI</h3><p id="hc290MyDocumentStatus" role="status"></p><div id="hc290MyDocuments" class="hc290DocumentGallery"></div></section><form class="hc289Form"><label class="hc289Full">Foto de perfil<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><label class="hc289Full">Dirección<input name="address" value="'+E(profile.address)+'" autocomplete="street-address"></label><label>Teléfono<input name="phone" value="'+E(profile.phone)+'" autocomplete="tel"></label><label>Correo<input name="email" type="email" value="'+E(profile.email)+'" autocomplete="email"></label><div class="hc289Full"><button type="button" id="hc289ProfileGeo">Guardar mi ubicación</button><span id="hc289ProfileGeoStatus"> '+(profile.latitude!=null?'Ubicación guardada':'Sin ubicación guardada')+'</span></div><button type="submit" class="hc289Primary">Guardar perfil</button><p role="status"></p></form><h3>Verificaciones por institución</h3>'+me.verifications.map(v=>'<p>'+E(directory.institutions.find(i=>i.id===v.institution_id)?.name||v.institution_id)+' · '+E(({pending:'Pendiente',verified:'Verificada',rejected:'Rechazada',revoked:'Revocada'})[v.status])+'</p>').join(''));let pos={latitude:profile.latitude,longitude:profile.longitude};q('#hc289ProfileGeo').onclick=e=>run(e.currentTarget,async()=>{pos=await geo();q('#hc289ProfileGeoStatus').textContent='Ubicación obtenida; guardá el perfil para conservarla.';},q('#hc289ProfileGeoStatus'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const values=Object.fromEntries(new FormData(e.target));await api('updateClientProfile',{profile:{...values,...pos}});if(e.target.elements.photo.files[0]){const read=await fileRead(e.target.elements.photo.files[0]);const j=await window.hc230AuthRequest('updateProfile',{token:token(),user:{photo:read.data}});window.hc289ClientSession.user={...user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));}await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';},el.querySelector('[role=status]'));};loadPersonalDocuments(el);}
 window.hc289ClientAccount=clientAccount;
 async function logoutClient(){const saved=window.hc289ClientSession;localStorage.removeItem('hc289.client');window.hc289ClientSession=null;requestSerial++;locked=false;q('#hc289Portal')?.remove();q('#hc289Dialog')?.remove();q('#hc289ClientLock')?.remove();document.body.classList.remove('hc289Client');location.reload();}
 document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(a.date)+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
 for(const event of ['pointerdown','keydown','touchstart'])document.addEventListener(event,()=>{if(!locked)lastActivity=Date.now();},{passive:true});
-setInterval(()=>{if(!window.hc289ClientSession||document.hidden)return;if(!locked&&Date.now()-lastActivity>300000){locked=true;q('#hc289Portal').inert=true;q('#hc289AccountMenu').hidden=true;const preserved=q('#hc289Dialog');if(preserved){preserved.id='hc289PreservedDialog';preserved.inert=true;}const el=dialog('Sesión bloqueada','<p>Confirmá tu contraseña para continuar. Tu formulario se conserva.</p><form><input type="password" name="password" autocomplete="current-password" aria-label="Contraseña" required><p><button type="submit">Continuar</button><button type="button" id="hc289LockedDevice">Huella, rostro o PIN</button><button type="button" id="hc289LockedExit">SALIR</button></p><p role="status"></p></form>');el.id='hc289ClientLock';el.style.zIndex=2147483646;el.querySelector('[data-289-close]').remove();el.querySelector('#hc289LockedExit').onclick=logoutClient;const device=el.querySelector('#hc289LockedDevice');device.disabled=location.origin!=='https://walterrigoni.github.io'||!window.PublicKeyCredential;device.onclick=e=>run(e.currentTarget,async()=>{const a=await window.hc280Access.authenticate(window.hc289ClientSession.user.username);if(a.user.role!=='cliente')throw Error('Cuenta no habilitada para el portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:e.target.elements.password.value});if(a.user.role!=='cliente')throw Error('Esta cuenta ya no tiene acceso al portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));};}else if(!locked)refresh();},8000);
+setInterval(()=>{if(!window.hc289ClientSession||document.hidden)return;if(!locked&&Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username)||0)>0&&Date.now()-lastActivity>Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username))*60000){locked=true;q('#hc289Portal').inert=true;q('#hc289AccountMenu').hidden=true;const preserved=q('#hc289Dialog');if(preserved){preserved.id='hc289PreservedDialog';preserved.inert=true;}const el=dialog('Sesión bloqueada','<p>Confirmá tu contraseña para continuar. Tu formulario se conserva.</p><form><input type="password" name="password" autocomplete="current-password" aria-label="Contraseña" required><p><button type="submit">Continuar</button><button type="button" id="hc289LockedDevice">Huella, rostro o PIN</button><button type="button" id="hc289LockedExit">SALIR</button></p><p role="status"></p></form>');el.id='hc289ClientLock';el.style.zIndex=2147483646;el.querySelector('[data-289-close]').remove();el.querySelector('#hc289LockedExit').onclick=logoutClient;const device=el.querySelector('#hc289LockedDevice');device.disabled=location.origin!=='https://walterrigoni.github.io'||!window.PublicKeyCredential;device.onclick=e=>run(e.currentTarget,async()=>{const a=await window.hc280Access.authenticate(window.hc289ClientSession.user.username);if(a.user.role!=='cliente')throw Error('Cuenta no habilitada para el portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:e.target.elements.password.value});if(a.user.role!=='cliente')throw Error('Esta cuenta ya no tiene acceso al portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));};}else if(!locked)refresh();},8000);
 let saved;try{saved=JSON.parse(localStorage.getItem('hc289.client')||'null');}catch{}if(saved?.token&&saved.user?.role==='cliente')setTimeout(()=>window.hc289EnterClient(saved),50);
 })();
 
@@ -50213,7 +50228,7 @@ const q=s=>document.querySelector(s),E=window.hc289Esc;
 function secure(){return location.origin==='https://walterrigoni.github.io'&&!!navigator.credentials&&!!window.PublicKeyCredential;}
 const decode=s=>Uint8Array.from(atob(s.replace(/-/g,'+').replace(/_/g,'/')+'='.repeat((4-s.length%4)%4)),c=>c.charCodeAt(0));
 async function enroll(){const box=q('#hc289ClientPasskeys'),status=box.querySelector('[role=status]'),password=box.querySelector('[type=password]'),button=box.querySelector('[data-enroll]');button.disabled=true;try{
- const cs=window.hc289ClientSession,a=await window.hc230AuthRequest('authenticateUser',{username:cs.user.username,password:password.value});if(a.user.username!==cs.user.username||a.user.role!=='cliente')throw Error('La cuenta no coincide.');password.value='';window.hc289ClientSession=a;localStorage.setItem('hc289.client',JSON.stringify(a));const access=window.hc280Access,o=await access.request('hospitalito-passkeys','registerOptions',{token:a.token}),pk={...o.options,challenge:decode(o.options.challenge),user:{...o.options.user,id:decode(o.options.user.id)},excludeCredentials:o.options.excludeCredentials?.map(c=>({...c,id:decode(c.id)})),authenticatorSelection:{...o.options.authenticatorSelection,authenticatorAttachment:'platform',userVerification:'required'}};const credential=await navigator.credentials.create({publicKey:pk});if(!credential)throw Error('Activación cancelada.');await access.request('hospitalito-passkeys','registerVerify',{token:a.token,challengeId:o.challengeId,response:access.jsonCredential(credential),label:'Portal · este dispositivo'});status.textContent='Dispositivo vinculado. Tu huella, rostro o PIN permanecen en el dispositivo.';await list();
+ const cs=window.hc289ClientSession,a=await window.hc230AuthRequest('authenticateUser',{username:cs.user.username,password:password.value});if(a.user.username!==cs.user.username||a.user.role!=='cliente')throw Error('La cuenta no coincide.');password.value='';window.hc289ClientSession=a;localStorage.setItem('hc289.client',JSON.stringify(a));const access=window.hc280Access,o=await access.request('hospitalito-passkeys','registerOptions',{token:a.token}),pk={...o.options,challenge:decode(o.options.challenge),user:{...o.options.user,id:decode(o.options.user.id)},excludeCredentials:o.options.excludeCredentials?.map(c=>({...c,id:decode(c.id)})),authenticatorSelection:{...o.options.authenticatorSelection,userVerification:'required'}};const credential=await window.hc306CreateCredential(pk,box);if(!credential)throw Error('Activación cancelada.');await access.request('hospitalito-passkeys','registerVerify',{token:a.token,challengeId:o.challengeId,response:access.jsonCredential(credential),label:'Portal · este dispositivo'});status.textContent='Dispositivo vinculado. Tu huella, rostro o PIN permanecen en el dispositivo.';await list();
  }catch(e){status.textContent=e.name==='NotAllowedError'?'Activación cancelada. Podés seguir usando tu contraseña.':e.message;}finally{button.disabled=!secure();}}
 async function list(){const box=q('#hc289ClientPasskeys');if(!box)return;try{const a=await window.hc280Access.request('hospitalito-passkeys','list',{token:window.hc289ClientSession.token});box.querySelector('[data-keys]').innerHTML=a.credentials.map(c=>'<p>'+E(c.label)+' <button type="button" data-revoke-key="'+E(c.id)+'">Desactivar</button></p>').join('')||'<p>No hay dispositivos vinculados.</p>';box.querySelectorAll('[data-revoke-key]').forEach(b=>b.onclick=async()=>{try{const password=box.querySelector('[type=password]'),a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:password.value});password.value='';await window.hc280Access.request('hospitalito-passkeys','revoke',{token:a.token,credentialId:b.dataset.revokeKey});await list();}catch(e){box.querySelector('[role=status]').textContent=e.message;}});}catch(e){box.querySelector('[role=status]').textContent='Para consultar o modificar las llaves, confirmá tu contraseña.';}}
 const base=window.hc289ClientAccount;window.hc289ClientAccount=async function(section){await base(section);if(section!=='privacy'||!window.hc289ClientSession)return;const el=q('#hc289Dialog');if(!el)return;const box=document.createElement('section');box.id='hc289ClientPasskeys';box.innerHTML='<hr><h3>Huella, rostro o PIN del dispositivo</h3><p>Se usa la biometría ya registrada en el teléfono o en Windows Hello. Hospitalito guarda una llave pública; no registra fotos de tu rostro ni huellas.</p><p>'+(!secure()?'Para vincular el dispositivo, abrí la web segura de Hospitalito.':'Cada dispositivo debe vincularse por separado.')+'</p><label>Confirmar contraseña para vincular o desactivar<input type="password" autocomplete="current-password"></label><p><button type="button" data-enroll '+(!secure()?'disabled':'')+'>Vincular este dispositivo</button></p><div data-keys></div><p role="status"></p>';el.append(box);box.querySelector('[data-enroll]').onclick=enroll;await list();};
@@ -50707,5 +50722,190 @@ body #hc289AccountMenu button:focus-visible{outline:2px solid var(--hc-theme-acc
 
 </style>
 
+
+<style id="hc-v306-styles">
+
+#hc232ChatTop,#hc289OutpatientTop,#hc292ProTop,#hc280SecurityButton{display:none!important}
+body .topbar{padding-right:56px!important;box-sizing:border-box}
+#hc300GlobalExit{left:auto!important;bottom:auto!important;right:10px;top:max(8px,env(safe-area-inset-top));width:34px!important;height:34px!important;font-size:22px!important;z-index:99990!important}
+#hc306ClinicalHeader{position:sticky;top:var(--hc306-header-top,0px);z-index:1250;background:var(--hc-theme-bg,#0c1929);padding:3px 0 5px;isolation:isolate;border-bottom:1px solid var(--hc-theme-line,#53718c)}
+body #hc306ClinicalHeader .medModuleTabs{position:static!important;top:auto!important;margin:5px 0 0!important;background:var(--hc-theme-surface,#132c44)!important;max-height:100px;overflow:auto}
+body #hc306ClinicalHeader #pacHdrBar{margin-top:4px!important}
+body.hcMobile #hc306ClinicalHeader .medModuleTabs{max-height:48px;flex-wrap:nowrap!important}
+body.hc286ArchiveOpen #hc306ClinicalHeader{display:none!important}
+body #medPres .hcRxCompactItem{padding:6px 8px!important;margin-bottom:5px!important;animation:none!important}
+body #medPres .hcRxCompactControls,body #medPres .hcRxMedicationControls{gap:4px!important;align-items:center}
+body #medPres .hc306RxHidden{display:none!important}
+body #medPres .hc306RxEdit{font-size:18px;min-width:30px;padding:3px 6px!important;min-height:30px!important}
+body #medPres :is(.hcInfusionFlowDot,.hcInfusionFlowArrow,.hcNurseItemAlert,.hc275MedicationNameAlert,.hc275DoseAlert,.hcNurseDoseAlert){animation:none!important}
+body #medPres .hcNurseItemAlert{border:2px solid #cb7b13!important}
+body #medPres .hcRxMedicationSchedule{min-width:0}
+.hc306Dialog{position:fixed;inset:0;z-index:200000;background:#0009;display:grid;place-items:center;padding:12px}
+.hc306Dialog>section{background:var(--hc-theme-surface,#153247);color:var(--hc-theme-text,#edf6ff);border:1px solid var(--hc-theme-line,#8296ab);border-radius:12px;padding:16px;width:min(650px,calc(100vw - 60px));max-height:80dvh;overflow:auto}
+.hc306Dialog h3{margin-top:0}.hc306Dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.hc306Dialog label{display:flex;gap:10px;align-items:flex-start;padding:9px;border-bottom:1px solid var(--hc-theme-line,#8296ab)}
+.hc306Dialog input[type=checkbox]{width:20px;min-width:20px;height:20px}.hc306Dialog small{display:block}
+.hc306ScaleHistory{margin-top:14px}.hc306ScaleHistory article{padding:9px;border:1px solid var(--hc-theme-line);border-radius:8px;margin:6px 0}.hc306ScaleHistory pre{white-space:pre-wrap;font:inherit}
+#hc306EvoAttachments{padding-top:10px;border-top:1px solid var(--hc-theme-line)}
+#hc306AttachSummary{font-size:12px;flex-basis:100%;color:var(--hc-theme-muted)}
+.hc306Meals{margin-top:10px;padding:8px;border:1px solid var(--hc-theme-line);border-radius:8px}.hc306Meal{display:grid;grid-template-columns:130px 90px minmax(100px,1fr);gap:6px;align-items:center;margin:5px 0}.hc306Meal label{display:flex;align-items:center;gap:5px!important}.hc306Meal input{min-width:0;width:100%;box-sizing:border-box}.hc306Meal input[type=checkbox]{width:auto}
+body[data-hc289-mode=light]{--bg:#f3f6fa;--card:#fff;--text:#15212c;--muted:#465564;--line:#9cabb9;color-scheme:light}
+body[data-hc289-mode=light] :is(.card,.instBar,.miniBox,.labHistoryItem,.moduleListItem,.hcSettingsPage,.hcSettingsCard,.hcSettingsStage,.hcSettingsShell,.hcSettingsModal,.hc280Overlay .card,.hcRxDetailsSection,.hcRxDetailsModalCard,.hcServiceRxPatient,.hcServiceRxItem,.hc288Result){background:var(--hc-theme-surface,#fff)!important;color:var(--hc-theme-text,#15212c)!important;border-color:var(--hc-theme-line,#8b9aab)!important}
+body[data-hc289-mode=light] :is(input,select,textarea,option){background:#fff!important;color:#15212c!important;border-color:#8b9aab!important}
+body[data-hc289-mode=light] :is(label,p,h1,h2,h3,h4,summary,pre,.pre,.labPretty,.panelTitle,.hcRxCompactDrug,.hcRxCompactPrep,.hcRxCompactRoute,.hcRxCompactSchedule,.hcRxCompactMlh,.hcRxMedicationVia,.hc288Fields,.hcSettingsLabel,.hcSettingsCardTitle){color:#15212c!important}
+body[data-hc289-mode=light] :is(.muted,.labMeta,.moduleMeta,.hcSettingsCardSub,.freeTextRxMeta,.hcServiceRxDetail){color:#465564!important}
+body[data-hc289-mode=light] :is(.hcSettingsBtn,.btn,.tab):not(.primary):not(.danger):not(.active){background:#edf2f7!important;color:#173047!important;border-color:#8296ab!important}
+body[data-hc289-mode=light] :is(.btn.primary,.hcSettingsBtn.primary,.tab.active){background:#0d6085!important;color:#fff!important}
+body[data-hc289-mode=light] .hc288ScaleList button[aria-pressed=true],body[data-hc289-mode=light] .hc289Primary{color:#fff!important;background:#0d6085!important}
+body[data-hc289-mode=light] :is(.hc288Error,.hcRxCompactSchedule.is-due){color:#843300!important}
+body[data-hc289-mode=light] :is(.hc288Vanco,.hc280Notice){background:#fff1d7!important;color:#55320b!important}
+body[data-hc289-mode=light] :is(#medScales a,.hc288Vanco a){color:#075a88!important}
+body[data-hc289-mode=light] :is(.hc275MedicationNameAlert,.hc275DoseAlert){background:#fff0c2!important;color:#713e00!important}
+@media(max-width:600px){.hc306Meal{grid-template-columns:120px minmax(0,1fr)}.hc306Meal>input:last-child{grid-column:1/-1}.hc306Dialog>section{padding:12px}.hc306Dialog footer{position:sticky;bottom:0;background:var(--hc-theme-surface);padding:8px 0}}
+@media print{#hc300GlobalExit{display:none!important}#hc306ClinicalHeader{position:static!important}}
+
+</style>
+<script id="hc-v306-ui">
+
+/* v306: continuity, saved assessments and compact clinical work. */
+(()=>{'use strict';
+const q=s=>document.querySelector(s),esc=v=>escHTML(String(v??''));
+window.HC_DEMO_VERSION='v306';document.title='Hospitalito · Historia Clínica Digital · v306';
+const institution=()=>String(session?.institutionId||localStorage.getItem(LS.backendRegistryId)||'local'),actor=()=>String(session?.username||''),scope=()=>actor()+'|'+institution();
+function notice(message){(window.hc289Toast||window.toast||alert)(message);}
+function dialog(title,body){
+ const overlay=document.createElement('div');overlay.className='hc306Dialog';overlay.innerHTML='<section role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><h3>'+esc(title)+'</h3>'+body+'</section>';
+ const previous=document.activeElement;document.body.append(overlay);
+ const close=()=>{overlay.remove();if(previous?.isConnected)previous.focus({preventScroll:true});};
+ overlay.querySelectorAll('[data-close]').forEach(b=>b.onclick=close);overlay.onclick=e=>{if(e.target===overlay)close();};
+ overlay.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();close();}if(e.key==='Tab'){const controls=[...overlay.querySelectorAll('button,input,select,textarea,a[href]')].filter(x=>!x.disabled),first=controls[0],last=controls.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus();}}};
+ overlay.querySelector('button,input,select,textarea')?.focus();return {overlay,close};
+}
+window.hc306CreateCredential=(publicKey,host)=>new Promise((resolve,reject)=>{
+ const button=document.createElement('button');button.type='button';button.className='btn primary';button.textContent='Continuar con huella, rostro o PIN';
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='btn';cancel.textContent='Cancelar activación';
+ const row=document.createElement('div');row.append(button,cancel);host.querySelector('[data-security-message],[role=status]')?.insertAdjacentElement('beforebegin',row);if(!row.isConnected)host.append(row);
+ const cleanup=()=>{clearTimeout(timer);row.remove();},timer=setTimeout(()=>{cleanup();reject(Error('La activación venció. Volvé a intentarlo.'));},110000);
+ cancel.onclick=()=>{cleanup();reject(Error('Activación cancelada.'));};
+ button.onclick=()=>{button.disabled=true;try{navigator.credentials.create({publicKey}).then(c=>{cleanup();resolve(c);},e=>{cleanup();reject(e);});}catch(e){cleanup();reject(e);}};button.focus();
+});
+let restoring=false,restored='',routeTimer,seenSession='',pending=null;
+function readRoute(){try{return JSON.parse(localStorage.getItem('hc306.route.'+scope())||'null');}catch{return null;}}
+function remember(){
+ if(!session||restoring||window.hc289ClientSession||pending)return;
+ const state={username:actor(),institution:institution(),patient:String(selectedPatientId||''),tab:medTab,filter:q('#medAreaFilter')?.value||'Todo',pageY:scrollY,panelY:q('#medPanel')?.scrollTop||0,tabX:q('.medModuleTabs')?.scrollLeft||0,evoEditing:['new','edit'].includes(evoUIState)};
+ if(q('#medPres'))state.pres=Object.fromEntries(Object.entries(q('#medPres').dataset).filter(([key])=>/^pr|pharmacy/.test(key)));
+ try{localStorage.setItem('hc306.route.'+scope(),JSON.stringify(state));localStorage.setItem('hc306.lastUsername',actor());}catch{}
+}
+function restoreRoute(){
+ if(!session||window.hc289ClientSession||restored===scope())return;
+ const state=pending||readRoute();if(!state){restored=scope();return;}if(state.username!==actor()||state.institution!==institution())return;
+ if(state.patient&&!findPatient(state.patient)){pending=state;return;}restoring=true;pending=null;restored=scope();
+ try{selectedPatientId=state.patient||null;if(document.querySelector('[data-medtab="'+CSS.escape(state.tab||'ingreso')+'"]'))medTab=state.tab;
+  const filter=q('#medAreaFilter');if(filter&&[...filter.options].some(x=>x.value===state.filter))filter.value=state.filter;
+  if(state.pres&&q('#medPres'))Object.assign(q('#medPres').dataset,state.pres);
+  renderMed();if(state.evoEditing&&medTab==='evolucion')window.hc280RestoreDraft?.('evolucion');
+  requestAnimationFrame(()=>{if(q('#medPanel'))q('#medPanel').scrollTop=state.panelY||0;if(q('.medModuleTabs'))q('.medModuleTabs').scrollLeft=state.tabX||0;scrollTo(0,state.pageY||0);});
+ }finally{restoring=false;}
+}
+window.hc306RememberRoute=remember;window.hc306RestoreRoute=restoreRoute;
+document.addEventListener('click',e=>{if(e.target.closest('[data-medtab],#medCenso .censoItem')){pending=null;restored=scope();}clearTimeout(routeTimer);routeTimer=setTimeout(remember,120);});
+document.addEventListener('scroll',()=>{clearTimeout(routeTimer);routeTimer=setTimeout(remember,150);},{capture:true,passive:true});
+document.addEventListener('visibilitychange',()=>{if(document.hidden){window.hc280PersistDrafts?.();remember();}else restoreRoute();});
+window.addEventListener('pagehide',()=>{window.hc280PersistDrafts?.();remember();});
+window.addEventListener('pageshow',()=>setTimeout(restoreRoute,100));
+const logoutBase=logout;logout=window.logout=function(){remember();pending=null;restored='';return logoutBase.apply(this,arguments);};
+function scaleRecords(pid){return (getClinical()?.[pid]?.calculatedScales||[]).filter(x=>!x.deletedAt).slice().sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt)));}
+function scaleText(tool,result,at){return tool.title+' · '+dmyhmFromISODateTime(at)+'\n'+(result.score!==undefined?'Puntaje: '+result.score+'/'+result.max+'\n':'')+[...(result.parts||[]),...(result.extra||[])].map(p=>p[0]+': '+p[1]).join('\n')+'\n'+(result.note||'');}
+window.hc306SaveScale=(pid,tool,values,result)=>{
+ if(!pid||pid!==String(selectedPatientId)||!findPatient(pid))throw Error('Seleccioná al paciente antes de guardar esta escala.');
+ if(!['medico','enfermero','bioquimico','microbiologo','imagenologo','farmaceutico'].includes(session?.role))throw Error('Tu perfil puede calcular y copiar este resultado.');
+ const {cl,cur}=hcEnsureClinicalPatient(pid),me=getCurrentUser(),at=isoNowLocalFull();
+ const record={id:uid('scale'),scaleId:tool.id,title:tool.title,values:JSON.parse(JSON.stringify(values)),result:JSON.parse(JSON.stringify(result)),text:scaleText(tool,result,at),createdAt:at,updatedAt:at,createdBy:me.username,createdByName:me.name,institutionId:institution()};
+ cur.calculatedScales=[...(cur.calculatedScales||[]),record];cl[pid]=cur;setClinical(cl);
+ if(!scaleRecords(pid).some(x=>x.id===record.id))throw Error('No se pudo verificar el guardado. Conservá el resultado y reintentá.');
+ window.hc224MarkClinicalFieldDirty?.(pid,'calculatedScales');hcBackendScheduleUrgentPush?.();logAction('guardó '+tool.title+' de '+buildPatientDisplayName(findPatient(pid)),pid);window.hc306RenderScaleHistory();notice('Escala guardada en la ficha del paciente.');return record;
+};
+window.hc306RenderScaleHistory=()=>{
+ const root=q('#medScales');if(!root)return;let box=q('#hc306ScaleHistory');if(!box){box=document.createElement('section');box.id='hc306ScaleHistory';box.className='hc306ScaleHistory';root.append(box);}
+ const rows=selectedPatientId?scaleRecords(selectedPatientId):[],html='<h3>Escalas guardadas de este paciente</h3>'+(!selectedPatientId?'<p>Seleccioná un paciente para guardar y consultar sus escalas.</p>':rows.length?rows.map(r=>'<article><b>'+esc(r.title)+'</b> · '+esc(dmyhmFromISODateTime(r.createdAt))+' · '+esc(r.createdByName||r.createdBy)+'<details><summary>Ver resultado guardado</summary><pre>'+esc(r.text)+'</pre></details></article>').join(''):'<p>Todavía no hay escalas guardadas. Calculá una y pulsá Guardar en este paciente.</p>');
+ if(box.innerHTML!==html)box.innerHTML=html;
+};
+window.hc306ChooseScales=pid=>{
+ const rows=scaleRecords(pid);if(!rows.length){notice('No hay escalas guardadas. Calculá y guardá una desde Escalas.');return;}
+ const selected=new Set(window.__evoAttach?.scaleIds||[]);
+ const {overlay,close}=dialog('Adjuntar escalas calculadas',rows.map(r=>'<label><input type="checkbox" value="'+esc(r.id)+'" '+(selected.has(r.id)?'checked':'')+'><span><b>'+esc(r.title)+'</b><small>'+esc(dmyhmFromISODateTime(r.createdAt))+' · '+esc(r.createdByName||r.createdBy)+(r.result?.score!==undefined?' · '+esc(r.result.score)+'/'+esc(r.result.max):'')+'</small></span></label>').join('')+'<footer><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn primary" data-attach>Adjuntar selección</button></footer>');
+ overlay.querySelector('[data-attach]').onclick=()=>{if(String(selectedPatientId)!==String(pid)){close();return;}const ids=[...overlay.querySelectorAll('input:checked')].map(x=>x.value);window.__evoAttach||={};window.__evoAttach.scaleIds=ids;window.__evoAttach.scales=rows.filter(r=>ids.includes(r.id)).map(r=>r.text).join('\n\n');updateAttachButtons();window.hc280PersistDrafts?.();close();};
+};
+const fields={sv:'attachSV',bal:'attachBAL',lab:'attachLAB',mic:'attachMIC',inv:'attachINV',rx:'attachRX',pr:'attachPR',scales:'attachSCALES'};
+window.hc306AttachmentData=()=>Object.fromEntries(Object.entries(fields).map(([key,field])=>[field,window.__evoAttach?.[key]||'']));
+window.hc306AttachmentText=data=>Object.entries(fields).map(([key,field])=>data?.[field]?'\n\n'+(key==='scales'?'ESCALAS CALCULADAS\n':'')+data[field]:'').join('');
+const templateBase=buildPrettyEvoTemplate;buildPrettyEvoTemplate=function(data){return templateBase.apply(this,arguments)+(data.attachSCALES?'\n\nESCALAS CALCULADAS\n'+data.attachSCALES:'');};
+const attachBase=updateAttachButtons;updateAttachButtons=function(){attachBase.apply(this,arguments);setAttachStatus('btnAttSCALES',!!window.__evoAttach?.scales);const summary=q('#hc306AttachSummary');if(summary)summary.textContent='Adjuntos: '+(Object.keys(fields).filter(k=>window.__evoAttach?.[k]).map(k=>({sv:'Signos vitales',bal:'Balances',lab:'Laboratorio',mic:'Microbiología',inv:'Invasiones',rx:'Imágenes',pr:'Prescripciones',scales:'Escalas calculadas'})[k]).join(', ')||'ninguno');};
+function microVersions(pid){return (getMicroData(pid).cur.microResults||[]).filter(r=>r.entries?.length).flatMap(r=>r.entries.map((entry,index)=>({id:r.id+':'+index,title:buildMicroRequestItemsHTML(r.request||{}),entry,result:{...r,entries:r.entries.slice(0,index+1),isDefinitive:entry.reportType==='definitivo'||entry.stage==='Resultado definitivo',updatedAt:entry.at,updatedByName:entry.byName}})));}
+window.hc306ChooseMicro=pid=>{
+ const rows=microVersions(pid);if(!rows.length){notice('Todavía no hay informes microbiológicos en este paciente.');return;}
+ const {overlay,close}=dialog('Informes de microbiología',rows.slice().reverse().map(r=>'<label><input type="checkbox" value="'+esc(r.id)+'"><span><b>'+esc(r.title)+'</b><small>'+esc(microResultStatusText(r.result))+' · '+esc(dmyhmFromISODateTime(r.entry.at))+'</small>'+esc(r.entry.growth||r.entry.note||'')+'</span><button type="button" class="btn small" data-print="'+esc(r.id)+'">Imprimir</button></label>').join('')+'<footer><button type="button" class="btn" data-close>Cancelar</button><button type="button" class="btn primary" data-attach>Adjuntar selección</button></footer>');
+ overlay.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>{const r=rows.find(x=>x.id===b.dataset.print);openPrintHTML('Informe '+microResultStatusText(r.result),buildInstHeaderHTML()+buildPatientHeaderHTMLForPrint(findPatient(pid))+'<pre class="pre">'+esc(buildMicroResultPretty(r.result))+'</pre>');});
+ overlay.querySelector('[data-attach]').onclick=()=>{if(String(selectedPatientId)!==String(pid)){close();return;}const ids=[...overlay.querySelectorAll('input:checked')].map(x=>x.value);window.__evoAttach||={};window.__evoAttach.mic=rows.filter(r=>ids.includes(r.id)).map(r=>buildMicroResultPretty(r.result)).join('\n\n');updateAttachButtons();window.hc280PersistDrafts?.();close();};
+};
+const evoBase=evoRenderEditor;evoRenderEditor=window.evoRenderEditor=function(record){
+ const value=evoBase.apply(this,arguments),pid=selectedPatientId;
+ if(q('#btnAttMIC'))q('#btnAttMIC').onclick=()=>window.hc306ChooseMicro(pid);
+ for(const id of ['btnEvoModePlantilla','btnEvoModeLibre']){const button=q('#'+id);if(!button)continue;const base=button.onclick;button.onclick=()=>{
+  const attachments={...window.__evoAttach},controls=[...q('#evoEditorWrap').querySelectorAll('input,textarea,select')].map(e=>({id:e.id,value:e.value,checked:e.checked}));
+  const k=String(pid)+'|'+String(q('#evoEditorWrap').dataset.hc280EditId||'');window.__hc306Modes||={};const cache=window.__hc306Modes[k]||={};
+  for(const c of controls)if(c.id)cache[c.id]=c;
+  base();for(const [id,c] of Object.entries(cache)){const el=document.getElementById(id);if(el){el.value=c.value;if(el.type==='checkbox'||el.type==='radio')el.checked=c.checked;}}
+  window.__evoAttach=attachments;updateAttachButtons();
+ };}
+ return value;
+};
+window.hc306IsCurrentPrescription=it=>{
+ if(!it||hcIsDeletedPrescriptionItem(it)||hcIsTerminalPrescriptionItem(it)||it.completedAt||it.endedAt)return false;
+ const end=new Date(hcPrescriptionTreatmentEndAt(it)||'').getTime();return !(Number.isFinite(end)&&end<=Date.now()&&!hcIntermittentInfusionIsRunning(it));
+};
+const openRows=new Set();let rxSignature='',rxRoot=null,forceRx=false;
+function compactRx(){
+ q('#medPres')?.querySelectorAll('.prListItem').forEach(row=>{
+  const controls=row.querySelector('.hcRxCompactControls,.hcRxMedicationControls');if(!controls)return;
+  const buttons=[...controls.querySelectorAll('button[data-pr-action]')].filter(b=>!['dose-up','dose-down','nurse-ack','start-intermittent-infusion','finish-prepared-bag'].includes(b.dataset.prAction));if(!buttons.length)return;
+  let edit=controls.querySelector('.hc306RxEdit');const key=String(selectedPatientId)+'|'+row.dataset.prItemId;
+  if(!edit){edit=document.createElement('button');edit.type='button';edit.className='btn small hc306RxEdit';edit.textContent='✎';edit.title='Editar / ver acciones de la prescripción';edit.setAttribute('aria-label',edit.title);controls.append(edit);edit.onclick=()=>{openRows.has(key)?openRows.delete(key):openRows.add(key);compactRx();};}
+  const expanded=openRows.has(key);edit.setAttribute('aria-expanded',String(expanded));buttons.forEach(b=>b.classList.toggle('hc306RxHidden',!expanded));
+ });
+}
+const presBase=renderPrescripciones;
+function signature(root){const cl=getClinical();return JSON.stringify([actor(),session?.role,selectedPatientId,q('#medAreaFilter')?.value,root.dataset,selectedPatientId?[cl[selectedPatientId],findPatient(selectedPatientId)]:[cl,getRegistry()],localStorage.getItem(LS.pharmacyDrugs),hcCurrentMedicationPlanDate()]);}
+renderPrescripciones=window.renderPrescripciones=function(){
+ const root=q('#medPres');if(!root)return;const next=signature(root);if(!forceRx&&rxRoot===root&&rxSignature===next&&root.childElementCount)return;
+ const focus=document.activeElement,focusId=focus?.id,selection=focus?.selectionStart,scroll=root.scrollTop,y=scrollY;
+ const value=presBase.apply(this,arguments);compactRx();rxRoot=root;rxSignature=signature(root);root.scrollTop=scroll;
+ if(focusId&&root.contains(document.getElementById(focusId))){const current=document.getElementById(focusId);current?.focus({preventScroll:true});if(typeof selection==='number')try{current.setSelectionRange(selection,selection);}catch{}}
+ if(scrollY!==y)scrollTo(0,y);return value;
+};
+let lastTasks='';window.hc306RefreshPrescriptions=()=>{
+ if(document.hidden||window.hc280EditorActive?.()||hcBackendShouldProtectUIRefresh())return;
+ const cl=getClinical(),items=selectedPatientId?cl[selectedPatientId]?.prescripciones?.infusionesContinuas||[]:Object.values(cl).flatMap(c=>c?.prescripciones?.infusionesContinuas||[]);
+ const tasks=JSON.stringify([hcNursePrescriptionTasks(items),items.map(i=>[i.id,window.hc306IsCurrentPrescription(i)])]);forceRx=tasks!==lastTasks;lastTasks=tasks;try{renderPrescripciones();}finally{forceRx=false;}
+};
+const meals=[['Desayuno','08:00'],['Almuerzo','12:00'],['Merienda','16:00'],['Cena','20:00'],['Colaciones','']];
+window.hc306NutritionMealsHTML=()=>'<fieldset class="hc306Meals"><legend>Programación por comidas</legend>'+meals.map(([name,time],i)=>'<div class="hc306Meal"><label><input type="checkbox" data-hc306-meal="'+i+'" '+(i<4?'checked':'')+'>'+name+'</label><input type="'+(i===4?'text':'time')+'" data-hc306-mealtime="'+i+'" value="'+time+'" placeholder="Ej.: 10:00 y 22:00" aria-label="Horario de '+name+'"><input data-hc306-mealdiet="'+i+'" aria-label="Dieta de '+name+'" placeholder="Dieta / contenido de '+name+'"></div>').join('')+'<p class="muted">Para vía oral, elegí las comidas. En nutrición por bomba podés desmarcarlas.</p></fieldset>';
+window.hc306ReadNutritionMeals=root=>{
+ const values=meals.flatMap(([name],i)=>root.querySelector('[data-hc306-meal="'+i+'"]')?.checked?[{name,time:root.querySelector('[data-hc306-mealtime="'+i+'"]')?.value||'',diet:root.querySelector('[data-hc306-mealdiet="'+i+'"]')?.value.trim()||''}]:[]);
+ if(/oral/i.test(q('#nutType')?.value||'')&&!values.length){alert('Elegí al menos una comida para la dieta oral.');return null;}return values;
+};
+window.hc306NutritionMealsText=r=>r.meals?.length?'<div class="moduleMeta"><b>Comidas:</b> '+r.meals.map(m=>esc(m.name)+(m.time?' '+esc(m.time):'')+(m.diet?': '+esc(m.diet):'')).join(' · ')+'</div>':'';
+const microBase=openMicroRequest;openMicroRequest=window.openMicroRequest=function(pid,req){const value=microBase.apply(this,arguments),stage=q('#microStage'),flag=q('#microDefFlag');if(stage&&flag){stage.previousElementSibling.textContent='Tipo de informe';flag.closest('.field').hidden=true;stage.onchange=()=>{flag.value=stage.value==='Resultado definitivo'?'si':'no';};stage.onchange();}return value;};
+const renderMicroBase=renderMIC;renderMIC=window.renderMIC=function(){const value=renderMicroBase.apply(this,arguments);const root=q('#medMicro');if(root&&selectedPatientId&&!q('#hc306MicroReports')){const button=document.createElement('button');button.id='hc306MicroReports';button.type='button';button.className='btn';button.textContent='Ver / imprimir informes parciales y definitivos';const pid=selectedPatientId;button.onclick=()=>window.hc306ChooseMicro(pid);root.prepend(button);}return value;};
+function updateHeaders(){
+ const header=q('#hc306ClinicalHeader');if(!header)return;let parent=header.parentElement,inside=false;while(parent&&parent!==document.body){if(/auto|scroll/.test(getComputedStyle(parent).overflowY)){inside=true;break;}parent=parent.parentElement;}
+ const top=q('.topbar'),height=inside?0:(top&&getComputedStyle(top).position==='sticky'?top.getBoundingClientRect().height:0),value=Math.round(height)+'px';if(header.style.getPropertyValue('--hc306-header-top')!==value)header.style.setProperty('--hc306-header-top',value);
+}
+new ResizeObserver(updateHeaders).observe(q('.topbar')||document.body);window.addEventListener('resize',updateHeaders);
+let loop=0;setInterval(()=>{updateHeaders();const current=session?scope():'';if(current!==seenSession){seenSession=current;restored='';pending=null;}restoreRoute();if(medTab==='escalas')window.hc306RenderScaleHistory();if(++loop%10===0)remember();},1000);
+setTimeout(()=>{restoreRoute();updateHeaders();compactRx();},200);
+})();
+
+</script>
 </body>
 </html>

@@ -1,0 +1,67 @@
+
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+let scripts=0;for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++;}}
+assert(html.includes('id="hc-v306-ui"'));assert.equal(scripts,58);
+function fn(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=html.indexOf('{',start);for(let i=open;i<html.length;i++){if(html[i]==='{')depth++;if(html[i]==='}'&&!--depth)return html.slice(start,i+1);}throw Error(name);}
+const now=Date.parse('2026-11-21T02:00:00-03:00');class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
+let rows=[{id:'workshift:inst:user:2026-11-20',kind:'work_shift',user:'user',institutionDataId:'inst',dateLocal:'2026-11-20',startDate:'2026-11-20',startTime:'20:00',endDate:'2026-11-21',endTime:'08:00',updatedAt:'2026-11-20T20:00:00'}];
+const storage=new Map(),ctx=vm.createContext({Date:FakeDate,Map,JSON,Number,activity:()=>rows,userName:()=> 'user',dataInstitution:()=> 'inst',localDate:()=> '2026-11-21',shiftId:()=> 'workshift:inst:user:2026-11-21',localStorage:{getItem:key=>storage.get(key)||null}});
+vm.runInContext(fn('todayShift'),ctx);assert.equal(vm.runInContext('todayShift().id',ctx),rows[0].id);
+storage.set('hc306.shift.inst.user',JSON.stringify(rows[0]));rows=[];assert.equal(vm.runInContext('todayShift().endTime',ctx),'08:00');
+ctx.dataInstitution=()=> 'other';assert.equal(vm.runInContext('todayShift()',ctx),null);
+console.log('PASS 58 scripts; overnight shifts, catalogue reload receipt and institution isolation');
+if(process.env.HC306_BROWSER!=='1')process.exit(0);
+const {chromium}=require('playwright'),http=require('node:http');
+(async()=>{
+ const server=http.createServer((req,res)=>{try{const name=req.url.split('?')[0]==='/'?'index.html':req.url.split('?')[0].slice(1);res.setHeader('Content-Type',name.endsWith('.js')?'text/javascript':'text/html');res.end(fs.readFileSync(path.join(__dirname,'..',name)));}catch{res.writeHead(404).end();}});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const browser=await chromium.launch({headless:true});
+ try{
+ const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[];
+ page.on('pageerror',e=>errors.push(e.message));page.on('dialog',async d=>{throw new Error('Unexpected dialog: '+d.message());});
+ await page.route('**/*',route=>route.request().url().startsWith('http://127.0.0.1:')?route.continue():route.fulfill({status:503,contentType:'application/json',body:'{"ok":false,"error":"Offline integration test"}'}));
+ await page.goto('http://127.0.0.1:'+server.address().port,{waitUntil:'load'});
+ await page.waitForTimeout(1500);
+ const checks=await page.evaluate(async()=>{
+  const results=[];function ok(name,value){if(!value)throw Error(name);results.push(name);}
+  localStorage.clear();
+  session={username:'test306',name:'Profesional de prueba',role:'medico',institutionId:'test306'};
+  saveJSON(LS.session,session);
+  getCurrentUser=()=>({id:'doctor306',username:'test306',name:'Profesional de prueba',role:session.role,active:true});
+  saveJSON(LS.users,[getCurrentUser()]);
+  saveJSON(LS.patients,[{id:'p306',dni:'00000001',lastName:'Paciente',firstNames:'Prueba'}]);
+  saveJSON(LS.registry,[{id:'adm306',patientId:'p306',active:true,bedId:'UTI-1',admDateTime:isoNowLocalFull()}]);
+  hcBackendConfigured=()=>false;hc270CheckScope=()=>{};hcBackendScheduleUrgentPush=()=>{};hcBackendMarkLocalSavedSoon=()=>{};
+  selectedPatientId='p306';medTab='evolucion';showAppByRole('medico');renderMed();
+  document.querySelector('#hc229ShiftModal')?.classList.remove('show');
+  ok('version',window.HC_DEMO_VERSION==='v306');ok('patient',!!findPatient('p306'));
+  const api=window.HospitalitoScales,tool=api.list().find(t=>t.id==='qsofa'),values={rr:22,sbp:100,mental:1},result=api.calculate('qsofa',values),record=window.hc306SaveScale('p306',tool,values,result);
+  ok('saved scale',getClinical().p306.calculatedScales[0].result.score===3);
+  const merged=hcMergeClinicalPatientRecord({calculatedScales:[record]},{calculatedScales:[{...record,id:'second-scale'}]});ok('concurrent scale merge',merged.calculatedScales.length===2);
+  evoUIState='new';evoRenderEditor({kind:'libre',data:{}});evoSetState('new');
+  ok('free text attachments',!!document.querySelector('#btnAttSV')&&!!document.querySelector('#btnAttSCALES')&&getComputedStyle(document.querySelector('#hc306EvoAttachments')).display!=='none');
+  document.querySelector('#evo_free').value='Evolución de prueba.';window.__evoAttach.sv='Signos vitales de prueba';window.__evoAttach.scales=record.text;document.querySelector('#btnSaveEvoFree').click();
+  const evo=getClinical().p306.evolucionesFull.at(-1);ok('free text save',evo.prettyText.includes('Signos vitales de prueba')&&evo.data.attachSCALES===record.text);
+  medTab='nutricion';renderMed();ok('five meals',document.querySelectorAll('[data-hc306-meal]').length===5);
+  document.querySelector('[data-hc306-mealdiet="0"]').value='Hiposódica';document.querySelector('#nutReqTiming').value='urgent';document.querySelector('#btnSaveNutReq').click();
+  const nut=getClinical().p306.nutritionRequests.at(-1);ok('meals persisted',nut.meals.length===4);ok('meal prescription',getClinical().p306.prescripciones.infusionesContinuas.some(r=>String(r.text||r.freeText||r.preparationText).includes('Desayuno')));
+  const latest=hcEnsureClinicalPatient('p306');latest.cur.microRequests=[{id:'micro306',createdAt:isoNowLocalFull(),items:[{name:'Hemocultivo',detail:'Prueba'}]}];latest.cl.p306=latest.cur;setClinical(latest.cl);
+  session.role='microbiologo';openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado parcial';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Colonias en crecimiento';document.querySelector('#btnSendLab').click();
+  let micro=getClinical().p306.microResults[0];ok('partial report',!micro.isDefinitive&&micro.entries[0].reportType==='parcial');
+  openMicroRequest('p306','micro306');document.querySelector('#microStage').value='Resultado definitivo';document.querySelector('#microStage').dispatchEvent(new Event('change'));document.querySelector('#microGrowth').value='Crecimiento identificado';document.querySelector('#btnSendLab').click();micro=getClinical().p306.microResults[0];ok('definitive report',micro.isDefinitive&&micro.entries.length===2);
+  ok('print status',buildMicroResultPretty(micro).includes('DEFINITIVO'));
+  session.role='medico';medTab='prescripciones';renderMed();const first=document.querySelector('#medPres').firstElementChild;renderPrescripciones();ok('stable DOM',first===document.querySelector('#medPres').firstElementChild);
+  ok('current order filter',window.hc306IsCurrentPrescription({id:'a',active:true})&&!window.hc306IsCurrentPrescription({id:'b',suspendedAt:isoNowLocalFull()})&&!window.hc306IsCurrentPrescription({id:'c',finishedAt:isoNowLocalFull()}));
+  window.hc306RememberRoute();const route=JSON.parse(localStorage.getItem('hc306.route.test306|test306'));ok('route persisted',route.patient==='p306'&&route.tab==='prescripciones');
+  ok('sticky group',document.querySelectorAll('#hc306ClinicalHeader > #instHdrBar,#hc306ClinicalHeader > #pacHdrBar,#hc306ClinicalHeader > .medModuleTabs').length===3);
+  ok('default persistent session',window.hc280Access.idleMinutes()===0);
+  window.hc306ChooseMicro('p306');ok('report version selector',document.querySelectorAll('.hc306Dialog input[type=checkbox]').length===2);document.querySelector('.hc306Dialog [data-close]').click();
+  localStorage.setItem('hc289.visual.test306',JSON.stringify({color:'default',mode:'light',font:'default'}));window.hc289ApplyVisual();
+  return results;
+ });
+ console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));
+ await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
+ const layout=await page.evaluate(()=>{document.body.classList.add('hcMobile');const h=document.querySelector('#hc306ClinicalHeader');return {sticky:getComputedStyle(h).position,width:document.documentElement.scrollWidth,viewport:innerWidth,light:document.body.dataset.hc289Mode,back:getComputedStyle(document.querySelector('#hc300GlobalExit')).right};});
+ assert.equal(layout.sticky,'sticky');assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
+ }finally{await browser.close();server.close();}
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -1,0 +1,38 @@
+
+#hc232ChatTop,#hc289OutpatientTop,#hc292ProTop,#hc280SecurityButton{display:none!important}
+body .topbar{padding-right:56px!important;box-sizing:border-box}
+#hc300GlobalExit{left:auto!important;bottom:auto!important;right:10px;top:max(8px,env(safe-area-inset-top));width:34px!important;height:34px!important;font-size:22px!important;z-index:99990!important}
+#hc306ClinicalHeader{position:sticky;top:var(--hc306-header-top,0px);z-index:1250;background:var(--hc-theme-bg,#0c1929);padding:3px 0 5px;isolation:isolate;border-bottom:1px solid var(--hc-theme-line,#53718c)}
+body #hc306ClinicalHeader .medModuleTabs{position:static!important;top:auto!important;margin:5px 0 0!important;background:var(--hc-theme-surface,#132c44)!important;max-height:100px;overflow:auto}
+body #hc306ClinicalHeader #pacHdrBar{margin-top:4px!important}
+body.hcMobile #hc306ClinicalHeader .medModuleTabs{max-height:48px;flex-wrap:nowrap!important}
+body.hc286ArchiveOpen #hc306ClinicalHeader{display:none!important}
+body #medPres .hcRxCompactItem{padding:6px 8px!important;margin-bottom:5px!important;animation:none!important}
+body #medPres .hcRxCompactControls,body #medPres .hcRxMedicationControls{gap:4px!important;align-items:center}
+body #medPres .hc306RxHidden{display:none!important}
+body #medPres .hc306RxEdit{font-size:18px;min-width:30px;padding:3px 6px!important;min-height:30px!important}
+body #medPres :is(.hcInfusionFlowDot,.hcInfusionFlowArrow,.hcNurseItemAlert,.hc275MedicationNameAlert,.hc275DoseAlert,.hcNurseDoseAlert){animation:none!important}
+body #medPres .hcNurseItemAlert{border:2px solid #cb7b13!important}
+body #medPres .hcRxMedicationSchedule{min-width:0}
+.hc306Dialog{position:fixed;inset:0;z-index:200000;background:#0009;display:grid;place-items:center;padding:12px}
+.hc306Dialog>section{background:var(--hc-theme-surface,#153247);color:var(--hc-theme-text,#edf6ff);border:1px solid var(--hc-theme-line,#8296ab);border-radius:12px;padding:16px;width:min(650px,calc(100vw - 60px));max-height:80dvh;overflow:auto}
+.hc306Dialog h3{margin-top:0}.hc306Dialog footer{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}.hc306Dialog label{display:flex;gap:10px;align-items:flex-start;padding:9px;border-bottom:1px solid var(--hc-theme-line,#8296ab)}
+.hc306Dialog input[type=checkbox]{width:20px;min-width:20px;height:20px}.hc306Dialog small{display:block}
+.hc306ScaleHistory{margin-top:14px}.hc306ScaleHistory article{padding:9px;border:1px solid var(--hc-theme-line);border-radius:8px;margin:6px 0}.hc306ScaleHistory pre{white-space:pre-wrap;font:inherit}
+#hc306EvoAttachments{padding-top:10px;border-top:1px solid var(--hc-theme-line)}
+#hc306AttachSummary{font-size:12px;flex-basis:100%;color:var(--hc-theme-muted)}
+.hc306Meals{margin-top:10px;padding:8px;border:1px solid var(--hc-theme-line);border-radius:8px}.hc306Meal{display:grid;grid-template-columns:130px 90px minmax(100px,1fr);gap:6px;align-items:center;margin:5px 0}.hc306Meal label{display:flex;align-items:center;gap:5px!important}.hc306Meal input{min-width:0;width:100%;box-sizing:border-box}.hc306Meal input[type=checkbox]{width:auto}
+body[data-hc289-mode=light]{--bg:#f3f6fa;--card:#fff;--text:#15212c;--muted:#465564;--line:#9cabb9;color-scheme:light}
+body[data-hc289-mode=light] :is(.card,.instBar,.miniBox,.labHistoryItem,.moduleListItem,.hcSettingsPage,.hcSettingsCard,.hcSettingsStage,.hcSettingsShell,.hcSettingsModal,.hc280Overlay .card,.hcRxDetailsSection,.hcRxDetailsModalCard,.hcServiceRxPatient,.hcServiceRxItem,.hc288Result){background:var(--hc-theme-surface,#fff)!important;color:var(--hc-theme-text,#15212c)!important;border-color:var(--hc-theme-line,#8b9aab)!important}
+body[data-hc289-mode=light] :is(input,select,textarea,option){background:#fff!important;color:#15212c!important;border-color:#8b9aab!important}
+body[data-hc289-mode=light] :is(label,p,h1,h2,h3,h4,summary,pre,.pre,.labPretty,.panelTitle,.hcRxCompactDrug,.hcRxCompactPrep,.hcRxCompactRoute,.hcRxCompactSchedule,.hcRxCompactMlh,.hcRxMedicationVia,.hc288Fields,.hcSettingsLabel,.hcSettingsCardTitle){color:#15212c!important}
+body[data-hc289-mode=light] :is(.muted,.labMeta,.moduleMeta,.hcSettingsCardSub,.freeTextRxMeta,.hcServiceRxDetail){color:#465564!important}
+body[data-hc289-mode=light] :is(.hcSettingsBtn,.btn,.tab):not(.primary):not(.danger):not(.active){background:#edf2f7!important;color:#173047!important;border-color:#8296ab!important}
+body[data-hc289-mode=light] :is(.btn.primary,.hcSettingsBtn.primary,.tab.active){background:#0d6085!important;color:#fff!important}
+body[data-hc289-mode=light] .hc288ScaleList button[aria-pressed=true],body[data-hc289-mode=light] .hc289Primary{color:#fff!important;background:#0d6085!important}
+body[data-hc289-mode=light] :is(.hc288Error,.hcRxCompactSchedule.is-due){color:#843300!important}
+body[data-hc289-mode=light] :is(.hc288Vanco,.hc280Notice){background:#fff1d7!important;color:#55320b!important}
+body[data-hc289-mode=light] :is(#medScales a,.hc288Vanco a){color:#075a88!important}
+body[data-hc289-mode=light] :is(.hc275MedicationNameAlert,.hc275DoseAlert){background:#fff0c2!important;color:#713e00!important}
+@media(max-width:600px){.hc306Meal{grid-template-columns:120px minmax(0,1fr)}.hc306Meal>input:last-child{grid-column:1/-1}.hc306Dialog>section{padding:12px}.hc306Dialog footer{position:sticky;bottom:0;background:var(--hc-theme-surface);padding:8px 0}}
+@media print{#hc300GlobalExit{display:none!important}#hc306ClinicalHeader{position:static!important}}
