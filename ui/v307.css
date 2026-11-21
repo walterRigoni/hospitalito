@@ -1,0 +1,54 @@
+/* Keep every flow state visible even when animation is disabled. */
+body #medPres .hcInfusionFlowIndicator{--hc307-flow:#22c55e}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc{--hc307-flow:#ef4444}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma{--hc307-flow:#facc15}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets{--hc307-flow:#ef4444}
+body #medPres .hcInfusionFlowIndicator.is-paused{--hc307-flow:#7dd3fc}
+body #medPres .hcInfusionFlowIndicator .hcInfusionFlowDot{
+  background:var(--hc307-flow)!important;border-color:var(--hc307-flow)!important;
+  box-shadow:0 0 5px var(--hc307-flow)!important;opacity:1!important;
+}
+body #medPres .hcInfusionFlowIndicator .hcInfusionFlowArrow{color:var(--hc307-flow)!important;animation:none!important}
+body #medPres .hcInfusionFlowIndicator.is-active .hcInfusionFlowDot{
+  animation:hc307FlowPulse 1.35s linear infinite!important;
+  animation-delay:calc(var(--flow-i)*.12s)!important;
+}
+body #medPres .hcInfusionFlowIndicator.is-paused .hcInfusionFlowDot{animation:none!important}
+@keyframes hc307FlowPulse{0%,18%{filter:brightness(1.35)}40%,100%{filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){body #medPres .hcInfusionFlowIndicator.is-active .hcInfusionFlowDot{animation:none!important}}
+
+body #medPanel #medPres .hcRxCompactItem{padding:4px 6px!important;margin-top:3px!important;margin-bottom:3px!important;min-height:0!important}
+body #medPanel #medPres .hcRxCompactGrid,body #medPanel #medPres .hcRxMedicationGrid{gap:3px 6px!important;align-items:center!important}
+body #medPanel #medPres .hcRxCompactScheduleLine{margin-top:1px;min-height:0}
+body #medPanel #medPres .hcRxCompactPrep{margin-top:1px}
+
+body #medBAL,body #medBAL .card,body #balList,body #balList>div{min-width:0;max-width:100%;box-sizing:border-box}
+body #medBAL .hc307BalanceScroll{
+  width:100%;max-width:100%;box-sizing:border-box;overflow:auto!important;
+  touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch;
+  scrollbar-width:auto;scrollbar-color:#7dd3fc #183247;
+}
+body #medBAL .hc307BalanceScroll>table{min-width:740px;width:100%;table-layout:auto}
+body #medBAL .hc307BalanceScroll th{white-space:nowrap}
+.hc307BalanceHelp{margin:5px 0;color:var(--hc-theme-muted,#b9cddd);font-size:12px}
+#hc307Version{display:inline-block;padding:2px 5px;border:1px solid currentColor;border-radius:5px;color:var(--hc-theme-text,#e5f3ff);font:700 12px/1.2 system-ui;white-space:nowrap}
+@media(max-width:680px){
+  body #medPanel #medPres .hcRxCompactItem>.hcRxCompactGrid,
+  body.hcMobilePortrait #medPanel #medPres .hcRxCompactItem>.hcRxCompactGrid{
+    display:grid!important;grid-template-columns:minmax(65px,1fr) auto!important;gap:2px 4px!important;
+  }
+  body #medPanel #medPres .hcRxCompactMain{grid-column:1/-1}
+  body #medPanel #medPres .hcRxCompactFlow,
+  body.hcMobilePortrait #medPanel #medPres .hcRxCompactFlow{
+    width:auto!important;min-width:0!important;max-width:140px!important;margin:0!important;padding:0!important;justify-self:start!important;
+  }
+  body #medPanel #medPres .hcRxCompactControls{justify-content:flex-end!important;flex-wrap:wrap;min-width:0}
+  body #medPanel #medPres .hcRxMedicationGrid{grid-template-columns:minmax(0,1fr) auto!important}
+  body #medPanel #medPres .hcRxMedicationGrid>.hcRxCompactMain{grid-column:1/-1}
+  body #medPanel #medPres .hcRxMedicationSchedule{text-align:left}
+}
+@media print{
+  .hc307BalanceHelp{display:none}
+  body #medBAL .hc307BalanceScroll{overflow:visible!important}
+  body #medBAL .hc307BalanceScroll>table{min-width:0}
+}

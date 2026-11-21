@@ -1,0 +1,35 @@
+name: Hospitalito v307 checks
+on:
+  push:
+    branches: [main, codex/hospitalito-v307]
+    paths: ['index.html', 'ui/v307.css', 'tests/workflow-v306.cjs', '.github/workflows/check-v307.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  clinical-workflow:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      TZ: America/Argentina/Buenos_Aires
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Existing clinical regressions
+        run: |
+          node tests/work-shift-close.cjs
+          node tests/prescription-flow.cjs
+          node tests/clinical-scales.cjs
+          node tests/history.cjs
+          node tests/clinical-sync.cjs
+      - name: Install browser test dependency
+        run: |
+          npm install --prefix "$RUNNER_TEMP/hc307" --no-save --ignore-scripts playwright@1.56.1
+          "$RUNNER_TEMP/hc307/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/hc307/node_modules" >> "$GITHUB_ENV"
+      - name: Desktop, mobile, flow colors and balance scrolling with fictitious data
+        env:
+          HC306_BROWSER: '1'
+        run: node tests/workflow-v306.cjs

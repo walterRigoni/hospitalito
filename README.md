@@ -1,12 +1,14 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v306**, basada en v305.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v307**, basada en v306.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Descargar el HTML v306](https://walterrigoni.github.io/hospitalito/Hospitalito_v306.html)
-- [Guía v306](Hospitalito_v306_guia.md)
+- [Descargar el HTML v307](https://walterrigoni.github.io/hospitalito/Hospitalito_v307.html)
+- [Guía v307](Hospitalito_v307_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
+
+v307 recupera las luces de las infusiones (verde activa, celeste pausa, rojo glóbulos rojos y amarillo plasma), reduce la altura de las prescripciones y permite desplazar las tablas de Balances hasta Balance acumulado. La barra superior y el Portal muestran v307.
 
 v306 conserva el módulo y paciente al retomar la sesión, reconoce jornadas nocturnas, ofrece activación directa de huella/rostro/PIN, compacta Cuenta y Prescripciones, mejora el tema Claro y mantiene fijos los membretes y la botonera. Permite guardar escalas por paciente y adjuntarlas a Evolución junto con informes parciales y definitivos de Microbiología. Nutrición incluye programación por comidas. Se verifica con datos ficticios en escritorio y celular.
 

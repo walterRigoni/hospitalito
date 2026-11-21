@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v306 · Registro de pacientes · Supabase</title>
+<title>Hospitalito v307 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;">Historia Clínica</div>
+    <div style="font-weight:1000;">Historia Clínica <span id="hc307Version">v307</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -14578,6 +14578,7 @@ function renderBAL(){
 
     <div class="card" style="margin-top:10px;">
       <div style="font-weight:900;">Registros</div>
+      <p class="hc307BalanceHelp">Deslizá la tabla para ver todas las columnas, incluido Balance acumulado.</p>
       <div id="balList" style="margin-top:8px;"></div>
     </div>
 
@@ -14770,6 +14771,10 @@ function renderBalList(arr){
     dayBlock.appendChild(dayTitle);
 
     const tableWrap = document.createElement("div");
+    tableWrap.className = "hc307BalanceScroll";
+    tableWrap.tabIndex = 0;
+    tableWrap.setAttribute("role", "region");
+    tableWrap.setAttribute("aria-label", "Registros de balance del " + dmyFromDateISO(dayKey));
     tableWrap.style.cssText = `
       border:1px solid rgba(255,255,255,.10);
       border-radius:12px;
@@ -47250,7 +47255,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 306;
+  const CURRENT_VERSION = 307;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -50208,7 +50213,7 @@ let calendarSerial=0;
 async function loadAvailability(){const s=bookingUI;if(!s)return;const seq=++calendarSerial;try{const c=await api('calendar',{providerId:s.providerId,month:s.month});if(seq!==calendarSerial||!bookingUI)return;const root=q('#hc289Availability');root.innerHTML=daysHTML(new Date(s.month+'-15T12:00'),'provider',c.days);root.querySelectorAll('[data-289-day]').forEach(b=>b.onclick=()=>{selectedDay=b.dataset['289Day'];root.querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));const d=c.days.find(d=>d.date===selectedDay);q('#hc289Slots').innerHTML=(d?.slots||[]).map((slot,i)=>'<button data-slot="'+i+'" '+(!slot.available?'disabled':'')+' aria-pressed="false">'+slot.local.slice(-5)+(!slot.available?' · ocupado':'')+'</button>').join('')||'Sin horarios publicados para este día.';q('#hc289Slots').querySelectorAll('[data-slot]').forEach(b=>b.onclick=()=>{bookingUI.slot=d.slots[Number(b.dataset.slot)];q('#hc289Slots').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',x===b));q('#hc289Book').disabled=!me?.verifications.some(v=>v.institution_id===directory.providers.find(p=>p.id===s.providerId)?.institution_id&&v.status==='verified');});});}catch(e){if(q('#hc289Availability'))q('#hc289Availability').textContent=e.message;}}
 function geo(){return window.HC299Geo.locate();}
 window.hc289Geo=geo;
-window.hc304RefreshPortal=()=>refresh();window.hc289EnterClient=async function(a){appointmentSync={institution:{loaded:false,error:''},private:{loaded:false,error:''},updatedAt:''};appointmentsTab='upcoming';appointmentRefreshTask=null;appointmentRefreshScope='';data={bookings:[],orders:[],results:[],admissions:[],privateVisits:[]};privateLoadError='';requestSerial++;session=null;selectedPatientId=null;localStorage.removeItem(LS.session);localStorage.removeItem(LS.globalAuthToken);localStorage.removeItem(LS.seedAdminToken);try{hc207SyncToken='';hc207SyncExpires=0;hcGlobalPendingAuth=null;}catch{}localStorage.removeItem(LS.globalAuthCurrentInstitution);window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));document.body.classList.add('hc289Client');q('#hc289Portal')?.remove();const portal=document.createElement('div');portal.id='hc289Portal';portal.innerHTML='<header><strong>Portal <small class="hc305Version">v306</small></strong><span class="hc289PortalWho">'+E(a.user.name)+'<br><small>@'+E(a.user.username)+'</small></span><button id="hc289PortalAccount" aria-haspopup="menu">Cuenta</button></header><nav class="hc305PortalNav" aria-label="Navegación del portal"><button type="button" class="hc289Primary" data-hc305-turnos data-hc305-nav="turnos">Mis turnos <span data-hc305-count hidden></span></button><button type="button" data-hc305-calendar data-hc305-nav="calendar">Calendario</button><button type="button" data-289-new data-hc305-nav="new">＋ Nuevo turno</button></nav><div class="hc289PortalLayout"><aside id="hc289Registry" class="hc289Registry '+(innerWidth<750?'collapsed':'')+'"><div class="hc289RegistryScroll" id="hc289RegistryContent"><h2>Registro</h2>Cargando…</div><button class="hc289Resize" aria-label="Expandir, contraer o arrastrar Registro" title="Arrastrar o pulsar">‹</button></aside><main id="hc289PortalMain" class="hc289PortalMain">Conectando con el portal…</main></div>';document.body.append(portal);for(const node of document.body.children)if(node instanceof HTMLElement&&!['hc289Portal','hc289AccountMenu','hc289Toast'].includes(node.id)&&!['STYLE','SCRIPT'].includes(node.tagName))node.inert=true;window.hc289ApplyVisual();setupSidebar();lastActivity=Date.now();locked=false;api('directory').then(d=>{directory=d;if(main()?.dataset.view==='appointments')appointmentsView();}).catch(()=>{});await refresh(true);};
+window.hc304RefreshPortal=()=>refresh();window.hc289EnterClient=async function(a){appointmentSync={institution:{loaded:false,error:''},private:{loaded:false,error:''},updatedAt:''};appointmentsTab='upcoming';appointmentRefreshTask=null;appointmentRefreshScope='';data={bookings:[],orders:[],results:[],admissions:[],privateVisits:[]};privateLoadError='';requestSerial++;session=null;selectedPatientId=null;localStorage.removeItem(LS.session);localStorage.removeItem(LS.globalAuthToken);localStorage.removeItem(LS.seedAdminToken);try{hc207SyncToken='';hc207SyncExpires=0;hcGlobalPendingAuth=null;}catch{}localStorage.removeItem(LS.globalAuthCurrentInstitution);window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));document.body.classList.add('hc289Client');q('#hc289Portal')?.remove();const portal=document.createElement('div');portal.id='hc289Portal';portal.innerHTML='<header><strong>Portal <small class="hc305Version">v307</small></strong><span class="hc289PortalWho">'+E(a.user.name)+'<br><small>@'+E(a.user.username)+'</small></span><button id="hc289PortalAccount" aria-haspopup="menu">Cuenta</button></header><nav class="hc305PortalNav" aria-label="Navegación del portal"><button type="button" class="hc289Primary" data-hc305-turnos data-hc305-nav="turnos">Mis turnos <span data-hc305-count hidden></span></button><button type="button" data-hc305-calendar data-hc305-nav="calendar">Calendario</button><button type="button" data-289-new data-hc305-nav="new">＋ Nuevo turno</button></nav><div class="hc289PortalLayout"><aside id="hc289Registry" class="hc289Registry '+(innerWidth<750?'collapsed':'')+'"><div class="hc289RegistryScroll" id="hc289RegistryContent"><h2>Registro</h2>Cargando…</div><button class="hc289Resize" aria-label="Expandir, contraer o arrastrar Registro" title="Arrastrar o pulsar">‹</button></aside><main id="hc289PortalMain" class="hc289PortalMain">Conectando con el portal…</main></div>';document.body.append(portal);for(const node of document.body.children)if(node instanceof HTMLElement&&!['hc289Portal','hc289AccountMenu','hc289Toast'].includes(node.id)&&!['STYLE','SCRIPT'].includes(node.tagName))node.inert=true;window.hc289ApplyVisual();setupSidebar();lastActivity=Date.now();locked=false;api('directory').then(d=>{directory=d;if(main()?.dataset.view==='appointments')appointmentsView();}).catch(()=>{});await refresh(true);};
 window.addEventListener('focus',()=>{if(window.hc289ClientSession&&!locked)refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden&&window.hc289ClientSession&&!locked)refresh();});
 function setupSidebar(){const sidebar=q('#hc289Registry'),grip=q('.hc289Resize');let down=0,start=0,moved=false;grip.onpointerdown=e=>{down=e.clientX;start=sidebar.classList.contains('collapsed')?0:sidebar.offsetWidth;moved=false;grip.setPointerCapture(e.pointerId);};grip.onpointermove=e=>{if(!grip.hasPointerCapture(e.pointerId))return;const width=Math.min(500,Math.max(0,start+e.clientX-down));if(Math.abs(e.clientX-down)>5)moved=true;sidebar.classList.toggle('collapsed',width<65);sidebar.style.width=Math.max(150,width)+'px';};grip.onpointerup=e=>{grip.releasePointerCapture(e.pointerId);if(!moved)sidebar.classList.toggle('collapsed');grip.textContent=sidebar.classList.contains('collapsed')?'›':'‹';};}
 async function clientAccount(section){if(section==='logout'){await logoutClient();return;}if(section==='settings'){const el=dialog('Configuración',window.hc289Personalization()+'<hr><button id="hc289ClientPrivacy">Seguridad y contraseña</button>');window.hc289PersonalizeRefresh=()=>{const page=el.querySelector('.hcSettingsPage');if(page)page.outerHTML=window.hc289Personalization();};q('#hc289ClientPrivacy').onclick=()=>window.hc289ClientAccount('privacy');return;}if(section==='privacy'){const el=dialog('Seguridad de la cuenta','<p>La sesión se mantiene en este dispositivo al cambiar de aplicación. Podés salir desde Cuenta → SALIR.</p><form class="hc289Form"><label class="hc289Full">Contraseña actual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="hc289Full">Nueva contraseña<input name="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><button type="submit">Cambiar contraseña</button><p role="status"></p></form>');el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await window.hc230AuthRequest('changePassword',{token:token(),...Object.fromEntries(new FormData(e.target))});e.target.reset();el.querySelector('[role=status]').textContent='Contraseña actualizada.';},el.querySelector('[role=status]'));};return;}if(section==='notifications'){return window.hc296Notifications();}
@@ -50935,6 +50940,67 @@ let loop=0;setInterval(()=>{updateHeaders();const current=session?scope():'';if(
 setTimeout(()=>{restoreRoute();updateHeaders();compactRx();},200);
 })();
 
+</script>
+
+<style id="hc-v307-styles">
+/* Keep every flow state visible even when animation is disabled. */
+body #medPres .hcInfusionFlowIndicator{--hc307-flow:#22c55e}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-rbc{--hc307-flow:#ef4444}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-plasma{--hc307-flow:#facc15}
+body #medPres .hcInfusionFlowIndicator.hcHemoFlow-platelets{--hc307-flow:#ef4444}
+body #medPres .hcInfusionFlowIndicator.is-paused{--hc307-flow:#7dd3fc}
+body #medPres .hcInfusionFlowIndicator .hcInfusionFlowDot{
+  background:var(--hc307-flow)!important;border-color:var(--hc307-flow)!important;
+  box-shadow:0 0 5px var(--hc307-flow)!important;opacity:1!important;
+}
+body #medPres .hcInfusionFlowIndicator .hcInfusionFlowArrow{color:var(--hc307-flow)!important;animation:none!important}
+body #medPres .hcInfusionFlowIndicator.is-active .hcInfusionFlowDot{
+  animation:hc307FlowPulse 1.35s linear infinite!important;
+  animation-delay:calc(var(--flow-i)*.12s)!important;
+}
+body #medPres .hcInfusionFlowIndicator.is-paused .hcInfusionFlowDot{animation:none!important}
+@keyframes hc307FlowPulse{0%,18%{filter:brightness(1.35)}40%,100%{filter:brightness(1)}}
+@media(prefers-reduced-motion:reduce){body #medPres .hcInfusionFlowIndicator.is-active .hcInfusionFlowDot{animation:none!important}}
+
+body #medPanel #medPres .hcRxCompactItem{padding:4px 6px!important;margin-top:3px!important;margin-bottom:3px!important;min-height:0!important}
+body #medPanel #medPres .hcRxCompactGrid,body #medPanel #medPres .hcRxMedicationGrid{gap:3px 6px!important;align-items:center!important}
+body #medPanel #medPres .hcRxCompactScheduleLine{margin-top:1px;min-height:0}
+body #medPanel #medPres .hcRxCompactPrep{margin-top:1px}
+
+body #medBAL,body #medBAL .card,body #balList,body #balList>div{min-width:0;max-width:100%;box-sizing:border-box}
+body #medBAL .hc307BalanceScroll{
+  width:100%;max-width:100%;box-sizing:border-box;overflow:auto!important;
+  touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch;
+  scrollbar-width:auto;scrollbar-color:#7dd3fc #183247;
+}
+body #medBAL .hc307BalanceScroll>table{min-width:740px;width:100%;table-layout:auto}
+body #medBAL .hc307BalanceScroll th{white-space:nowrap}
+.hc307BalanceHelp{margin:5px 0;color:var(--hc-theme-muted,#b9cddd);font-size:12px}
+#hc307Version{display:inline-block;padding:2px 5px;border:1px solid currentColor;border-radius:5px;color:var(--hc-theme-text,#e5f3ff);font:700 12px/1.2 system-ui;white-space:nowrap}
+@media(max-width:680px){
+  body #medPanel #medPres .hcRxCompactItem>.hcRxCompactGrid,
+  body.hcMobilePortrait #medPanel #medPres .hcRxCompactItem>.hcRxCompactGrid{
+    display:grid!important;grid-template-columns:minmax(65px,1fr) auto!important;gap:2px 4px!important;
+  }
+  body #medPanel #medPres .hcRxCompactMain{grid-column:1/-1}
+  body #medPanel #medPres .hcRxCompactFlow,
+  body.hcMobilePortrait #medPanel #medPres .hcRxCompactFlow{
+    width:auto!important;min-width:0!important;max-width:140px!important;margin:0!important;padding:0!important;justify-self:start!important;
+  }
+  body #medPanel #medPres .hcRxCompactControls{justify-content:flex-end!important;flex-wrap:wrap;min-width:0}
+  body #medPanel #medPres .hcRxMedicationGrid{grid-template-columns:minmax(0,1fr) auto!important}
+  body #medPanel #medPres .hcRxMedicationGrid>.hcRxCompactMain{grid-column:1/-1}
+  body #medPanel #medPres .hcRxMedicationSchedule{text-align:left}
+}
+@media print{
+  .hc307BalanceHelp{display:none}
+  body #medBAL .hc307BalanceScroll{overflow:visible!important}
+  body #medBAL .hc307BalanceScroll>table{min-width:0}
+}
+
+</style>
+<script id="hc-v307-ui">
+window.HC_DEMO_VERSION="v307";document.title="Hospitalito · Historia Clínica Digital · v307";
 </script>
 </body>
 </html>
