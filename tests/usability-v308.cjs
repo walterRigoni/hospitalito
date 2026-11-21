@@ -20,7 +20,9 @@ async function run() {
   try {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
-      const page = await context.newPage(), errors=[];
+      const page = await context.newPage(), errors=[],bookings=[];
+      const next = new Date(date);next.setDate(next.getDate()+6);next.setHours(15,0,0,0);
+      const nextDay = [next.getFullYear(),String(next.getMonth()+1).padStart(2,'0'),String(next.getDate()).padStart(2,'0')].join('-');
       page.setDefaultTimeout(8000);
       page.on('pageerror',error=>{errors.push(error.message);console.error('Error de interfaz:',error.stack);});
       await page.route('**/*',async route=>{
@@ -32,7 +34,7 @@ async function run() {
           me:{client:{username:'test',profile:{}},verifications:[{institution_id:'inst',status:'verified'}]},
           calendar:{days:[1,2].map(d=>({date:month+'-0'+d,free:1,total:1,slots:[{local:month+'-0'+d+'T12:00',available:true}]}))},
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
-          myVisits:{visits:[]}, clientData:{admissions:[],results:[],orders:[],bookings:[]}
+          myVisits:{visits:[]}, clientData:{admissions:[],results:[],orders:[],bookings}
         };
         if (route.request().url().includes('hospitalito-telemed')) {
           const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
@@ -118,7 +120,17 @@ async function run() {
       await page.locator('[data-hc305-nav=turnos]').click();
       assert(await page.getByRole('heading',{name:'Mis turnos',exact:true}).isVisible());
       await page.locator('#hc305AppointmentList').getByText(/No tenés turnos/).waitFor();
+      bookings.push({id:'turno-prueba',provider_id:'qa',status:'confirmed',starts_at:next.toISOString(),minutes:30});
+      await page.locator('[data-hc305-refresh]').click();
+      const booked=page.locator('#hc305AppointmentList .hc304Appointment.future');
+      await booked.waitFor();
+      assert(await booked.getByText('Confirmado',{exact:true}).isVisible());
       await capture(page,'turnos-'+width);
+      await booked.getByRole('button',{name:'Ver en calendario'}).click();
+      const calendarDay=page.locator('.hc289Month:not(.small) [data-289-day="'+nextDay+'"]');
+      assert.equal(await calendarDay.evaluate(b=>getComputedStyle(b).backgroundColor),'rgb(18, 120, 69)');
+      await calendarDay.click();
+      assert(await page.locator('#hc289PortalMain .hc304Appointment.future').isVisible());
       if(width<800){
         await page.locator('#hc308RegistryToggle').click();
         assert.equal(await page.locator('#hc308RegistryToggle').getAttribute('aria-expanded'),'true');
