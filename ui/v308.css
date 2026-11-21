@@ -89,3 +89,14 @@ body #hc289Portal :is(#hc289Slots, #hc292Slots) button[aria-pressed=true] {
   background: #d9f5e6; color: #113f2c; border: 2px solid #33805d; font-weight: 700;
 }
 #hc289Portal #hc299Route[hidden] { display: none !important; }
+
+body[data-hc289-mode=light] #medPanel #medEvol :is(.card, .miniBox, #evoViewer, #hc306EvoAttachments) {
+  background: #fff !important; color: #172e40 !important; border-color: #a0b1bc !important;
+}
+body[data-hc289-mode=light] #medPanel #medEvol :is(.card label, .card h3, .miniBox summary) { color: #213e52 !important; }
+@media (max-width: 760px) {
+  body.hcMobile .hc304Mainbar > div:first-child { min-height: 0; padding-right: 50px; box-sizing: border-box; gap: 2px 8px !important; }
+  body.hcMobile .hc304Mainbar #whoami { flex: 0 1 auto; max-width: 100%; width: auto; order: 1; padding: 0; }
+  body.hcMobile .hc304Mainbar > div:last-child { align-items: center; flex-wrap: wrap; }
+  body.hcMobile .hc304Mainbar #hcMobileCensoBtn { order: 0; margin: 2px 4px 2px 0; }
+}

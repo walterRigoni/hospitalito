@@ -21,7 +21,8 @@ async function run() {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
       const page = await context.newPage(), errors=[];
-      page.on('pageerror',error=>errors.push(error.message));
+      page.setDefaultTimeout(8000);
+      page.on('pageerror',error=>{errors.push(error.message);console.error('Error de interfaz:',error.stack);});
       await page.route('**/*',async route=>{
         if(route.request().url()===site) return route.fulfill({contentType:'text/html',body:html});
         const b=route.request().postDataJSON()||{};
@@ -76,6 +77,9 @@ async function run() {
       assert.equal(await page.locator('#evo_free').inputValue(),'Texto de prueba');
       await page.locator('#btnSaveEvoFree').click();
       assert((await page.evaluate(()=>getClinical().p.evolucionesFull.at(-1).prettyText)).includes('Texto de prueba'));
+      assert(await page.locator('#evoEditorWrap').isHidden());
+      assert.equal(await page.locator('#evoOpenText').innerText(),'EVOLUCIÓN (TEXTO LIBRE)\n\nTexto de prueba');
+      await capture(page,'evolucion-'+width);
       await page.locator('#btnAccount').click();
       assert(await page.getByRole('group',{name:'Mi cuenta',exact:true}).isVisible());
       const menu=await page.locator('#hc289AccountMenu').boundingBox();

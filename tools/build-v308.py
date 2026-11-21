@@ -101,7 +101,7 @@ replace(page[start:end], """function applyDraft(d,root){
 }
 """)
 # Never replace a draft with a different patient's form while a screen refresh is pending.
-replace("if(!visible(root))return null;const controls={};", "if(!visible(root)||root.dataset.hc280Patient!==String(selectedPatientId))return null;const controls={};")
+replace("if(!visible(root))return null;const controls={};", "if(!visible(root)||(module==='evolucion'&&root.dataset.hc280Patient!==String(selectedPatientId)))return null;const controls={};")
 
 replace("if(box.innerHTML!==html)box.innerHTML=html;", "if(box.hcHistoryContent!==html){box.innerHTML=html;box.hcHistoryContent=html;}")
 replace('touch-action:pan-y pinch-zoom !important;\n}', 'touch-action:pan-x pan-y pinch-zoom !important;\n}')
@@ -141,6 +141,23 @@ replace("status.textContent=selected.address?'Ubicación elegida: '+selected.add
 replace("}catch(e){if(plan.isConnected)q('#hc292Slots').textContent=e.message;}", "}catch(e){if(attempt===slotSerial&&plan.isConnected)q('#hc292Slots').textContent=e.message;}")
 replace("if(render&&!bookingUI&&(!main()?.dataset.view||main().dataset.view==='calendar'))calendarView(selectedDay);",
         "if(render&&!bookingUI&&!main()?.dataset.view)appointmentsView();else if(render&&!bookingUI&&main()?.dataset.view==='calendar')calendarView(selectedDay);")
+# Resolve form fields while they are still inside the form.
+replace("const profileGrid=document.createElement('div');profileGrid.className='hc298ProfileGrid';",
+        "profile.open=!f.elements.credential.value||!f.elements.specialty.value;const profileGrid=document.createElement('div');profileGrid.className='hc298ProfileGrid';")
+replace("profile.append(profileGrid);profile.open=!f.elements.credential.value||!f.elements.specialty.value;", "profile.append(profileGrid);")
+# A visible editor protects unsaved work during background refresh. Close it after
+# a successful save so the viewer opens and another tap cannot duplicate the note.
+save_end = 'toast("Evolución guardada");\n    evoUIState = "view";'
+if page.count(save_end) != 2:
+    raise ValueError("Expected both evolution save handlers")
+page = page.replace(save_end, 'toast("Evolución guardada");\n    evoSetState("view");\n    window.hc280CompleteDraft?.("evolucion");')
+replace("const editorBase=evoRenderEditor;", "window.hc280CompleteDraft=clearDraft;\nconst editorBase=evoRenderEditor;")
+replace("if(b.matches('#btnSaveEvo,#btnSaveEvoFree')){persistDrafts();setTimeout(()=>{if(evoUIState==='view'&&!visible(q('#evoEditorWrap')))clearDraft('evolucion');},0);}",
+        "if(b.matches('#btnSaveEvo,#btnSaveEvoFree'))persistDrafts();")
+replace("if(!d)return false;if(module==='evolucion'){const arr=evoGetList", "if(!d||d.pid!==String(selectedPatientId)||d.username!==actor()||d.institutionId!==scope())return false;if(module==='evolucion'){const arr=evoGetList")
+replace("if(who.parentElement!==account.parentElement)account.before(who);", "")
+replace('if(left) left.appendChild(btn);', 'const account=document.getElementById("btnAccount");if(account)account.before(btn);else if(left)left.appendChild(btn);')
+replace("['Mis ámbitos','private-workspaces']", "['Cambiar lugar de atención','private-workspaces']")
 # Keep the exit action legible at the reserved top-right position.
 css = (root/'ui/v308.css').read_text()
 script = (root/'ui/v308.js').read_text()
