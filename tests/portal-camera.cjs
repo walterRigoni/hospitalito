@@ -28,6 +28,17 @@ module.exports=async function run(options={}){
    return route.fulfill({status:404,body:''});
   });
   await page.goto(site);await page.locator('#hc289RegisterLink').click();
+  const form=page.locator('#hc289Signup');
+  const next=form.getByRole('button',{name:'Continuar',exact:true});
+  const previous=form.getByRole('button',{name:'Anterior',exact:true});
+  check(await form.locator('[name=username]').isVisible(),'Registration opens at the account step');
+  await next.click();
+  check(await form.locator('[name=username]').evaluate(node=>node===document.activeElement),'Missing login is focused');
+  await form.locator('[name=username]').fill('camera_fixture@example.com');
+  await form.locator('[name=password]').fill('local-only-fixture-password');
+  await next.click();
+  await next.click();
+  check(await page.locator('#hc289SignupStatus').innerText()==='Agregá una foto del frente del DNI.','Registration identifies the missing photo');
   const front=page.locator('[data-document-side="front"]'),back=page.locator('[data-document-side="back"]');
   check(await front.locator('[data-open-camera]').isVisible()&&await back.locator('[data-open-camera]').isVisible(),'Camera is available on both DNI sides');
   check(await front.locator('[data-photo-source="album"]').getAttribute('accept')==='image/*','Album includes all image formats');
@@ -77,10 +88,12 @@ module.exports=async function run(options={}){
   check(await page.evaluate(()=>__streams.at(-2).getTracks().every(t=>t.readyState==='ended')),'Switching DNI sides stops the previous camera');
   await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));check(await page.evaluate(()=>__streams.at(-1).getTracks().every(t=>t.readyState==='ended')),'Leaving the page stops the camera');
   check(registrations.length===0,'Selecting and capturing photos never submits a registration');
-  const form=page.locator('#hc289Signup');await form.locator('[name=username]').fill('camera_fixture@example.com');await form.locator('[name=password]').fill('local-only-fixture-password');await form.locator('[name=name]').fill('PERSONA FICTICIA');await form.locator('[name=dni]').fill('99999991');await form.locator('[name=dob]').fill('1990-01-01');await form.locator('[name=confirmedData]').check();
+  await next.click();await form.locator('[name=name]').fill('PERSONA FICTICIA');await form.locator('[name=dni]').fill('99999991');await form.locator('[name=dob]').fill('1990-01-01');await form.locator('[name=confirmedData]').check();
   await form.locator('button[type=submit]').click();await page.locator('#hc289SignupStatus').filter({hasText:'Fallo de prueba'}).waitFor();
   check(registrations.length===1&&registrations[0].document.data.startsWith('data:image/jpeg;base64,')&&registrations[0].documentBack.data.startsWith('data:image/jpeg;base64,'),'Explicit registration converts both sources to server-compatible JPEGs');
   check(registrations[0].document.data!==registrations[0].documentBack.data,'Registration keeps the two DNI sides distinct');
+  check(await form.locator('[name=name]').inputValue()==='PERSONA FICTICIA','Submission error preserves the review fields');
+  await previous.click();
   check(await front.locator('.hc290PhotoPreview').isVisible()&&await back.locator('.hc290PhotoPreview').isVisible(),'A registration error preserves both photos');
   await front.locator('[data-remove-document]').click();check(await front.locator('.hc290PhotoPreview').isHidden()&&await back.locator('.hc290PhotoPreview').isVisible(),'Removing the front preserves the reverse');
   for(const width of [320,390,768]){await page.setViewportSize({width,height:844});check(await page.locator('#hc289Dialog').evaluate(e=>e.scrollWidth<=e.clientWidth+2),'Registration fits viewport '+width);}

@@ -1,0 +1,63 @@
+#hc289Dialog :is(.hc309RegistrationStep, .hc309RegistrationActions [hidden])[hidden],
+#hc289Dialog .hc309RegistrationActions > [hidden],
+#hc289Portal :is(.hc299LocateBar, #hc309TrySearch, #hc292SearchForm label)[hidden] { display: none !important; }
+
+.hc309RegistrationProgress {
+  display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 4px;
+  list-style: none; margin: 12px 0; padding: 0; max-width: 760px;
+  color: var(--hc-theme-muted); font-size: 13px;
+}
+.hc309RegistrationProgress li { padding: 6px; text-align: center; border-bottom: 2px solid var(--hc-theme-line); }
+.hc309RegistrationProgress [aria-current=step] {
+  color: var(--hc-theme-text); border-color: var(--hc-theme-accent); font-weight: 750;
+}
+#hc289Signup.hc309Registration { display: block; max-width: 760px; }
+.hc309RegistrationStep { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px 14px; }
+#hc289Dialog .hc309RegistrationStep > h3 { margin: 2px 0 0; }
+#hc289Dialog .hc309RegistrationStep label { min-width: 0; }
+#hc289Dialog .hc309RegistrationStep input:not([type=checkbox]) { font-size: 16px; }
+#hc289Dialog .hc309RegistrationStep .hc290Document { min-width: 0; margin: 0; padding: 9px 10px; }
+#hc289Dialog .hc309RegistrationStep .hc290PhotoActions { gap: 6px; }
+.hc309RegistrationActions {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+  border-top: 1px solid var(--hc-theme-line); padding: 8px 0 12px;
+}
+.hc309RegistrationActions button { min-height: 42px; }
+.hc309RegistrationActions [role=status] { flex: 0 0 100%; margin: 0; }
+.hc309RegistrationActions [role=status]:empty { display: none; }
+#hc289Dialog .hc309RegistrationActions :is(button[type=submit],.hc289Primary) { padding-inline: 22px; }
+#hc289Dialog .hc309RegistrationActions #hc290ExistingLogin { background: transparent; }
+
+#hc289Portal .hc309CareChoices {
+  display: grid; max-width: 940px; gap: 8px; margin: 10px 0 14px;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+}
+#hc289Portal .hc309CareChoices button {
+  min-width: 0; text-align: left; padding: 10px; min-height: 58px;
+  border: 1px solid var(--hc-theme-line); border-radius: 9px;
+  background: var(--hc-theme-surface); color: var(--hc-theme-text);
+}
+#hc289Portal .hc309CareChoices [aria-pressed=true] { border: 2px solid #3d9064; background: #e2f6eb; color: #143f2c; padding: 9px; }
+#hc289Portal .hc309CareChoices small { display: block; margin-top: 3px; font-size: 11px; line-height: 1.2; }
+#hc289Portal #hc292SearchForm { grid-template-columns: repeat(3,minmax(0,1fr)); max-width: 940px; box-sizing: border-box; }
+#hc289Portal .hc309Empty { border: 1px solid var(--hc-theme-line); border-radius: 8px; padding: 12px; max-width: 900px; }
+#hc289Portal #hc292Directory, #hc289Portal .hc309SelectedProfile { max-width: 940px; }
+#hc289Portal #hc292PaymentSummary {
+  border: 1px solid var(--hc-theme-line); border-radius: 8px; background: var(--hc-theme-surface-2); padding: 9px;
+}
+#hc289Portal #hc292Status:empty { display: none; }
+#hc289Portal .hc297Available > span:last-child { text-align: right; white-space: normal; }
+.hc309Agenda [data-day] { grid-template-columns: 88px minmax(0,1fr) 72px; }
+.hc309Agenda [data-day] [data-add] { font-size: 12px; align-self: center; }
+.hc309Agenda .hc298Footer { padding-top: 7px; }
+.hc309Agenda .hc298Footer [data-save]:not(:empty) { font-size: 13px; }
+@media(max-width:760px) {
+  .hc309RegistrationStep { grid-template-columns: minmax(0,1fr); gap: 9px; }
+  #hc289Portal .hc309CareChoices { gap: 5px; }
+  #hc289Portal .hc309CareChoices button { font-size: 12px; padding: 6px; }
+  #hc289Portal .hc309CareChoices [aria-pressed=true] { padding: 5px; }
+  #hc289Portal .hc309CareChoices small { font-size: 10px; }
+  #hc289Portal #hc292SearchForm { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  #hc289Portal #hc292SearchForm label:has([name=date]) { grid-column: 1/-1; }
+  .hc309Agenda [data-day] { grid-template-columns: minmax(0,1fr) auto !important; }
+}

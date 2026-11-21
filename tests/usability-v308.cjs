@@ -4,7 +4,7 @@ const path = require('node:path');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
-assert.equal(html, fs.readFileSync(path.join(root, 'Hospitalito_v308.html'), 'utf8'));
+assert.equal(html, fs.readFileSync(path.join(root, 'Hospitalito_v'+html.match(/CURRENT_VERSION = (\d+);/)[1]+'.html'), 'utf8'));
 const site = 'https://walterrigoni.github.io/hospitalito/';
 const screenshotDir = process.env.HC_VISUAL_DIR;
 const date = new Date();
@@ -48,7 +48,7 @@ async function run() {
       await page.goto(site);
       await page.waitForSelector('#hc289RegisterLink');
       assert.equal(await page.locator('#loginWrap > .card #hc280DeviceLogin').count(),1);
-      assert.equal(await page.locator('#hc307Version').innerText(),'v308');
+      assert.equal(await page.locator('#hc307Version').innerText(),'v'+html.match(/CURRENT_VERSION = (\d+);/)[1]);
       assert.equal(await page.getByLabel('Contraseña',{exact:true}).count(),1);
       await capture(page,'ingreso-'+width);
       await page.evaluate(()=>{
@@ -108,7 +108,13 @@ async function run() {
       assert.equal(await agenda.locator('[name=specialty]').inputValue(),'');
       await agenda.locator('[name=specialty]').selectOption({label:'Cardiología'});
       await agenda.locator('[name=credential]').fill('Matrícula ficticia');
+      await agenda.locator('[name=enabled]').check();
+      await agenda.locator('[data-day="2"] [data-active]').check();
       await agenda.locator('[name=rate30]').fill('1800');
+      await agenda.locator('[type=submit]').click();
+      await agenda.getByText(/agregá la dirección del consultorio/).waitFor();
+      assert(await agenda.locator('[data-day="2"] [data-address]').evaluate(el=>el===document.activeElement));
+      await agenda.locator('[data-day="2"] [data-address]').fill('Calle ficticia 123');
       await capture(page,'agenda-'+width);
       const saved=page.waitForRequest(req=>req.method()==='POST' && req.postDataJSON()?.action==='saveProfile');
       await agenda.locator('[type=submit]').click();
@@ -139,7 +145,11 @@ async function run() {
         assert.equal(await page.locator('#hc308RegistryToggle').getAttribute('aria-expanded'),'false');
       }
       await page.locator('[data-hc305-nav=new]').click();
-      await page.locator('#hc292SearchForm [name=mode]').selectOption('office');
+      assert(await page.getByRole('group',{name:'Lugar de atención'}).isVisible());
+      assert(await page.locator('#hc299Locate').isHidden());
+      await capture(page,'lugar-de-atencion-'+width);
+      await page.locator('[data-care-mode=office]').click();
+      assert.equal(await page.locator('[data-care-mode=office]').getAttribute('aria-pressed'),'true');
       await page.locator('[data-tele-profile=qa]').click();
       await page.locator('#hc292Slots button').first().click();
       await page.locator('#hc292Accept').check();
