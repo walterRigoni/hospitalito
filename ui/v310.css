@@ -164,3 +164,12 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   .hc310Settings { grid-template-columns:1fr; }
   .hc310Settings nav { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+#hc297Workspace .hc310VideoPanel {
+  border:1px solid var(--hc310-line);border-radius:8px;background:var(--hc310-surface);
+  padding:10px;margin:12px 0;color:var(--hc310-text);
+}
+#hc297Workspace .hc310VideoPanel h3 { margin:0; }
+#hc297Workspace .hc310VideoDock {
+  position:relative;inset:auto;min-height:0;overflow:visible;padding:9px;background:var(--hc310-bg);color:var(--hc310-text);
+}
+#hc297Workspace .hc310VideoDock .hc292VideoStage { min-height:0;max-height:56vh;aspect-ratio:16/9; }

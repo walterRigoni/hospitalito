@@ -1,12 +1,14 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión de prueba actual: **v309**, basada en v308.
+Sistema Digital de Historia Clínica. Versión de prueba actual: **v310**, basada en v309.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Descargar el HTML v309](https://walterrigoni.github.io/hospitalito/Hospitalito_v309.html)
+- [Descargar el HTML v310](https://walterrigoni.github.io/hospitalito/Hospitalito_v310.html)
 - [Guía v307](Hospitalito_v307_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
+
+v310 reúne los turnos del paciente en el lateral y abre el calendario al ingresar. Nuevo Turno permite elegir día y modalidad antes de buscar. Las agendas privadas muestran los turnos por día y abren la historia del paciente. Atención a Domicilio utiliza los horarios publicados del profesional y, si hay cobros habilitados, el pago completo al reservar. Los avisos de nuevas solicitudes se muestran en Hospitalito.
 
 v309 guía el registro del paciente en tres pasos. Nuevo turno muestra Telemedicina, Consultorio Privado e Instituciones en la misma pantalla. La agenda profesional señala los campos que hay que corregir para guardar y la historia privada conserva los cambios escritos durante un guardado.
 

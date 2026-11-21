@@ -84,7 +84,7 @@ change("if(!me)await refresh();const p=me?.client||{},profile=p.profile||{},user
        "if(!me)await refresh();const user=window.hc289ClientSession?.user;if(!user)return;const p=me?.client||{},profile=p.profile||{};")
 change("'+me.verifications.map(v=>", "'+(me?.verifications||[]).map(v=>")
 change("await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';",
-       "window.HC310.avatar(q('#hc289PortalAccount'),window.hc289ClientSession.user);await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';")
+       "window.HC310?.avatar(q('#hc289PortalAccount'),window.hc289ClientSession.user);await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';")
 change("Sólo se muestran informes publicados de tu ficha verificada.</p>':'');}",
        "Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}")
 change("window.hc304RefreshPortal=()=>refresh();", """window.hc310InstitutionVisit=id=>{
@@ -113,8 +113,8 @@ document.addEventListener('pointerout',event=>{
    hoverTimer=setTimeout(()=>{if(!menu.matches(':hover')&&!menuTrigger?.matches(':hover'))closeMenu();},180);
 });
 """)
-change("const account=q('#btnAccount');if(account){", """window.HC310.avatar(q('#hc289PortalAccount'),window.hc289ClientSession?.user);
- const account=q('#btnAccount');if(account){window.HC310.avatar(account,U());""")
+change("const account=q('#btnAccount');if(account){", """window.HC310?.avatar(q('#hc289PortalAccount'),window.hc289ClientSession?.user);
+ const account=q('#btnAccount');if(account){window.HC310?.avatar(account,U());""")
 
 # Patient search keeps a single modality selector and filters after choosing a date.
 region("window.hc292Search=async function(initial={}){", " async function detail(p,mode,date)", """window.hc292Search=async function(initial={}){
@@ -193,6 +193,23 @@ change("""if (row) row.closest('form').querySelector('[data-day-tab="' + row.dat
       if(form.hc310SelectWeekday)form.hc310SelectWeekday(Number(row.dataset.day));
       else form.querySelector('[data-day-tab="' + row.dataset.day + '"]')?.click();
     }""")
+change("window.hc292OpenVideo=async function(id){", "window.hc292OpenVideo=async function(id,host){")
+change("document.body.append(root);activeRoom=root;", """const docked=host?.isConnected===true;
+ if(docked){root.classList.add('hc310VideoDock');root.removeAttribute('aria-modal');}
+ (docked?host:document.body).append(root);activeRoom=root;
+ let detachObserver;""")
+change("closed=true;connectionGen++;clearInterval(poll);", "closed=true;detachObserver?.disconnect();connectionGen++;clearInterval(poll);")
+change("const escape=e=>{if(e.key==='Escape')cleanup();};", """if(docked){
+   detachObserver=new MutationObserver(()=>{if(!root.isConnected)cleanup();});
+   detachObserver.observe(document.body,{childList:true,subtree:true});
+ }
+ const escape=e=>{if(e.key==='Escape')cleanup();};""")
+change("""(v.mode==='telemedicine'&&['confirmed','active'].includes(v.status)?'<button data-video>Comenzar videollamada</button>':'')""",
+       """(v.mode==='telemedicine'&&['confirmed','active'].includes(v.status)?'<button class="hc289Primary" data-video>Abrir videollamada</button>':'')""")
+change("""+'<button data-summary>Gestionar consulta</button></div><div data-notes></div>""",
+       """+'<button data-summary>Gestionar consulta</button></div>'+(v.mode==='telemedicine'?'<section data-visit-video class="hc310VideoPanel"><h3>Videollamada</h3><p>La sala se habilita diez minutos antes de la consulta.</p><div data-video-room></div></section>':'')+'<div data-notes></div>""")
+change("()=>window.hc292OpenVideo(id));$('[data-summary]',main)",
+       "()=>window.hc292OpenVideo(id,$('[data-video-room]',main)));$('[data-summary]',main)")
 assets = ['ui/v310.css', 'ui/v310.js']
 insertion = ''.join(
     f'<{tag} id="hc-v310-{kind}">\n{(root / file).read_text()}\n</{tag}>\n'
