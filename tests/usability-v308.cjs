@@ -34,7 +34,13 @@ async function run() {
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
           myVisits:{visits:[]}, clientData:{admissions:[],results:[],orders:[],bookings:[]}
         };
-        if (b.action==='directory' && route.request().url().includes('hospitalito-telemed')) return route.fulfill({json:{ok:true,providers:[]}});
+        if (route.request().url().includes('hospitalito-telemed')) {
+          const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
+          if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[{...provider,username:'qa',trialAvailable:true,modes:{office,telemedicine:office}}]}});
+          if(b.action==='availability')return route.fulfill({json:{ok:true,providers:[{id:'qa',available:true}]}});
+          if(b.action==='slots')return route.fulfill({json:{ok:true,profileRevision:1,slots:[{start:b.date+'T12:00:00Z',local:b.date+'T09:00',available:true,address:'Calle de prueba 100',location:'Consultorio',latitude:-31.4,longitude:-64.2}]}});
+          if(b.action==='saveProfile')return route.fulfill({json:{ok:true,profile:{...b.profile,revision:1}}});
+        }
         return route.fulfill({json:{ok:true,...responses[b.action]}});
       });
       await page.goto(site);
@@ -79,6 +85,8 @@ async function run() {
       assert((await page.evaluate(()=>getClinical().p.evolucionesFull.at(-1).prettyText)).includes('Texto de prueba'));
       assert(await page.locator('#evoEditorWrap').isHidden());
       assert.equal(await page.locator('#evoOpenText').innerText(),'EVOLUCIÓN (TEXTO LIBRE)\n\nTexto de prueba');
+      await page.locator('#evoList button').first().click();
+      assert.equal(await page.locator('#evoList button[aria-pressed=true]').count(),1);
       await capture(page,'evolucion-'+width);
       await page.locator('#btnAccount').click();
       assert(await page.getByRole('group',{name:'Mi cuenta',exact:true}).isVisible());
@@ -95,7 +103,14 @@ async function run() {
         await agenda.locator('[data-day-tab="2"]').click();
         assert(await agenda.locator('[data-day="2"]').isVisible());
       }
+      await agenda.locator('[name=specialty]').selectOption({label:'Cardiología'});
+      await agenda.locator('[name=credential]').fill('Matrícula ficticia');
+      await agenda.locator('[name=rate30]').fill('1800');
       await capture(page,'agenda-'+width);
+      const saved=page.waitForRequest(req=>req.method()==='POST' && req.postDataJSON()?.action==='saveProfile');
+      await agenda.locator('[type=submit]').click();
+      assert((await saved).postDataJSON().profile.modes.office.rates.some(rate=>rate.minutes===30&&rate.amount_cents===180000));
+      await agenda.getByText(/Guardado en el servidor/).waitFor();
       await agenda.locator('button[aria-label^="Cerrar"],[data-close]').first().click();
       await page.evaluate(()=>document.querySelector('#hc297Workspace')?.remove());
       await page.evaluate(()=>hc289EnterClient({token:'fixture',user:{username:'test',name:'Paciente de prueba',role:'cliente'}}));
@@ -103,6 +118,16 @@ async function run() {
       assert(await page.getByRole('heading',{name:'Mis turnos',exact:true}).isVisible());
       await capture(page,'turnos-'+width);
       await page.locator('[data-hc305-nav=new]').click();
+      await page.locator('#hc292SearchForm [name=mode]').selectOption('office');
+      await page.locator('[data-tele-profile=qa]').click();
+      await page.locator('#hc292Slots button').first().click();
+      await page.locator('#hc292Accept').check();
+      assert(await page.locator('#hc292Reserve').isEnabled());
+      await page.locator('#hc292Plan').selectOption('30');
+      assert(!(await page.locator('#hc292Accept').isChecked()));
+      assert(await page.locator('#hc292Reserve').isDisabled());
+      assert(await page.locator('#hc299Route').isHidden());
+      await page.locator('[data-hc300-close-profile]').click();
       await page.locator('#hc292InstitutionSearch').click();
       await page.locator('[data-289-provider-detail=qa]').click();
       await page.locator('[data-289-day="'+month+'-01"]').click();

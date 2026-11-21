@@ -100,3 +100,11 @@ body[data-hc289-mode=light] #medPanel #medEvol :is(.card label, .card h3, .miniB
   body.hcMobile .hc304Mainbar > div:last-child { align-items: center; flex-wrap: wrap; }
   body.hcMobile .hc304Mainbar #hcMobileCensoBtn { order: 0; margin: 2px 4px 2px 0; }
 }
+
+#medPanel #evoList .hc308EvolutionRow {
+  width: 100%; min-height: 40px; text-align: left; color: var(--hc-theme-text);
+  font: inherit; border-color: var(--hc-theme-line) !important;
+}
+#medPanel #evoList .hc308EvolutionRow[aria-pressed=true] {
+  border-inline-start: 4px solid var(--hc-theme-accent) !important;
+}

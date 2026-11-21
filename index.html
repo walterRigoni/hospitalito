@@ -13229,7 +13229,7 @@ function evoRender(){
   root.innerHTML = `
     <div class="card">
       <div class="muted" style="font-size:12px; margin-bottom:8px;">
-        Evolución • Doble click en una fila para abrir
+        Evolución del paciente
       </div>
 
       <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
@@ -13891,7 +13891,7 @@ function evoRenderList(pid){
   const { arr } = evoGetList(pid);
 
   if(!arr.length){
-    box.innerHTML = `<div class="muted" style="font-size:12px;">Todavía no hay evoluciones.</div>`;
+    box.innerHTML = `<span class="muted" style="font-size:12px;">Todavía no hay evoluciones.</span>`;
     return;
   }
 
@@ -13900,7 +13900,8 @@ function evoRenderList(pid){
     const idx = arr.length - 1 - revIdx;
     const isOpen = (openedEvoIndex === idx);
 
-    const row = document.createElement("div");
+    const row = document.createElement("button");
+    row.type="button";row.className="hc308EvolutionRow";row.setAttribute("aria-pressed",String(isOpen));
     row.style.cssText = `
       display:flex; justify-content:space-between; align-items:center; gap:10px;
       padding:6px 10px; border-radius:12px; border:1px solid rgba(255,255,255,.10);
@@ -13914,19 +13915,21 @@ function evoRenderList(pid){
     const tag = (r.kind === "libre") ? "libre" : "plantilla";
 
     row.innerHTML = `
-      <div style="min-width:0; display:flex; gap:10px; align-items:center;">
-        <div style="white-space:nowrap;">${escHTML(d)}</div>
-        <div style="white-space:nowrap; font-weight:900; overflow:hidden; text-overflow:ellipsis;">${escHTML(a)}</div>
-        <div class="muted" style="white-space:nowrap;">(${escHTML(tag)})</div>
-      </div>
-      <div class="muted" style="white-space:nowrap;">${isOpen ? "abierta" : "doble click"}</div>
+      <span style="min-width:0; display:flex; gap:10px; align-items:center;">
+        <span style="white-space:nowrap;">${escHTML(d)}</span>
+        <span style="white-space:nowrap; font-weight:900; overflow:hidden; text-overflow:ellipsis;">${escHTML(a)}</span>
+        <span class="muted" style="white-space:nowrap;">(${escHTML(tag)})</span>
+      </span>
+      <span class="muted" style="white-space:nowrap;">${isOpen ? "Abierta" : "Abrir"}</span>
     `;
 
-    row.ondblclick = ()=>{
+    row.onclick = ()=>{
+      window.hc280PersistDrafts?.();
       openedEvoIndex = idx;
       evoUIState = "view";
       evoSetState("view");
-      evoRenderList(pid);
+      evoRender();
+      document.querySelector('#evoList button[aria-pressed="true"]')?.focus({preventScroll:true});
     };
 
     box.appendChild(row);
@@ -51153,6 +51156,14 @@ body[data-hc289-mode=light] #medPanel #medEvol :is(.card label, .card h3, .miniB
   body.hcMobile .hc304Mainbar #whoami { flex: 0 1 auto; max-width: 100%; width: auto; order: 1; padding: 0; }
   body.hcMobile .hc304Mainbar > div:last-child { align-items: center; flex-wrap: wrap; }
   body.hcMobile .hc304Mainbar #hcMobileCensoBtn { order: 0; margin: 2px 4px 2px 0; }
+}
+
+#medPanel #evoList .hc308EvolutionRow {
+  width: 100%; min-height: 40px; text-align: left; color: var(--hc-theme-text);
+  font: inherit; border-color: var(--hc-theme-line) !important;
+}
+#medPanel #evoList .hc308EvolutionRow[aria-pressed=true] {
+  border-inline-start: 4px solid var(--hc-theme-accent) !important;
 }
 </style>
 <script id="hc-v308-ui">

@@ -158,6 +158,17 @@ replace("if(!d)return false;if(module==='evolucion'){const arr=evoGetList", "if(
 replace("if(who.parentElement!==account.parentElement)account.before(who);", "")
 replace('if(left) left.appendChild(btn);', 'const account=document.getElementById("btnAccount");if(account)account.before(btn);else if(left)left.appendChild(btn);')
 replace("['Mis ámbitos','private-workspaces']", "['Cambiar lugar de atención','private-workspaces']")
+replace('Evolución • Doble click en una fila para abrir', 'Evolución del paciente')
+start=page.index('function evoRenderList(pid)')
+end=page.index('function evoBuildPrintDoc()',start)
+old=page[start:end]
+new=old.replace('const row = document.createElement("div");', 'const row = document.createElement("button");\n    row.type="button";row.className="hc308EvolutionRow";row.setAttribute("aria-pressed",String(isOpen));')
+new=new.replace('<div style=', '<span style=').replace('<div class=', '<span class=').replace('</div>', '</span>')
+new=new.replace('${isOpen ? "abierta" : "doble click"}', '${isOpen ? "Abierta" : "Abrir"}')
+new=new.replace('row.ondblclick = ()=>{', 'row.onclick = ()=>{\n      window.hc280PersistDrafts?.();')
+new=new.replace('      evoRenderList(pid);', '''      evoRender();
+      document.querySelector('#evoList button[aria-pressed="true"]')?.focus({preventScroll:true});''')
+replace(old,new)
 # Keep the exit action legible at the reserved top-right position.
 css = (root/'ui/v308.css').read_text()
 script = (root/'ui/v308.js').read_text()
