@@ -1,0 +1,166 @@
+/* Semantic foreground/background pairs. Keep both colors together when styling a state. */
+body {
+  --hc310-bg: var(--hc-theme-bg, #101821);
+  --hc310-surface: var(--hc-theme-surface, #17242f);
+  --hc310-raised: var(--hc-theme-surface-2, #223545);
+  --hc310-text: var(--hc-theme-text, #f3f6fa);
+  --hc310-muted: var(--hc-theme-muted, #c3cfdb);
+  --hc310-line: var(--hc-theme-line, #607184);
+  --hc310-focus: var(--hc-theme-accent, #66b3ed);
+  --hc310-primary: #126548;
+  --hc310-primary-text: #fff;
+  --hc310-green: #224736;
+  --hc310-green-text: #c9f9da;
+  --hc310-yellow: #4c3a19;
+  --hc310-yellow-text: #fff0bd;
+  --hc310-red: #532d38;
+  --hc310-red-text: #ffe1e7;
+}
+body[data-hc289-mode=light] {
+  --hc310-green: #def4e6;
+  --hc310-green-text: #12432c;
+  --hc310-yellow: #fff0c8;
+  --hc310-yellow-text: #573a00;
+  --hc310-red: #fae5e9;
+  --hc310-red-text: #662839;
+}
+.hc310Muted { color:var(--hc310-muted); }
+body :is(#hc289Portal,#hc297Workspace,#hc289Dialog,#hcSettingsModal,#hc289AccountMenu) {
+  color:var(--hc310-text);
+  color-scheme:dark;
+}
+body[data-hc289-mode=light] :is(#hc289Portal,#hc297Workspace,#hc289Dialog,#hcSettingsModal,#hc289AccountMenu) { color-scheme:light; }
+body :is(#hc289Portal,#hc297Workspace,#hc289Dialog,#hcSettingsModal) :is(input:not([type=checkbox],[type=radio],[type=range]),textarea,select) {
+  background:var(--hc310-surface)!important;
+  color:var(--hc310-text)!important;
+  border-color:var(--hc310-line)!important;
+}
+body :is(#hc289Portal,#hc297Workspace,#hc289Dialog,#hcSettingsModal) :is(input,textarea)::placeholder { color:var(--hc310-muted); opacity:1; }
+body :is(#hc289Portal,#hc297Workspace,#hc289Dialog,#hcSettingsModal,#hc289AccountMenu) :focus-visible {
+  outline:2px solid var(--hc310-focus);outline-offset:2px;
+}
+body :is(#hc289Portal,#hc289Dialog) :is(.hc289Panel,.hc289Form,.hcSettingsStage,.hc304PaymentBreakdown) {
+  background:var(--hc310-surface);color:var(--hc310-text);border-color:var(--hc310-line);
+}
+body :is(#hc289Portal,#hc289Dialog) :is(.hc289Notice, .hc289State, .hc298BankStatus) { color:var(--hc310-muted); }
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace) :is(button.hc289Primary,button[data-hc310-book]) {
+  background:var(--hc310-primary)!important;color:var(--hc310-primary-text)!important;border-color:var(--hc310-primary)!important;
+}
+body #hc289AccountMenu button:not(.hc289Danger) { color:var(--hc310-text);background:var(--hc310-surface); }
+body #hc289AccountMenu button:not(.hc289Danger):is(:hover,:focus-visible) { background:var(--hc310-raised); }
+body[data-hc289-mode=light] #hc289AccountMenu .hc289Danger { color:#8c2331; }
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace) [hidden] { display:none!important; }
+body .hc310Avatar {
+  width:40px!important;height:40px!important;min-width:40px!important;padding:0!important;border-radius:50%!important;
+  display:inline-grid;place-items:center;overflow:hidden;color:var(--hc310-text);background:var(--hc310-raised);flex:none;
+}
+.hc310Avatar img { width:100%;height:100%;object-fit:cover; }
+.hc310Avatar svg { width:21px;height:21px; }
+
+#hc289Portal header { gap:10px;padding:8px 16px;min-height:56px;flex:none; }
+#hc289Portal header [data-hc310-home] { margin-right:auto;text-align:left;background:none;border:0;padding:0;font-size:19px;font-weight:750;color:var(--hc310-text); }
+#hc289Portal header [data-hc310-home] small { font-size:11px;color:var(--hc310-muted); }
+#hc289Portal .hc310Layout { position:relative;min-width:0;display:flex;--sidebar-size:290px; }
+#hc289Portal #hc289Registry { display:flex;flex-direction:column;width:var(--sidebar-size);min-width:0;max-width:none;overflow:hidden;
+  box-sizing:border-box;border:0;background:var(--hc310-surface);color:var(--hc310-text); }
+#hc289Portal #hc289Registry h2 { margin:15px 14px 5px;font-size:17px; }
+#hc289Portal #hc289Registry h3 { margin:12px 3px 5px;font-size:13px;color:var(--hc310-muted); }
+#hc289Portal .hc310SideNav { display:flex;align-items:center;gap:5px;padding:0 10px 6px; }
+#hc289Portal .hc310SideNav button { min-width:0;color:var(--hc310-text);border:0;background:none;padding:7px; }
+#hc289Portal .hc289RegistryScroll {
+  height:auto;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 12px 77px;
+}
+#hc289Portal .hc310VisitLine,#hc297Workspace .hc310VisitLine,#hc289Dialog .hc310VisitLine {
+  display:flex;align-items:center;width:100%;min-width:0;gap:7px;text-align:left;padding:8px 3px;margin:0;
+  border:0;border-radius:0;border-bottom:1px solid var(--hc310-line);color:var(--hc310-text);background:transparent;
+  white-space:normal;overflow-wrap:anywhere;
+}
+#hc289Portal .hc310VisitLine span, #hc289Dialog .hc310VisitLine span { min-width:0;flex:1; }
+#hc289Portal .hc310VisitLine small { display:block;color:var(--hc310-muted);line-height:1.25; }
+#hc289Portal .hc310VisitLine:hover, #hc289Dialog .hc310VisitLine:hover { background:var(--hc310-raised); }
+.hc310VisitLine i { width:8px;height:8px;flex:none;background:var(--hc310-muted);border-radius:100%; }
+.hc310VisitLine i[data-state=future] { background:#3aa975; }
+.hc310VisitLine i[data-state=pending] { background:#cd9a2f; }
+.hc310VisitLine i[data-state=cancelled] { background:#be5168; }
+#hc289Portal .hc310SideFooter { position:absolute;bottom:0;left:0;right:0;padding:10px 12px 13px;background:var(--hc310-surface); }
+#hc289Portal [data-hc310-book] { display:block;width:100%;min-height:42px;font-size:14px;font-weight:750;border-radius:24px;box-shadow:0 3px 10px #0003; }
+#hc289Portal .hc310Divider { width:8px;flex:none;cursor:col-resize;touch-action:none;background:linear-gradient(90deg,transparent 3px,var(--hc310-line) 3px,var(--hc310-line) 4px,transparent 4px); }
+#hc289Portal .hc310Divider:hover { background:var(--hc310-raised); }
+#hc289Portal .hc310SideToggle { position:absolute;z-index:10;top:48%;left:calc(var(--sidebar-size) - 8px);border-radius:6px;
+  padding:0;min-width:0;width:19px;height:42px;color:var(--hc310-text);background:var(--hc310-raised);font-size:19px; }
+#hc289Portal .hc310Closed #hc289Registry { display:none; }
+#hc289Portal .hc310Closed .hc310Divider { visibility:hidden; }
+#hc289Portal .hc310Closed .hc310SideToggle { left:0; }
+#hc289Portal .hc310Resizing { user-select:none;cursor:col-resize; }
+#hc289Portal #hc289PortalMain { min-width:0;min-height:0;flex:1;padding:14px clamp(15px,2.1vw,34px); }
+#hc289Portal .hc310Inline {
+  position:relative;inset:auto;z-index:auto;overflow:visible;background:var(--hc310-bg);color:var(--hc310-text);
+  min-height:100%;max-width:1100px;padding:0;margin:0 auto;
+}
+.hc310Settings { display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr);gap:12px; }
+.hc310Settings nav { display:grid;gap:4px;align-content:start; }
+.hc310Profile { display:flex;align-items:center;gap:10px; }
+
+.hc310Calendar { width:100%;margin:auto; }
+.hc310CalendarTall { height:100%;display:flex;flex-direction:column; }
+.hc310MonthHeader { display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 9px; }
+.hc310MonthHeader h2 { font-size:clamp(16px,2vw,24px);margin:0;text-transform:capitalize;text-align:center; }
+.hc310MonthHeader button { width:38px;min-height:36px;font-size:20px;line-height:1;padding:0; }
+.hc310CalendarViewport {
+  overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none;min-width:0;
+}
+.hc310CalendarTall .hc310CalendarViewport { flex:1;min-height:320px; }
+.hc310CalendarTrack { display:flex;width:300%;height:100%; }
+.hc310MonthGrid {
+  box-sizing:border-box;min-width:0;width:33.333333%;flex:none;display:grid;padding:2px;
+  grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(6,minmax(35px,1fr));gap:4px;
+}
+.hc310MonthGrid>span { font-size:12px;text-align:center;color:var(--hc310-muted);padding:2px; }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button {
+  box-sizing:border-box;min-height:35px;min-width:0;margin:0;padding:4px;border-radius:7px;
+  text-align:inherit;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;
+  background:var(--hc310-surface);color:var(--hc310-text);border:1px solid var(--hc310-line);
+}
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[disabled] { color:var(--hc310-muted);background:var(--hc310-bg);opacity:.73; }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[aria-pressed=true] { border:2px solid var(--hc310-focus);padding:3px; }
+.hc310MonthGrid>button>small { width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px; }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[data-state=future] { background:var(--hc310-green);color:var(--hc310-green-text); }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[data-state=pending] { background:var(--hc310-yellow);color:var(--hc310-yellow-text); }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[data-state=cancelled] { background:var(--hc310-red);color:var(--hc310-red-text); }
+body :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid>button[data-state=past] { background:var(--hc310-raised);color:var(--hc310-text); }
+
+#hc289Portal .hc310Booking { max-width:1040px;margin:auto; }
+#hc289Portal .hc310Booking h2 { margin:8px 0; }
+#hc289Portal .hc310Booking .hc309CareChoices { grid-template-columns:repeat(4,minmax(0,1fr));max-width:none; }
+#hc289Portal .hc310Booking .hc309CareChoices [aria-pressed=true],
+body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
+  background:var(--hc310-green)!important;color:var(--hc310-green-text)!important;
+}
+#hc289Portal .hc310Booking #hc292SearchForm { grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;max-width:none; }
+.hc310Urgency { display:flex;align-items:center;gap:5px;margin:9px 0;font-size:13px;font-weight:750; }
+.hc310Urgency input { accent-color:#b32e48;width:17px;height:17px; }
+#hc310UrgentHelp { background:var(--hc310-red);color:var(--hc310-red-text);padding:8px 12px;border-radius:7px; }
+#hc310UrgentHelp a { color:inherit;font-weight:750; }
+#hc289Portal .hc310ProviderLine {
+  width:100%;display:grid;gap:3px;text-align:left;margin:0 0 5px;padding:9px 11px;
+  background:var(--hc310-green);color:var(--hc310-green-text);border:1px solid var(--hc310-line);border-radius:8px;
+}
+.hc310ResultDetail { padding:12px;border:1px solid var(--hc310-line);border-radius:9px;margin-top:8px; }
+.hc310ProfessionalAgenda { margin:6px 0;padding:5px; }
+.hc310ProfessionalAgenda [data-day-agenda] h3 { margin:9px 0 4px;font-size:15px;text-transform:capitalize; }
+.hc310ProfessionalAgenda [data-day-agenda] p { margin:5px 0; }
+.hc310NewAlerts { background:var(--hc310-yellow)!important;color:var(--hc310-yellow-text)!important;font-weight:750; }
+@media(max-width:760px) {
+  #hc289Portal #hc289Registry { position:absolute;inset:0 auto 0 0;width:min(82vw,340px);z-index:9;box-shadow:5px 0 15px #0004; }
+  #hc289Portal .hc310Divider { display:none; }
+  #hc289Portal .hc310SideToggle { left:calc(min(82vw,340px) - 8px); }
+  #hc289Portal .hc310Closed .hc310SideToggle { left:0; }
+  #hc289Portal #hc289PortalMain { padding:10px 15px; }
+  .hc310MonthGrid { gap:2px; }
+  .hc310MonthGrid>button>small { font-size:9px; }
+  #hc289Portal .hc310Booking .hc309CareChoices { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #hc289Portal .hc310Booking #hc292SearchForm { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #hc289Portal .hc310Booking #hc292SearchForm [type=submit] { grid-column:1/-1; }
+  .hc310Settings { grid-template-columns:1fr; }
+  .hc310Settings nav { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}

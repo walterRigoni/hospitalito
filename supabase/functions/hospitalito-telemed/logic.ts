@@ -18,7 +18,7 @@ export function weekly(raw:any,address=''){
 }
 export function cleanProfile(p:any,role:string){
  if(!roles.includes(role))throw Error('Se requiere un profesional habilitado');const modes:any={};
- for(const mode of ['telemedicine','office']){
+ for(const mode of ['telemedicine','office','home']){
   const m=p?.modes?.[mode]||{},rates=(Array.isArray(m.rates)?m.rates:[]).map((r:any)=>({minutes:integer(r.minutes,15,60),amount_cents:integer(r.amount_cents,100,100000000)}));
   if(rates.some((r:any)=>![15,30,45,60].includes(r.minutes))||new Set(rates.map((r:any)=>r.minutes)).size!==rates.length)throw Error('Duraciones o precios repetidos');
   const schedule=weekly(m.weekly,mode==='office'?str(p.address,500):'');

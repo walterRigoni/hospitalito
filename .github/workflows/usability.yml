@@ -1,8 +1,8 @@
 name: Hospitalito - revisión de interfaz
 on:
   push:
-    branches: [main, codex/hospitalito-v309]
-    paths: ['index.html', 'ui/v309.*', 'tests/portal-camera.cjs', 'tools/build-v309.py', 'tests/usability-v308.cjs', '.github/workflows/usability.yml']
+    branches: [main, codex/hospitalito-v310]
+    paths: ['index.html', 'ui/v310.*', 'tests/portal-camera.cjs', 'tools/build-v310.py', 'tests/usability-v310.cjs', '.github/workflows/usability.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -19,8 +19,8 @@ jobs:
           node-version: '24'
       - name: Verificar HTML reproducible
         run: |
-          python3 tools/build-v309.py
-          git diff --exit-code -- index.html Hospitalito_v309.html
+          python3 tools/build-v310.py
+          git diff --exit-code -- index.html Hospitalito_v310.html
       - name: Instalar Chromium
         run: |
           npm install --prefix "$RUNNER_TEMP/browser" --no-save --ignore-scripts playwright@1.56.1
@@ -34,7 +34,7 @@ jobs:
         if: ${{ !cancelled() }}
         env:
           HC_VISUAL_DIR: review-views
-        run: node tests/usability-v308.cjs
+        run: node tests/usability-v310.cjs
       - name: Probar registro, archivos y cámara simulada
         if: ${{ !cancelled() }}
         run: node tests/portal-camera.cjs
