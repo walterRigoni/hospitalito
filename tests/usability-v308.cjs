@@ -20,7 +20,8 @@ async function run() {
   try {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
-      const page = await context.newPage(), errors=[],bookings=[];
+      const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[];
+      let failDirectory=true;
       const next = new Date(date);next.setDate(next.getDate()+6);next.setHours(15,0,0,0);
       const nextDay = [next.getFullYear(),String(next.getMonth()+1).padStart(2,'0'),String(next.getDate()).padStart(2,'0')].join('-');
       page.setDefaultTimeout(8000);
@@ -34,13 +35,22 @@ async function run() {
           me:{client:{username:'test',profile:{}},verifications:[{institution_id:'inst',status:'verified'}]},
           calendar:{days:[1,2].map(d=>({date:month+'-0'+d,free:1,total:1,slots:[{local:month+'-0'+d+'T12:00',available:true}]}))},
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
-          myVisits:{visits:[]}, clientData:{admissions:[],results:[],orders:[],bookings}
+          myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings}
         };
         if (route.request().url().includes('hospitalito-telemed')) {
           const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
+          if(b.action==='directory' && failDirectory) {failDirectory=false;return route.fulfill({status:503,json:{ok:false,error:'Conexión de prueba interrumpida'}});}
           if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[{...provider,username:'qa',trialAvailable:true,modes:{office,telemedicine:office}}]}});
           if(b.action==='availability')return route.fulfill({json:{ok:true,providers:[{id:'qa',available:true}]}});
           if(b.action==='slots')return route.fulfill({json:{ok:true,profileRevision:1,slots:[{start:b.date+'T12:00:00Z',local:b.date+'T09:00',available:true,address:'Calle de prueba 100',location:'Consultorio',latitude:-31.4,longitude:-64.2}]}});
+          if(b.action==='reserve'){
+            reserveRequests.push(b);
+            const visit={id:'visita-de-prueba',mode:'office',client:'test',status:'confirmed',starts_at:next.toISOString(),minutes:b.minutes,is_trial:true,total_cents:0,peer_name:provider.name};
+            visits.push(visit);
+            return route.fulfill({json:{ok:true,visit}});
+          }
+          if(b.action==='visit')return route.fulfill({json:{ok:true,visit:visits.find(v=>v.id===b.visitId),side:'client',peerName:provider.name,payments:[]}});
+          if(b.action==='documents')return route.fulfill({json:{ok:true,documents:[]}});
           if(b.action==='saveProfile')return route.fulfill({json:{ok:true,profile:{...b.profile,revision:1}}});
         }
         return route.fulfill({json:{ok:true,...responses[b.action]}});
@@ -147,6 +157,8 @@ async function run() {
       await page.locator('[data-hc305-nav=new]').click();
       assert(await page.getByRole('group',{name:'Lugar de atención'}).isVisible());
       assert(await page.locator('#hc299Locate').isHidden());
+      await page.locator('#hc309TrySearch').click();
+      await page.locator('[data-tele-profile=qa]').waitFor();
       await capture(page,'lugar-de-atencion-'+width);
       await page.locator('[data-care-mode=office]').click();
       assert.equal(await page.locator('[data-care-mode=office]').getAttribute('aria-pressed'),'true');
@@ -158,7 +170,16 @@ async function run() {
       assert(!(await page.locator('#hc292Accept').isChecked()));
       assert(await page.locator('#hc292Reserve').isDisabled());
       assert(await page.locator('#hc299Route').isHidden());
-      await page.locator('[data-hc300-close-profile]').click();
+      await page.locator('#hc292Slots button').first().click();
+      await page.locator('#hc292Accept').check();
+      await page.locator('#hc292Reserve').click();
+      await page.locator('#hc289Dialog').getByText(/Prueba gratuita confirmada/).waitFor();
+      assert.equal(reserveRequests.length,1);
+      assert.equal(reserveRequests[0].minutes,30);
+      await page.locator('[data-292-close]').click();
+      await page.locator('[data-hc305-nav=turnos]').click();
+      await page.getByRole('button',{name:'Ver consulta y pagos'}).waitFor();
+      await page.locator('[data-hc305-nav=new]').click();
       await page.locator('#hc292InstitutionSearch').click();
       await page.locator('[data-289-provider-detail=qa]').click();
       await page.locator('[data-289-day="'+month+'-01"]').click();

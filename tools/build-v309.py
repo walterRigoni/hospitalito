@@ -37,7 +37,7 @@ replace("user.disabled=false;user.focus();", "registration.show(0);user.disabled
 start = page.index(" root.innerHTML='<button data-289-back>‹ Mi calendario</button><h2>Encontrá tu profesional")
 end = page.index("\n const f=q('#hc292SearchForm')", start)
 old = page[start:end]
-new = old[:old.index("<form")] + old[old.index("<form"):]
+new = old
 intro_start = new.index("<button data-289-back")
 intro_end = new.index("<form")
 new = new[:intro_start] + """<h2>Nuevo turno</h2><div class="hc309CareChoices" role="group" aria-label="Lugar de atención"><button type="button" data-care-mode="telemedicine"><b>Telemedicina</b><small>Atención por videollamada</small></button><button type="button" data-care-mode="office"><b>Consultorio Privado</b><small>Atención presencial</small></button><button type="button" id="hc292InstitutionSearch"><b>Instituciones</b><small>Turnos de tu institución</small></button></div>""" + new[intro_end:]
@@ -132,6 +132,14 @@ new += """;}
  }"""
 replace(old,new)
 
+replace("selected=j.slots[Number(b.dataset.teleSlot)];status.dataset.location", """const slot=j.slots[Number(b.dataset.teleSlot)];
+ if(selected?.start!==slot.start){requestId=crypto.randomUUID();q('#hc292Accept').checked=false;}
+ selected=slot;status.dataset.location""")
+replace("plan.disabled=accept.disabled=true;", """plan.disabled=accept.disabled=true;
+   const slots=[...box.querySelectorAll('[data-tele-slot]:enabled')];slots.forEach(slot=>slot.disabled=true);""")
+replace("plan.disabled=accept.disabled=false;if(plan.isConnected)can();", "plan.disabled=accept.disabled=false;slots.forEach(slot=>slot.disabled=false);if(plan.isConnected)can();")
+replace("window.hc289Toast('Reserva confirmada. Podés verla en Mis turnos.');", """window.hc289Toast(j.visit.status==='awaiting_payment'?'Reserva pendiente de pago. Podés verla en Mis turnos.':'Reserva confirmada. Podés verla en Mis turnos.');""")
+replace("E(n.payload.visitId)", "E(n.payload?.visitId||'')")
 # Agenda: show the invalid field, even when its day or group is collapsed.
 replace("if(!f.checkValidity())throw Error('Revisá especialidad, matrícula, importes y CBU/CVU.');",
         "if(!window.HC309.agendaValid(f,mode))return;")
@@ -140,6 +148,8 @@ replace("add(d);$('[data-active]',d).checked=true;", "const count=$('[data-windo
 replace("profile=r.profile;editing(false);saveStatus.textContent=", "profile=r.profile;editing(false);status.textContent='Agenda guardada';saveStatus.textContent=")
 replace("const status=q('[data-status]',el);if(status?.textContent.startsWith('Agenda guardada.'))", "window.HC309.bindAgenda(f);const status=q('[data-status]',el);if(status?.textContent.startsWith('Agenda guardada.'))")
 
+replace('se gestiona desde Mis ámbitos.', 'se abre desde Cuenta → Cambiar lugar de atención.')
+replace('>Estado / cancelar / finalizar</button>', '>Gestionar consulta</button>')
 # An older save must not acknowledge a newer draft typed while it was in flight.
 replace("const result=await api('saveClinicalRecord',{visitId:id,revision,record:Object.fromEntries(new FormData(f))});revision=result.note.revision;f.dataset.clinicalDirty='0';clinicalDrafts.delete(key);status.textContent='Evolución guardada en el servidor · revisión '+revision;",
         """const record=Object.fromEntries(new FormData(f));

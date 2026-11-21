@@ -61,3 +61,7 @@
   #hc289Portal #hc292SearchForm label:has([name=date]) { grid-column: 1/-1; }
   .hc309Agenda [data-day] { grid-template-columns: minmax(0,1fr) auto !important; }
 }
+body[data-hc289-mode=light] .hc289Dialog.hc309Agenda.hc298ServiceActive [data-day]:has([data-active]:checked) {
+  background: #e5f6eb !important; color: #164c2b !important; border-color: #78ab8b !important;
+}
+.hc309Agenda [data-week] .hc297Window + .hc297Window { border-top: 1px solid var(--hc-theme-line); padding-top: 5px; }
