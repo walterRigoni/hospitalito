@@ -2,7 +2,8 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 let scripts=0;for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++;}}
-const expectedVersion=html.includes('id="hc-v307-ui"')?'v307':'v306',expectedScripts=expectedVersion==='v307'?59:58;
+const expectedVersion = 'v' + html.match(/const CURRENT_VERSION = (\d+);/)[1];
+const expectedScripts = {v306:58, v307:59, v308:60}[expectedVersion];
 assert(html.includes('id="hc-v306-ui"'));assert.equal(scripts,expectedScripts);
 function fn(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=html.indexOf('{',start);for(let i=open;i<html.length;i++){if(html[i]==='{')depth++;if(html[i]==='}'&&!--depth)return html.slice(start,i+1);}throw Error(name);}
 const now=Date.parse('2026-11-21T02:00:00-03:00');class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
@@ -70,8 +71,8 @@ const {chromium}=require('playwright'),http=require('node:http');
   localStorage.setItem('hc289.visual.test306',JSON.stringify({color:'default',mode:'light',font:'default'}));window.hc289ApplyVisual();
   const diet=document.querySelector('.freeTextRxItem .freeTextRxText'),dietColor=getComputedStyle(diet).color,dietSurface=getComputedStyle(diet).backgroundColor;
   ok('light prescription text',dietColor==='rgb(21, 33, 44)'&&dietSurface==='rgb(255, 255, 255)');ok('light diet title',getComputedStyle(document.querySelector('.hc275NutritionTitle')).color==='rgb(7, 81, 120)');
-  if(expectedVersion==='v307'){
-   ok('visible version',document.querySelector('#hc307Version')?.textContent==='v307');
+  if(['v307','v308'].includes(expectedVersion)){
+   ok('visible version',document.querySelector('#hc307Version')?.textContent===expectedVersion);
    const fixture=hcEnsureClinicalPatient('p306'),base=fixture.cur.prescripciones.infusionesContinuas.find(i=>i.id==='inf306');
    fixture.cur.prescripciones.infusionesContinuas.push(...[
     {id:'paused307',active:false},
@@ -107,7 +108,7 @@ const {chromium}=require('playwright'),http=require('node:http');
  const sticky=await page.evaluate(()=>({top:document.querySelector('#hc306ClinicalHeader').getBoundingClientRect().top,bar:document.querySelector('.topbar').getBoundingClientRect().bottom,scroll:scrollY}));
  assert(sticky.scroll>100&&Math.abs(sticky.top-sticky.bar)<4,JSON.stringify(sticky));console.log('PASS headers remain visible while scrolling',sticky);
  await page.evaluate(()=>window.scrollTo(0,0));
- if(expectedVersion==='v307'){
+ if(['v307','v308'].includes(expectedVersion)){
   for(const width of [320,390,844,1280]){
    await page.setViewportSize({width,height:844});
    await page.evaluate(()=>{medTab='bal';renderMed();});

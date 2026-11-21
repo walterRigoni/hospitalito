@@ -1,15 +1,37 @@
-const CACHE='hospitalito-v307-shell';
-const SHELL=['./','./manifest.webmanifest','./hospitalito-icon.svg'];
-self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
-self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
-self.addEventListener('fetch',event=>{
-  const req=event.request,url=new URL(req.url);
-  if(req.method!=='GET'||url.hostname.includes('supabase.co'))return;
-  if(req.mode==='navigate'){
-    event.respondWith(fetch(req,{cache:'no-store'}).then(res=>{const copy=res.clone();caches.open(CACHE).then(c=>c.put('./',copy));return res;}).catch(()=>caches.match('./')));
-    return;
-  }
-  if(url.origin===self.location.origin){event.respondWith(fetch(req).then(res=>{if(res.ok){const copy=res.clone();caches.open(CACHE).then(c=>c.put(req,copy));}return res;}).catch(()=>caches.match(req)));}
+const CACHE = 'hospitalito-v308-shell';
+const HOME = new URL('./', self.registration.scope).href;
+const ASSETS = ['./manifest.webmanifest', './hospitalito-icon.svg'];
+const appPages = new Set([new URL(HOME).pathname, new URL('./index.html', HOME).pathname, new URL('./Hospitalito_v308.html', HOME).pathname]);
+self.addEventListener('install', event => {
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await cache.addAll([HOME, ...ASSETS].map(url => new Request(new URL(url, HOME), {cache:'reload'})));
+    await self.skipWaiting();
+  })());
 });
-
-
+self.addEventListener('activate', event => {
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(key => /^hospitalito-v\d+(?:-shell)?$/.test(key) && key !== CACHE).map(key => caches.delete(key)));
+    await self.clients.claim();
+  })());
+});
+self.addEventListener('fetch', event => {
+  const request = event.request, url = new URL(request.url);
+  if (request.method !== 'GET' || url.origin !== self.location.origin || url.searchParams.has('_hc_update_probe')) return;
+  const isPage = request.mode === 'navigate' && appPages.has(url.pathname);
+  const isAsset = ASSETS.some(path => new URL(path, HOME).pathname === url.pathname);
+  if (!isPage && !isAsset) return;
+  event.respondWith((async () => {
+    const key = isPage ? HOME : url.origin + url.pathname;
+    const cache = await caches.open(CACHE);
+    let response;
+    try { response = await fetch(request, {cache:'no-store'}); }
+    catch (error) { return await cache.match(key) || Response.error(); }
+    if (response.ok && (!isPage || (response.headers.get('Content-Type') || '').includes('text/html'))) {
+      const copy = response.clone();
+      event.waitUntil(cache.put(key, copy).catch(() => {}));
+    }
+    return response;
+  })());
+});

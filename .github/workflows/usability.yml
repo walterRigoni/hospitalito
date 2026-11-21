@@ -1,0 +1,43 @@
+name: Hospitalito - revisión de interfaz
+on:
+  push:
+    branches: [main, codex/hospitalito-v308]
+    paths: ['index.html', 'ui/v308.*', 'tests/usability-v308.cjs', '.github/workflows/usability.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  interfaz:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      TZ: America/Argentina/Buenos_Aires
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verificar HTML reproducible
+        run: |
+          python3 tools/build-v308.py
+          git diff --exit-code -- index.html Hospitalito_v308.html
+      - name: Instalar Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser" --no-save --ignore-scripts playwright@1.56.1
+          "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/browser/node_modules" >> "$GITHUB_ENV"
+      - name: Flujo clínico en escritorio y celular
+        env:
+          HC306_BROWSER: '1'
+        run: node tests/workflow-v306.cjs
+      - name: Probar interfaz y turnos con datos ficticios
+        if: ${{ !cancelled() }}
+        env:
+          HC_VISUAL_DIR: review-views
+        run: node tests/usability-v308.cjs
+      - name: Guardar vistas de prueba
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pantallas-de-prueba
+          path: review-views

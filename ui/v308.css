@@ -1,0 +1,78 @@
+/* Shared visual hierarchy, with the user's theme and font. */
+body {
+  --hc308-space: clamp(10px, 2vw, 20px);
+  --hc308-accent: var(--hc-theme-accent, #247cab);
+}
+body :is(#loginWrap, #medPanel, #hc289Portal, #hc297Workspace, #hc289Dialog, .hc289Dialog) :focus-visible {
+  outline: 2px solid var(--hc308-accent);
+  outline-offset: 2px;
+}
+#loginWrap, #loginWrap * { box-sizing: border-box; }
+body #loginWrap > .card {
+  max-width: 420px;
+  padding: clamp(18px, 4vw, 32px);
+  border-radius: 14px;
+  background: var(--hc-theme-surface);
+  color: var(--hc-theme-text);
+}
+#loginWrap h3 { font-size: 24px; line-height: 1.2; }
+#loginWrap .row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+#loginWrap input { width: 100%; min-height: 42px; font-size: 16px; }
+#loginWrap :is(#btnLogin, #hc280DeviceLogin, #hc289RegisterLink) { width: 100%; min-height: 42px; }
+#loginWrap #btnLogin { font-size: 15px; }
+#loginWrap #hc280DeviceLogin { margin: 8px 0 0; }
+#loginWrap #hc289RegisterLink { margin: 12px 0 0 !important; font-weight: 650; }
+#loginWrap .hc308AdminHelp { font-size: 12px; margin-top: 14px; color: var(--hc-theme-muted); }
+#loginWrap .hc308AdminHelp summary { cursor: pointer; }
+body #hc289AccountMenu[data-grouped] { padding: 6px; }
+.hc308MenuGroup + .hc308MenuGroup { border-top: 1px solid var(--hc-theme-line); margin-top: 4px; }
+.hc308MenuGroup h3 { margin: 10px 10px 4px; font: 700 12px/1.3 inherit; font-size: 12px; color: var(--hc-theme-muted); }
+body #hc289AccountMenu .hc308MenuGroup button { width: 100%; text-align: left; min-height: 38px; }
+.hc308ModulePicker { display: none; }
+#medPanel .medModuleTabs .tab.active { box-shadow: inset 0 -3px 0 currentColor; font-weight: 750; }
+#medPanel .hc308ActionLabel, #appAdmin .hc308ActionLabel { vertical-align: middle; }
+button[data-hc289-icon] .hc308ActionLabel { margin-inline-start: .35em; white-space: normal; }
+#medPanel #medPres .hc306RxEdit { width: auto !important; min-width: 44px; font-size: 12px; line-height: 1.2; }
+#hc289Portal .hc305PortalNav [aria-current=page] { border-width: 2px; font-weight: 800; }
+#hc289Portal #hc292SearchForm { align-items: end; padding: 10px; }
+#hc289Portal #hc292SearchForm label { gap: 4px; }
+#hc289Portal .hc303Steps { gap: 4px; }
+#hc289Portal .hc303Steps li { flex: 1 1 auto; }
+body[data-hc289-mode=light] :is(.hc297EntryGrid .institutionChoiceBtn, #hc297Workspace .hc297Visit, .hc289Dialog.hc298Compact [data-day]) {
+  background: #f8fbfd !important; color: #193344 !important; border-color: #879cac !important;
+}
+body[data-hc289-mode=light] .hc297EntryGrid .institutionChoiceBtn :is(b, span) { color: #193344 !important; }
+body[data-hc289-mode=light] #hc289Portal .hc303Steps li[aria-current=step] { background: #e1f4e8; color: #135d37; }
+#hc297Workspace > header [data-settings] { font-weight: 700; }
+#hc297Workspace .hc297Visit { width: 100%; overflow-wrap: anywhere; }
+@media(max-width:760px) {
+  body .hc304Mainbar > div:last-child {
+    display: flex !important; flex-wrap: wrap; justify-content: flex-start; gap: 4px !important;
+  }
+  body .hc304Mainbar > div:last-child > .btn {
+    flex: 0 1 auto; width: auto !important; padding: 5px 9px !important; font-size: 12px !important;
+  }
+  body .hc304Mainbar #whoami { width: auto; flex: 1 0 100%; overflow: hidden; }
+  body .hc304Mainbar #hcMobileCensoBtn { width: auto !important; min-height: 40px !important; }
+  #hc306ClinicalHeader:has(.hc308ModulePicker) {
+    display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 6px;
+  }
+  #hc306ClinicalHeader > :not(.hc308ModulePicker, .medModuleTabs) { grid-column: 1 / -1; }
+  body #hc306ClinicalHeader .hc308ModulePicker:not([hidden]) {
+    display: block; grid-column: 1; width: 94px; height: 38px; margin: 5px 0 0;
+    border: 1px solid var(--hc-theme-line); border-radius: 7px; color: var(--hc-theme-text);
+    background: var(--hc-theme-surface); font: inherit; font-size: 13px; padding-inline: 5px;
+  }
+  body #hc306ClinicalHeader .medModuleTabs { min-width: 0; grid-column: 2; }
+  body #hc306ClinicalHeader .hc308ModulePicker[hidden] + .medModuleTabs { grid-column: 1 / -1; }
+  body #hc306ClinicalHeader .medModuleTabs .tab { min-height: 36px; }
+  body #hc289Portal .hc305PortalNav { gap: 4px; padding: 6px 8px; }
+  body #hc289Portal .hc305PortalNav button { min-height: 40px; }
+  #hc289Portal #hc292SearchForm { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  #hc289Portal #hc292SearchForm :is(input, select), .hc298Compact :is(input:not([type=checkbox]), select) { min-height: 36px; }
+  #hc297Workspace > header { padding: 10px; gap: 6px; }
+  #hc297Workspace .hc297WorkspaceGrid { padding: 10px; gap: 10px; }
+  .hc298Compact .hc298DayTabs button { min-height: 36px; }
+}
+@media print { .hc308ModulePicker { display: none !important; } }
+body #hc300GlobalExit { font: 650 12px/1 system-ui !important; width: 42px !important; border-radius: 7px; }
