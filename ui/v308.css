@@ -108,3 +108,13 @@ body[data-hc289-mode=light] #medPanel #medEvol :is(.card label, .card h3, .miniB
 #medPanel #evoList .hc308EvolutionRow[aria-pressed=true] {
   border-inline-start: 4px solid var(--hc-theme-accent) !important;
 }
+
+#hc289Portal .hc305PortalNav { grid-template-columns: repeat(4,minmax(0,1fr)); }
+#hc308RegistryToggle[aria-expanded=true] { box-shadow: inset 0 -3px 0 currentColor; }
+@media(max-width:760px) {
+  #hc289Portal .hc305PortalNav button { padding: 4px 2px; font-size: 12px; }
+  #hc289Portal .hc289PortalLayout { position: relative; }
+  #hc289Portal .hc289Registry { position: absolute; inset: 0 auto 0 0; z-index: 8; width: min(85%,320px); box-shadow: 5px 3px 15px #15212c2e; }
+  #hc289Portal .hc289Resize { display: none; }
+  #hc289Portal .hc289Registry.collapsed { border: 0; }
+}

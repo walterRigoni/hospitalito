@@ -103,6 +103,7 @@ async function run() {
         await agenda.locator('[data-day-tab="2"]').click();
         assert(await agenda.locator('[data-day="2"]').isVisible());
       }
+      assert.equal(await agenda.locator('[name=specialty]').inputValue(),'');
       await agenda.locator('[name=specialty]').selectOption({label:'Cardiología'});
       await agenda.locator('[name=credential]').fill('Matrícula ficticia');
       await agenda.locator('[name=rate30]').fill('1800');
@@ -116,7 +117,15 @@ async function run() {
       await page.evaluate(()=>hc289EnterClient({token:'fixture',user:{username:'test',name:'Paciente de prueba',role:'cliente'}}));
       await page.locator('[data-hc305-nav=turnos]').click();
       assert(await page.getByRole('heading',{name:'Mis turnos',exact:true}).isVisible());
+      await page.locator('#hc305AppointmentList').getByText(/No tenés turnos/).waitFor();
       await capture(page,'turnos-'+width);
+      if(width<800){
+        await page.locator('#hc308RegistryToggle').click();
+        assert.equal(await page.locator('#hc308RegistryToggle').getAttribute('aria-expanded'),'true');
+        await page.locator('[data-289-results]').click();
+        assert(await page.getByRole('heading',{name:'Mis resultados'}).isVisible());
+        assert.equal(await page.locator('#hc308RegistryToggle').getAttribute('aria-expanded'),'false');
+      }
       await page.locator('[data-hc305-nav=new]').click();
       await page.locator('#hc292SearchForm [name=mode]').selectOption('office');
       await page.locator('[data-tele-profile=qa]').click();

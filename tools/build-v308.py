@@ -169,6 +169,26 @@ new=new.replace('row.ondblclick = ()=>{', 'row.onclick = ()=>{\n      window.hc2
 new=new.replace('      evoRenderList(pid);', '''      evoRender();
       document.querySelector('#evoList button[aria-pressed="true"]')?.focus({preventScroll:true});''')
 replace(old,new)
+replace("const options=window.hc292SpecialtyOptions(j.role,[p.specialty]);", """const options='<option value="">Elegí tu especialidad</option>'+window.hc292SpecialtyOptions(j.role,[p.specialty]);""")
+replace('data-hc305-nav="new">＋ Nuevo turno</button></nav>', 'data-hc305-nav="new">Nuevo turno</button><button type="button" id="hc308RegistryToggle" aria-controls="hc289Registry">Mi registro</button></nav>')
+start=page.index('function setupSidebar()')
+end=page.index('\n',start)
+replace(page[start:end], """function setupSidebar(){
+ const sidebar=q('#hc289Registry'),grip=q('.hc289Resize'),toggle=q('#hc308RegistryToggle');
+ let down=0,start=0,moved=false;
+ function sync(){const open=!sidebar.classList.contains('collapsed');toggle.setAttribute('aria-expanded',String(open));grip.textContent=open?'‹':'›';}
+ function flip(){sidebar.classList.toggle('collapsed');sync();}
+ toggle.onclick=flip;
+ grip.setAttribute('aria-controls',sidebar.id);
+ grip.onpointerdown=e=>{down=e.clientX;start=sidebar.classList.contains('collapsed')?0:sidebar.offsetWidth;moved=false;grip.setPointerCapture(e.pointerId);};
+ grip.onpointermove=e=>{if(!grip.hasPointerCapture(e.pointerId)||Math.abs(e.clientX-down)<=5&&!moved)return;moved=true;const width=Math.min(500,Math.max(0,start+e.clientX-down));sidebar.classList.toggle('collapsed',width<65);sidebar.style.width=Math.max(150,width)+'px';};
+ grip.onpointerup=e=>grip.releasePointerCapture(e.pointerId);
+ grip.onclick=e=>{if(!moved||e.detail===0)flip();moved=false;};
+ sidebar.addEventListener('click',e=>{if(innerWidth<=760&&e.target.closest('#hc289RegistryContent button')){sidebar.classList.add('collapsed');sync();}});
+ const portal=q('#hc289Portal');portal.addEventListener('keydown',e=>{if(e.key==='Escape'&&innerWidth<=760&&!sidebar.classList.contains('collapsed')){sidebar.classList.add('collapsed');sync();toggle.focus();}});
+ portal.querySelector('.hc305PortalNav').addEventListener('click',e=>{if(innerWidth<=760&&e.target.closest('[data-hc305-nav]'))sidebar.classList.add('collapsed');});
+ new MutationObserver(sync).observe(sidebar,{attributes:true,attributeFilter:['class']});sync();
+}""")
 # Keep the exit action legible at the reserved top-right position.
 css = (root/'ui/v308.css').read_text()
 script = (root/'ui/v308.js').read_text()
