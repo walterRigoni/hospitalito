@@ -30,8 +30,10 @@ async function run() {
           directory:{providers:[provider],institutions:[{id:'inst',name:'Centro de prueba'}]},
           me:{client:{username:'test',profile:{}},verifications:[{institution_id:'inst',status:'verified'}]},
           calendar:{days:[1,2].map(d=>({date:month+'-0'+d,free:1,total:1,slots:[{local:month+'-0'+d+'T12:00',available:true}]}))},
+          myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
           myVisits:{visits:[]}, clientData:{admissions:[],results:[],orders:[],bookings:[]}
         };
+        if (b.action==='directory' && route.request().url().includes('hospitalito-telemed')) return route.fulfill({json:{ok:true,providers:[]}});
         return route.fulfill({json:{ok:true,...responses[b.action]}});
       });
       await page.goto(site);
@@ -47,8 +49,10 @@ async function run() {
         saveJSON(LS.patients,[{id:'p',dni:'00000001',lastName:'Paciente',firstNames:'Prueba'}]);
         saveJSON(LS.registry,[{id:'a',patientId:'p',active:true,bedId:'UTI-1',admDateTime:isoNowLocalFull()}]);
         hcBackendConfigured=()=>false;hc270CheckScope=()=>{};hcBackendScheduleUrgentPush=()=>{};hcBackendMarkLocalSavedSoon=()=>{};
+        const now=Date.now(),day=isoNowLocalFull().slice(0,10),inst=localStorage.getItem(LS.backendRegistryId)||'inst';
+        const shift={id:'workshift:'+inst+':qa308:'+day,kind:'work_shift',user:'qa308',institutionDataId:inst,dateLocal:day,startDateTime:new Date(now-3600000).toISOString(),endDateTime:new Date(now+3600000).toISOString(),services:['UTI']};
+        localStorage.setItem('hc306.shift.'+inst+'.qa308',JSON.stringify(shift));
         selectedPatientId='p';medTab='ingreso';showAppByRole('medico');renderMed();
-        document.querySelector('#hc229ShiftModal')?.classList.remove('show');
         localStorage.setItem('hc289.visual.qa308',JSON.stringify({mode:'light',font:'default',color:'default'}));window.hc289ApplyVisual();
       });
       if(width<800) {
@@ -78,6 +82,18 @@ async function run() {
       assert(menu.x>=0&&menu.x+menu.width<=width+1);
       await capture(page,'cuenta-'+width);
       await page.keyboard.press('Escape');
+      await page.evaluate(()=>hc297Workspace('office'));
+      await page.locator('#hc297Workspace [data-settings]').click();
+      const agenda=page.locator('.hc298Compact');
+      await agenda.waitFor();
+      assert(await agenda.locator('summary img[alt="Foto de perfil"]').isVisible());
+      if(width<800) {
+        await agenda.locator('[data-day-tab="2"]').click();
+        assert(await agenda.locator('[data-day="2"]').isVisible());
+      }
+      await capture(page,'agenda-'+width);
+      await agenda.locator('button[aria-label^="Cerrar"],[data-close]').first().click();
+      await page.evaluate(()=>document.querySelector('#hc297Workspace')?.remove());
       await page.evaluate(()=>hc289EnterClient({token:'fixture',user:{username:'test',name:'Paciente de prueba',role:'cliente'}}));
       await page.locator('[data-hc305-nav=turnos]').click();
       assert(await page.getByRole('heading',{name:'Mis turnos',exact:true}).isVisible());

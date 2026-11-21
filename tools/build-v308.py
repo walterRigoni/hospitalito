@@ -129,6 +129,18 @@ replace("api('directory').then(d=>{directory=d;if(main()?.dataset.view==='appoin
 replace("if(render&&!bookingUI)calendarView();", "if(render&&!bookingUI&&(!main()?.dataset.view||main().dataset.view==='calendar'))calendarView(selectedDay);")
 replace("if(!bookingUI?.slot)throw Error", "if(!bookingUI?.slot||!bookingUI.providerId)throw Error")
 
+# The stray character before a style element also made the browser close <head> early.
+replace('+<style id="hcV258HemotherapyStyles">', '<style id="hcV258HemotherapyStyles">')
+replace("q('img.hc296Portrait',body)?.remove();", "const photo=q('img.hc296Portrait',body);if(photo)summary.prepend(photo);")
+replace('>Mis ámbitos</button><button type="button" data-exit', '>Cambiar lugar de atención</button><button type="button" data-exit')
+replace("const attempt=++slotSerial;selected=null;can();requestId=", """const attempt=++slotSerial;selected=null;
+ q('#hc292Accept').checked=false;const route=q('#hc299Route');route.hidden=true;route.removeAttribute('href');
+ if(status.dataset.location){status.textContent='';delete status.dataset.location;}
+ can();requestId=""")
+replace("status.textContent=selected.address?'Ubicación elegida: '+selected.address:'';", "status.dataset.location='true';status.textContent=selected.address?'Ubicación elegida: '+selected.address:'';")
+replace("}catch(e){if(plan.isConnected)q('#hc292Slots').textContent=e.message;}", "}catch(e){if(attempt===slotSerial&&plan.isConnected)q('#hc292Slots').textContent=e.message;}")
+replace("if(render&&!bookingUI&&(!main()?.dataset.view||main().dataset.view==='calendar'))calendarView(selectedDay);",
+        "if(render&&!bookingUI&&!main()?.dataset.view)appointmentsView();else if(render&&!bookingUI&&main()?.dataset.view==='calendar')calendarView(selectedDay);")
 # Keep the exit action legible at the reserved top-right position.
 css = (root/'ui/v308.css').read_text()
 script = (root/'ui/v308.js').read_text()
