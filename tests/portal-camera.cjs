@@ -16,7 +16,7 @@ module.exports=async function run(options={}){
     if(__cameraMode==='delayed')await new Promise(resolve=>window.__releaseCamera=resolve);return stream;
    };
    const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{__revoked.push(url);revoke(url);};
-   window.Tesseract={createWorker:async()=>({setParameters:async()=>{},recognize:async()=>({data:{text:''}}),terminate:async()=>{}})};
+   window.Tesseract={createWorker:async()=>({setParameters:async()=>{},recognize:async()=>({data:{text:window.__ocrText||'',confidence:96}}),terminate:async()=>{}})};
   });
   await page.route('**/*',async route=>{
    if(route.request().url()===site)return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'index.html'),'utf8')});
@@ -88,7 +88,13 @@ module.exports=async function run(options={}){
   check(await page.evaluate(()=>__streams.at(-2).getTracks().every(t=>t.readyState==='ended')),'Switching DNI sides stops the previous camera');
   await page.evaluate(()=>window.dispatchEvent(new Event('pagehide')));check(await page.evaluate(()=>__streams.at(-1).getTracks().every(t=>t.readyState==='ended')),'Leaving the page stops the camera');
   check(registrations.length===0,'Selecting and capturing photos never submits a registration');
-  await next.click();await form.locator('[name=name]').fill('PERSONA FICTICIA');await form.locator('[name=dni]').fill('99999991');await form.locator('[name=dob]').fill('1990-01-01');await form.locator('[name=confirmedData]').check();
+  await page.evaluate(()=>{window.__ocrText='Apellido PRUEBA\nNombre PERSONA\nDocumento 99.999.991\nFecha de nacimiento 01/01/1990';});
+  await page.locator('#hc289Scan').click();
+  await page.locator('#hc289OCRStatus').getByText(/Datos leídos/).waitFor();
+  await next.click();
+  check(await form.locator('[name=dni]').inputValue()==='99999991','OCR populates the review step without submitting');
+  check(await form.locator('[name=name]').inputValue()==='PERSONA PRUEBA','OCR name is visible and editable on review');
+  await form.locator('[name=name]').fill('PERSONA FICTICIA');await form.locator('[name=dni]').fill('99999991');await form.locator('[name=dob]').fill('1990-01-01');await form.locator('[name=confirmedData]').check();
   await form.locator('button[type=submit]').click();await page.locator('#hc289SignupStatus').filter({hasText:'Fallo de prueba'}).waitFor();
   check(registrations.length===1&&registrations[0].document.data.startsWith('data:image/jpeg;base64,')&&registrations[0].documentBack.data.startsWith('data:image/jpeg;base64,'),'Explicit registration converts both sources to server-compatible JPEGs');
   check(registrations[0].document.data!==registrations[0].documentBack.data,'Registration keeps the two DNI sides distinct');

@@ -116,6 +116,7 @@ async function run() {
         assert(await agenda.locator('[data-day="2"]').isVisible());
       }
       assert.equal(await agenda.locator('[name=specialty]').inputValue(),'');
+      await agenda.locator('[name=display_name]').fill('Profesional de prueba');
       await agenda.locator('[name=specialty]').selectOption({label:'Cardiología'});
       await agenda.locator('[name=credential]').fill('Matrícula ficticia');
       await agenda.locator('[name=enabled]').check();
