@@ -90,7 +90,7 @@ module.exports=async function run(options={}){
   check(registrations.length===0,'Selecting and capturing photos never submits a registration');
   await page.evaluate(()=>{window.__ocrText='Apellido PRUEBA\nNombre PERSONA\nDocumento 99.999.991\nFecha de nacimiento 01/01/1990';});
   await page.locator('#hc289Scan').click();
-  await page.locator('#hc289OCRStatus').getByText(/Datos leídos/).waitFor();
+  await page.locator('#hc289OCRStatus').filter({hasText:/Datos leídos/}).waitFor();
   await next.click();
   check(await form.locator('[name=dni]').inputValue()==='99999991','OCR populates the review step without submitting');
   check(await form.locator('[name=name]').inputValue()==='PERSONA PRUEBA','OCR name is visible and editable on review');

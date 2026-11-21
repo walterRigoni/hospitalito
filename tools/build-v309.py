@@ -169,6 +169,57 @@ replace("await window.hc297MountClinical($('[data-notes]',main),id);await window
  ]);
  }catch(e){if(sequence===openSequence&&root.isConnected)main.innerHTML='<p role="status">'+E(e.message)+'</p>';}""")
 
+# Put the next appointment first and let the professional return to the list on a phone.
+replace('<aside><h2>Mis consultas</h2><button type="button" data-refresh>Actualizar</button>',
+        '<aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div>')
+replace('<main><p>Elegí una consulta para abrir la historia clínica, los documentos y la atención.</p></main>',
+        '<main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main>')
+start = page.index(" async function refresh(){const status=$('[data-list-status]',root);")
+end = page.index(' async function open(id)', start)
+replace(page[start:end], """ const list=$('[data-visits]',root),status=$('[data-list-status]',root);
+ const filter=$('[data-visit-filter]',root),reload=$('[data-refresh]',root);
+ const visitPane=$('main',root);
+ let visits=[],loaded=false;
+ const statesArchived=new Set(['finished','cancelled','expired']);
+ function currentVisit(visit){
+    return ['active','payment_review'].includes(visit.status)||(!statesArchived.has(visit.status)&&
+       (Date.parse(visit.ends_at)||Date.parse(visit.starts_at)+Number(visit.minutes||30)*60000)>Date.now());
+ }
+ function renderList(){
+   const upcoming=filter.value==='next';
+   const rows=visits.filter(visit=>currentVisit(visit)===upcoming)
+       .sort((a,b)=>(upcoming?1:-1)*(Date.parse(a.starts_at)-Date.parse(b.starts_at)));
+   list.innerHTML=rows.map(v=>'<button type="button" class="hc297Visit" data-visit="'+E(v.id)+'"><b>'+
+      E(v.peer_name||v.client)+'</b><span>'+E(when(v.starts_at))+'</span><span>'+
+      E(STATES[v.status]||v.status)+' · '+(v.is_trial?'Prueba gratuita':money(v.total_cents))+'</span>'+
+      E(v.location_snapshot)+'</button>').join('')||
+      (upcoming?'<p>No tenés consultas próximas. Revisá tu disponibilidad en Días, horarios y tarifas.</p>':'<p>Todavía no hay consultas en el historial.</p>');
+   list.querySelectorAll('[data-visit]').forEach(button=>button.onclick=()=>open(button.dataset.visit));
+ }
+ async function refresh(){
+   if(reload.disabled)return;
+   reload.disabled=true;status.textContent='Actualizando consultas…';
+   try{
+     const result=await api('myVisits');
+     if(!root.isConnected||workspaceOwner!==owner())return;
+     visits=(result.visits||[]).filter(visit=>visit.mode===mode);
+     loaded=true;renderList();status.textContent='';
+   }catch(error){
+     if(root.isConnected)status.textContent='No se pudieron actualizar las consultas. '+error.message;
+   }finally{reload.disabled=false;}
+ }
+ filter.onchange=()=>{if(loaded)renderList();};
+ $('[data-visit-back]',root).onclick=()=>{
+   openSequence++;const selected=visitPane.dataset.visitId;
+   visitPane.hidden=true;root.classList.remove('hc309VisitOpen');
+   [...list.querySelectorAll('[data-visit]')].find(button=>button.dataset.visit===selected)?.focus();
+ };
+""")
+replace("""const main=$('main',root);main.innerHTML='<p role="status">Abriendo consulta…</p>';""",
+        """const main=$('[data-visit-content]',root);
+ visitPane.hidden=false;visitPane.dataset.visitId=id;root.classList.add('hc309VisitOpen');
+ main.innerHTML='<p role="status">Abriendo consulta…</p>';""")
+
 css = (root/'ui/v309.css').read_text()
 js = (root/'ui/v309.js').read_text()
 end = page.rindex('</body>')

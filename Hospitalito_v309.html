@@ -50657,12 +50657,51 @@ window.hc297MountClinical=async function(host,id){
 window.addEventListener('beforeunload',e=>{if(document.querySelector('[data-clinical-dirty=\"1\"]')||[...clinicalDrafts.keys()].some(k=>k.startsWith(owner()+':'))){e.preventDefault();e.returnValue='';}});
 window.hc297Workspace=async function(mode){
  if(!['telemedicine','office'].includes(mode))return;hcInstitutionChooserClose();$('#hc297Workspace')?.remove();
- const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.innerHTML='<header><div><b>'+E(mode==='office'?'Consultorio Privado':'Telemedicina')+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>✎ Días, horarios y tarifas</button><button type="button" data-switch>Cambiar lugar de atención</button><button type="button" data-exit>Salir de mi cuenta</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><button type="button" data-refresh>Actualizar</button><p data-list-status role="status"></p><div data-visits></div></aside><main><p>Elegí una consulta para abrir la historia clínica, los documentos y la atención.</p></main></div>';document.body.append(root);
+ const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.innerHTML='<header><div><b>'+E(mode==='office'?'Consultorio Privado':'Telemedicina')+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>✎ Días, horarios y tarifas</button><button type="button" data-switch>Cambiar lugar de atención</button><button type="button" data-exit>Salir de mi cuenta</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div><p data-list-status role="status"></p><div data-visits></div></aside><main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main></div>';document.body.append(root);
  $('[data-settings]',root).onclick=()=>window.hc292Professional(mode);
  $('[data-switch]',root).onclick=()=>{root.remove();hcInstitutionChooserOpen(hcGlobalStoredInstitutions?.()||[],{required:!session,switching:!!session});};
  $('[data-exit]',root).onclick=()=>{clinicalDrafts.clear();root.remove();localStorage.removeItem(LS.globalAuthToken);localStorage.removeItem(LS.globalAuthUser);localStorage.removeItem(LS.session);localStorage.removeItem(LS.globalAuthCurrentInstitution);session=null;hcGlobalPendingAuth=null;location.reload();};
- async function refresh(){const status=$('[data-list-status]',root);try{const j=await api('myVisits');if(!root.isConnected||workspaceOwner!==owner())return;const visits=j.visits.filter(v=>v.mode===mode);$('[data-visits]',root).innerHTML=visits.map(v=>'<button type="button" class="hc297Visit" data-visit="'+E(v.id)+'"><b>'+E(v.peer_name||v.client)+'</b><span>'+E(when(v.starts_at))+'</span><span>'+E(STATES[v.status]||v.status)+' · '+(v.is_trial?'Prueba gratuita':money(v.total_cents))+'</span>'+E(v.location_snapshot)+'</button>').join('')||'<p>Todavía no tenés consultas en esta modalidad. Publicá tu disponibilidad para recibir reservas del Portal.</p>';status.textContent='';$('[data-visits]',root).querySelectorAll('[data-visit]').forEach(b=>b.onclick=()=>open(b.dataset.visit));}catch(e){status.textContent=e.message;}}
- async function open(id){const sequence=++openSequence;const main=$('main',root);main.innerHTML='<p role="status">Abriendo consulta…</p>';try{const j=await api('visit',{visitId:id});if(!root.isConnected||workspaceOwner!==owner()||sequence!==openSequence)return;const v=j.visit;main.innerHTML='<h2>'+E(j.peerName)+'</h2><p>DNI '+E(j.patient?.dni)+' · '+E(when(v.starts_at))+'</p><p>'+E(v.location_snapshot)+'</p><div class="hc289Slots">'+(v.mode==='telemedicine'&&['confirmed','active'].includes(v.status)?'<button data-video>Comenzar videollamada</button>':'')+'<button data-summary>Gestionar consulta</button></div><div data-notes></div><div data-documents></div>';$('[data-video]',main)?.addEventListener('click',()=>window.hc292OpenVideo(id));$('[data-summary]',main).onclick=()=>window.hc292Visit(id);const notes=$('[data-notes]',main),docs=$('[data-documents]',main);
+ const list=$('[data-visits]',root),status=$('[data-list-status]',root);
+ const filter=$('[data-visit-filter]',root),reload=$('[data-refresh]',root);
+ const visitPane=$('main',root);
+ let visits=[],loaded=false;
+ const statesArchived=new Set(['finished','cancelled','expired']);
+ function currentVisit(visit){
+    return ['active','payment_review'].includes(visit.status)||(!statesArchived.has(visit.status)&&
+       (Date.parse(visit.ends_at)||Date.parse(visit.starts_at)+Number(visit.minutes||30)*60000)>Date.now());
+ }
+ function renderList(){
+   const upcoming=filter.value==='next';
+   const rows=visits.filter(visit=>currentVisit(visit)===upcoming)
+       .sort((a,b)=>(upcoming?1:-1)*(Date.parse(a.starts_at)-Date.parse(b.starts_at)));
+   list.innerHTML=rows.map(v=>'<button type="button" class="hc297Visit" data-visit="'+E(v.id)+'"><b>'+
+      E(v.peer_name||v.client)+'</b><span>'+E(when(v.starts_at))+'</span><span>'+
+      E(STATES[v.status]||v.status)+' · '+(v.is_trial?'Prueba gratuita':money(v.total_cents))+'</span>'+
+      E(v.location_snapshot)+'</button>').join('')||
+      (upcoming?'<p>No tenés consultas próximas. Revisá tu disponibilidad en Días, horarios y tarifas.</p>':'<p>Todavía no hay consultas en el historial.</p>');
+   list.querySelectorAll('[data-visit]').forEach(button=>button.onclick=()=>open(button.dataset.visit));
+ }
+ async function refresh(){
+   if(reload.disabled)return;
+   reload.disabled=true;status.textContent='Actualizando consultas…';
+   try{
+     const result=await api('myVisits');
+     if(!root.isConnected||workspaceOwner!==owner())return;
+     visits=(result.visits||[]).filter(visit=>visit.mode===mode);
+     loaded=true;renderList();status.textContent='';
+   }catch(error){
+     if(root.isConnected)status.textContent='No se pudieron actualizar las consultas. '+error.message;
+   }finally{reload.disabled=false;}
+ }
+ filter.onchange=()=>{if(loaded)renderList();};
+ $('[data-visit-back]',root).onclick=()=>{
+   openSequence++;const selected=visitPane.dataset.visitId;
+   visitPane.hidden=true;root.classList.remove('hc309VisitOpen');
+   [...list.querySelectorAll('[data-visit]')].find(button=>button.dataset.visit===selected)?.focus();
+ };
+ async function open(id){const sequence=++openSequence;const main=$('[data-visit-content]',root);
+ visitPane.hidden=false;visitPane.dataset.visitId=id;root.classList.add('hc309VisitOpen');
+ main.innerHTML='<p role="status">Abriendo consulta…</p>';try{const j=await api('visit',{visitId:id});if(!root.isConnected||workspaceOwner!==owner()||sequence!==openSequence)return;const v=j.visit;main.innerHTML='<h2>'+E(j.peerName)+'</h2><p>DNI '+E(j.patient?.dni)+' · '+E(when(v.starts_at))+'</p><p>'+E(v.location_snapshot)+'</p><div class="hc289Slots">'+(v.mode==='telemedicine'&&['confirmed','active'].includes(v.status)?'<button data-video>Comenzar videollamada</button>':'')+'<button data-summary>Gestionar consulta</button></div><div data-notes></div><div data-documents></div>';$('[data-video]',main)?.addEventListener('click',()=>window.hc292OpenVideo(id));$('[data-summary]',main).onclick=()=>window.hc292Visit(id);const notes=$('[data-notes]',main),docs=$('[data-documents]',main);
  await Promise.all([
    window.hc297MountClinical(notes,id),
    window.hc292Documents(docs,id,j).catch(error=>{docs.textContent='Documentos: '+error.message;})
@@ -51395,6 +51434,17 @@ body[data-hc289-mode=light] .hc289Dialog.hc309Agenda.hc298ServiceActive [data-da
   background: #e5f6eb !important; color: #164c2b !important; border-color: #78ab8b !important;
 }
 .hc309Agenda [data-week] .hc297Window + .hc297Window { border-top: 1px solid var(--hc-theme-line); padding-top: 5px; }
+#hc297Workspace [data-visit-back] { margin-bottom: 6px; }
+#hc297Workspace main[hidden] { display: none !important; }
+#hc297Workspace .hc309VisitFilters { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+#hc297Workspace .hc309VisitFilters label { display: grid; gap: 3px; min-width: 0; flex: 1 1 150px; }
+#hc297Workspace .hc309VisitFilters select {
+  width: 100%; min-height: 38px; padding: 5px; background: var(--hc-theme-surface);
+  border: 1px solid var(--hc-theme-line); border-radius: 7px; color: var(--hc-theme-text);
+}
+@media(max-width:760px) {
+  #hc297Workspace.hc309VisitOpen aside { display: none; }
+}
 </style>
 <script id="hc-v309-ui">
 /* Keep the original forms and their in-flight work while changing what the user sees. */

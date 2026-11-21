@@ -21,7 +21,9 @@ async function run() {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
       const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[];
-      let failDirectory=true;
+      let failDirectory=true,resolveNote;
+      const prior={id:'consulta-anterior',mode:'office',status:'finished',starts_at:new Date(date.getTime()-86400000).toISOString(),minutes:30,is_trial:true,peer_name:'Persona anterior'};
+      const upcoming={...prior,id:'consulta-proxima',status:'confirmed',starts_at:new Date(date.getTime()+3600000).toISOString(),peer_name:'Persona próxima'};
       const next = new Date(date);next.setDate(next.getDate()+6);next.setHours(15,0,0,0);
       const nextDay = [next.getFullYear(),String(next.getMonth()+1).padStart(2,'0'),String(next.getDate()).padStart(2,'0')].join('-');
       page.setDefaultTimeout(8000);
@@ -49,6 +51,13 @@ async function run() {
             visits.push(visit);
             return route.fulfill({json:{ok:true,visit}});
           }
+          if(b.action==='myVisits'&&!b.token)return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
+          if(b.action==='clinicalRecord')return route.fulfill({json:{ok:true,note:null,history:[]}});
+          if(b.action==='saveClinicalRecord'){
+            await new Promise(resolve=>{resolveNote=resolve;});
+            return route.fulfill({json:{ok:true,note:{revision:1}}});
+          }
+          if(b.action==='visit'&&!b.token)return route.fulfill({json:{ok:true,side:'provider',visit:upcoming,peerName:upcoming.peer_name}});
           if(b.action==='visit')return route.fulfill({json:{ok:true,visit:visits.find(v=>v.id===b.visitId),side:'client',peerName:provider.name,payments:[]}});
           if(b.action==='documents')return route.fulfill({json:{ok:true,documents:[]}});
           if(b.action==='saveProfile')return route.fulfill({json:{ok:true,profile:{...b.profile,revision:1}}});
@@ -132,6 +141,23 @@ async function run() {
       assert((await saved).postDataJSON().profile.modes.office.rates.some(rate=>rate.minutes===30&&rate.amount_cents===180000));
       await agenda.getByText(/Guardado en el servidor/).waitFor();
       await agenda.locator('button[aria-label^="Cerrar"],[data-close]').first().click();
+      const workspace=page.locator('#hc297Workspace');
+      await workspace.locator('[data-visit-filter]').selectOption('past');
+      assert(await workspace.getByRole('button',{name:/Persona anterior/}).isVisible());
+      await workspace.locator('[data-visit-filter]').selectOption('next');
+      await workspace.getByRole('button',{name:/Persona próxima/}).click();
+      const note=workspace.locator('textarea[name=plan]');
+      await note.fill('Texto inicialmente guardado');
+      const pendingSave=page.waitForRequest(req=>req.method()==='POST' && req.postDataJSON()?.action==='saveClinicalRecord');
+      await workspace.getByRole('button',{name:'Guardar evolución'}).click();
+      await pendingSave;
+      await note.fill('Borrador nuevo');
+      resolveNote();
+      await workspace.getByText(/cambios posteriores pendientes/).waitFor();
+      await workspace.locator('[data-visit-back]').click();
+      await workspace.getByRole('button',{name:/Persona próxima/}).click();
+      await note.waitFor();
+      assert.equal(await note.inputValue(),'Borrador nuevo');
       await page.evaluate(()=>document.querySelector('#hc297Workspace')?.remove());
       await page.evaluate(()=>hc289EnterClient({token:'fixture',user:{username:'test',name:'Paciente de prueba',role:'cliente'}}));
       await page.locator('[data-hc305-nav=turnos]').click();

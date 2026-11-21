@@ -65,3 +65,14 @@ body[data-hc289-mode=light] .hc289Dialog.hc309Agenda.hc298ServiceActive [data-da
   background: #e5f6eb !important; color: #164c2b !important; border-color: #78ab8b !important;
 }
 .hc309Agenda [data-week] .hc297Window + .hc297Window { border-top: 1px solid var(--hc-theme-line); padding-top: 5px; }
+#hc297Workspace [data-visit-back] { margin-bottom: 6px; }
+#hc297Workspace main[hidden] { display: none !important; }
+#hc297Workspace .hc309VisitFilters { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+#hc297Workspace .hc309VisitFilters label { display: grid; gap: 3px; min-width: 0; flex: 1 1 150px; }
+#hc297Workspace .hc309VisitFilters select {
+  width: 100%; min-height: 38px; padding: 5px; background: var(--hc-theme-surface);
+  border: 1px solid var(--hc-theme-line); border-radius: 7px; color: var(--hc-theme-text);
+}
+@media(max-width:760px) {
+  #hc297Workspace.hc309VisitOpen aside { display: none; }
+}
