@@ -170,14 +170,14 @@ async function run() {
             visits.push(visit);
             return route.fulfill({json:{ok:true,visit}});
           }
-          if(b.action==='myVisits'&&!b.token)return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
-          if(b.action==='notifications'&&b.token)return route.fulfill({json:{ok:true,notifications:[{
+          if(b.action==='myVisits'&&b.token==='fixture-professional')return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
+          if(b.action==='notifications'&&b.token!=='fixture-professional')return route.fulfill({json:{ok:true,notifications:[{
             id:'recordatorio-ficticio',kind:'tele_reminder',title:'Recordatorio de turno · 24 horas',body:'Turno de prueba'
           },...waitlist.map(()=>({
             id:'wait-notice-ficticio',kind:'appointment_waitlist',title:'Se liberó un turno',body:'Horario ficticio',
             payload:{mode:'office',providerId:'qa',role:'medico',specialty:'Cardiología',local:alternativeSlot.local,minutes:15}
           }))]}});
-          if(b.action==='notifications'&&!b.token)return route.fulfill({json:{ok:true,notifications:[{
+          if(b.action==='notifications'&&b.token==='fixture-professional')return route.fulfill({json:{ok:true,notifications:[{
             id:'aviso-ficticio',kind:'tele_booking',title:'Nueva solicitud de turno',body:'Atención a Domicilio',
             payload:{visitId:'aviso-domicilio',mode:'home'}
           }]}});
@@ -187,7 +187,7 @@ async function run() {
             await new Promise(resolve=>{resolveNote=resolve;});
             return route.fulfill({json:{ok:true,note:{revision:1}}});
           }
-          if(b.action==='visit'&&!b.token)return route.fulfill({json:{ok:true,side:'provider',visit:upcoming,peerName:upcoming.peer_name}});
+          if(b.action==='visit'&&b.token==='fixture-professional')return route.fulfill({json:{ok:true,side:'provider',visit:upcoming,peerName:upcoming.peer_name}});
           if(b.action==='visit')return route.fulfill({json:{ok:true,visit:visits.find(v=>v.id===b.visitId),side:'client',peerName:provider.name,payments:[]}});
           if(b.action==='documents')return route.fulfill({json:{ok:true,documents:[]}});
           if(b.action==='saveProfile')return route.fulfill({json:{ok:true,profile:{...b.profile,revision:1}}});
@@ -213,11 +213,10 @@ async function run() {
         selectedPatientId='p';medTab='ingreso';showAppByRole('medico');renderMed();
         localStorage.setItem('hc289.visual.qa308',JSON.stringify({mode:'light',font:'default',color:'default'}));window.hc289ApplyVisual();
       });
-      if(width<800) {
-        await page.locator('.hc308ModulePicker').selectOption('evolucion');
-      } else await page.locator('[data-medtab=evolucion]').click();
+      assert.equal(await page.locator('.hc308ModulePicker').count(),0);
+      await page.locator('[data-medtab=evolucion]').click();
       await page.locator('#btnNuevaEvo').click();
-      await page.locator('#evo_dx').fill('Diagnóstico de prueba');
+      await page.locator('#evo_dx + .hc320Rich .hc320RichInput').fill('Diagnóstico de prueba');
       await page.locator('#arm_on').check();
       const mode=page.locator('#arm_modo');
       const first=await mode.locator('option').evaluateAll(options=>options.find(o=>o.value)?.value);
@@ -225,7 +224,7 @@ async function run() {
       const dynamic=page.locator('#armBlock input[type=number]').first();
       if(await dynamic.count()) await dynamic.fill('22');
       await page.locator('#btnEvoModeLibre').click();
-      await page.locator('#evo_free').fill('Texto de prueba');
+      await page.locator('#evo_free + .hc320Rich .hc320RichInput').fill('Texto de prueba');
       await page.locator('#btnEvoModePlantilla').click();
       assert.equal(await page.locator('#evo_dx').inputValue(),'Diagnóstico de prueba');
       assert(await page.locator('#arm_on').isChecked());
@@ -283,6 +282,7 @@ async function run() {
       await page.keyboard.press('Escape');
       await page.evaluate(()=>{
         saveJSON(LS.globalAuthUser,{username:'qa308',name:'Profesional de prueba',role:'medico'});
+        localStorage.setItem(LS.globalAuthToken,'fixture-professional');
         return hc297Workspace('office');
       });
       const workspace=page.locator('#hc297Workspace');
@@ -295,17 +295,25 @@ async function run() {
       await centeredIcon(professionalAvatar,'img');
       await professionalAvatar.evaluate(button=>window.HC310.avatar(button,{}));
       const accountMenu=page.locator('#hc289AccountMenu');
-      if(width<800){
-        await professionalAvatar.tap();
+      const openProfessionalMenu=async()=>{
+        if(width<800)await professionalAvatar.tap();else await professionalAvatar.hover();
         await accountMenu.waitFor();
-        await professionalAvatar.tap();
-      }else{
-        await professionalAvatar.hover();
-        await accountMenu.waitFor();
-        await professionalAvatar.click();
-      }
-      await page.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
-      const professionalName=page.locator('#hc289Dialog [data-hc314-row=name]');
+      };
+      await openProfessionalMenu();
+      await accountMenu.getByRole('menuitem',{name:'Cambiar lugar de atención'}).click();
+      await page.locator('#btnCloseInstitutionChooser').click();
+      assert.equal(await workspace.getAttribute('data-mode'),'office');
+      const workplaceDay=workspace.locator('[data-agenda-month] .hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]');
+      await workplaceDay.click();
+      await workspace.locator('[data-agenda-day] [data-calendar-visit]').first().waitFor();
+      await workspace.locator('[data-day-back]').click();
+      await workspace.locator('[data-month-picker]').click();
+      await page.locator('dialog[open] [name=month]').waitFor();
+      await page.locator('dialog[open] [data-hc320-close]').click();
+      await openProfessionalMenu();
+      await accountMenu.getByRole('menuitem',{name:'Perfil',exact:true}).click();
+      await page.locator('#hcSettingsModal').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      const professionalName=page.locator('#hcSettingsContent [data-hc314-row=name]');
       await professionalName.getByText('Profesional de prueba').waitFor();
       await professionalName.getByRole('button',{name:'Editar Nombre visible'}).click();
       const nameEditor=professionalName.getByRole('textbox',{name:'Nombre visible'});
@@ -313,17 +321,20 @@ async function run() {
       await professionalName.getByRole('button',{name:'Cancelar'}).click();
       assert.equal(await nameEditor.count(),0);
       await professionalName.getByText('Profesional de prueba').waitFor();
-      await page.locator('#hc289Dialog').getByRole('button',{name:'Apariencia',exact:true}).click();
-      await page.locator('#hc289Dialog [data-vmode=dark]').waitFor();
-      const professionalFormat=page.locator('#hc289Dialog .hc313Format');
+      await page.locator('#hcSettingsCloseBtn').click();
+      await openProfessionalMenu();
+      await accountMenu.getByRole('menuitem',{name:'Configuración',exact:true}).click();
+      await page.locator('#hcSettingsContent [data-vmode=dark]').waitFor();
+      const professionalFormat=page.locator('#hcSettingsContent .hc313Format');
       await professionalFormat.getByLabel('Formato de fecha').selectOption('iso');
       await professionalFormat.getByLabel('Formato de hora').selectOption('12h');
       assert.equal(await page.evaluate(()=>dmyhmFromISODateTime('2026-11-12T13:00')),'2026-11-12 1:00 p. m.');
       await professionalFormat.getByLabel('Formato de fecha').selectOption('dmy');
       await professionalFormat.getByLabel('Formato de hora').selectOption('24h');
 
-      await page.locator('#hc289Dialog [data-289-close]').click();
-      await page.locator('#hc297Workspace [data-settings]').click();
+      await page.locator('#hcSettingsCloseBtn').click();
+      await openProfessionalMenu();
+      await accountMenu.getByRole('menuitem',{name:'Días, horarios y tarifas',exact:true}).click();
       const agenda=page.locator('.hc298Compact');
       await agenda.waitFor();
       assert(await agenda.locator('summary img[alt="Foto de perfil"]').isVisible());
@@ -361,7 +372,7 @@ async function run() {
       assert(await workspace.getByRole('button',{name:/Persona anterior/}).isVisible());
       await workspace.locator('[data-visit-filter]').selectOption('next');
       await workspace.getByRole('button',{name:/Persona próxima/}).click();
-      const note=workspace.locator('textarea[name=plan]');
+      const note=workspace.locator('textarea[name=plan] + .hc320Rich .hc320RichInput');
       await note.fill('Texto inicialmente guardado');
       const pendingSave=page.waitForRequest(req=>req.method()==='POST' && req.postDataJSON()?.action==='saveClinicalRecord');
       await workspace.getByRole('button',{name:'Guardar evolución'}).click();
@@ -372,9 +383,10 @@ async function run() {
       await workspace.locator('[data-visit-back]').click();
       await workspace.getByRole('button',{name:/Persona próxima/}).click();
       await note.waitFor();
-      assert.equal(await note.inputValue(),'Borrador nuevo');
-      await workspace.getByRole('button',{name:'Avisos · 1'}).click();
-      await page.locator('#hc289Dialog').getByRole('button',{name:'Ver turno',exact:true}).click();
+      assert.equal(await note.innerText(),'Borrador nuevo');
+      await openProfessionalMenu();
+      await accountMenu.getByRole('menuitem',{name:'Avisos',exact:true}).click();
+      await page.locator('#hcSettingsContent').getByRole('button',{name:'Ver turno',exact:true}).click();
       await workspace.getByRole('heading',{name:'Paciente de domicilio'}).waitFor();
       assert.equal(await workspace.getAttribute('data-mode'),'home');
       await page.evaluate(()=>document.querySelector('#hc297Workspace')?.remove());
@@ -396,7 +408,7 @@ async function run() {
       for(const theme of ['light','dark']){
         await page.evaluate(theme=>{localStorage.setItem('hc289.visual.test',JSON.stringify({mode:theme,color:'default'}));hc289ApplyVisual();},theme);
         await contrast(start);
-        await contrast(portal.locator('.hc310MonthHeader h2'));
+        await contrast(portal.locator('.hc310MonthHeader [data-month-picker]'));
       }
       await capture(page,'calendario-'+width);
       const mainPane=portal.locator('#hc289PortalMain');

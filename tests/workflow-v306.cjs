@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 let scripts=0;for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++;}}
 const expectedVersion = 'v' + html.match(/const CURRENT_VERSION = (\d+);/)[1];
-const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62,v311:63,v312:63,v313:64,v314:65,v315:66,v316:67,v317:68}[expectedVersion];
+const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62,v311:63,v312:63,v313:64,v314:65,v315:66,v316:67,v317:68,v320:70}[expectedVersion];
 assert(html.includes('id="hc-v306-ui"'));assert.equal(scripts,expectedScripts);
 function fn(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=html.indexOf('{',start);for(let i=open;i<html.length;i++){if(html[i]==='{')depth++;if(html[i]==='}'&&!--depth)return html.slice(start,i+1);}throw Error(name);}
 const now=Date.parse('2026-11-21T02:00:00-03:00');class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
@@ -61,6 +61,16 @@ const {chromium}=require('playwright'),http=require('node:http');
   ok('print status',buildMicroResultPretty(micro).includes('DEFINITIVO'));
   session.role='medico';const rx=hcEnsureClinicalPatient('p306');rx.cur.prescripciones.infusionesContinuas.push({id:'inf306',drugId:'noradrenalina',drugName:'Noradrenalina',type:'infusion_continua',via:'EV',regularidad:'continua',active:true,rateMlH:10,mlHour:10,volumeMl:100,totalAmount:4,totalAmountUnit:'mg',weightKg:70,startedAt:isoNowLocalFull(),createdAt:isoNowLocalFull()});rx.cl.p306=rx.cur;setClinical(rx.cl);medTab='prescripciones';renderMed();const first=document.querySelector('#medPres').firstElementChild;renderPrescripciones();ok('stable DOM',first===document.querySelector('#medPres').firstElementChild);
   const infusion=document.querySelector('[data-pr-item-id="inf306"]');ok('infusion rate arrows',!!infusion?.querySelector('[data-pr-action="dose-up"]')&&!!infusion?.querySelector('[data-pr-action="dose-down"]'));
+  if(expectedVersion==='v320'){
+   const rate=()=>Number(getClinical().p306.prescripciones.infusionesContinuas.find(item=>item.id==='inf306').mlHour);
+   const oldRate=rate();
+   infusion.querySelector('[data-pr-action="dose-up"]').click();
+   ok('higher dose persisted',rate()>oldRate);
+   renderPrescripciones();
+   ok('dose arrows preserve the prescription row',infusion===document.querySelector('[data-pr-item-id="inf306"]'));
+   infusion.querySelector('[data-pr-action="dose-down"]').click();
+   ok('lower dose persisted',Math.abs(rate()-oldRate)<1e-9);
+  }
   const pencil=infusion.querySelector('.hc306RxEdit'),pause=infusion.querySelector('.hcRxCompactControls [data-pr-action="pause"]');ok('compact actions',!!pencil&&getComputedStyle(pause).display==='none');pencil.click();ok('pencil opens actions',getComputedStyle(pause).display!=='none');pencil.click();
   ok('current order filter',window.hc306IsCurrentPrescription({id:'a',active:true})&&!window.hc306IsCurrentPrescription({id:'b',suspendedAt:isoNowLocalFull()})&&!window.hc306IsCurrentPrescription({id:'c',finishedAt:isoNowLocalFull()}));
   window.hc306RememberRoute();const route=JSON.parse(localStorage.getItem('hc306.route.test306|test306'));ok('route persisted',route.patient==='p306'&&route.tab==='prescripciones');
@@ -102,11 +112,11 @@ const {chromium}=require('playwright'),http=require('node:http');
  console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
  const layout=await page.evaluate(()=>{document.body.classList.add('hcMobile');const h=document.querySelector('#hc306ClinicalHeader');return {sticky:getComputedStyle(h).position,width:document.documentElement.scrollWidth,viewport:innerWidth,light:document.body.dataset.hc289Mode,logoutVisible:document.querySelector('#btnLogout').getClientRects().length>0};});
- assert.equal(layout.sticky,'sticky');assert.equal(layout.logoutVisible,false);assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
+ assert.equal(layout.sticky,expectedVersion==='v320'?'static':'sticky');assert.equal(layout.logoutVisible,false);assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
  await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='2000px';spacer.id='hc306StickyTest';document.querySelector('#medPanel').append(spacer);window.scrollTo(0,450);});
  await page.waitForTimeout(1100);
  const sticky=await page.evaluate(()=>({top:document.querySelector('#hc306ClinicalHeader').getBoundingClientRect().top,bar:document.querySelector('.topbar').getBoundingClientRect().bottom,scroll:scrollY}));
- assert(sticky.scroll>100&&Math.abs(sticky.top-sticky.bar)<4,JSON.stringify(sticky));console.log('PASS headers remain visible while scrolling',sticky);
+ assert(sticky.scroll>100&&(expectedVersion==='v320'?sticky.top<sticky.bar-10:Math.abs(sticky.top-sticky.bar)<4),JSON.stringify(sticky));console.log('PASS clinical header scroll behavior',sticky);
  await page.evaluate(()=>window.scrollTo(0,0));
  if(['v307','v308','v309','v310'].includes(expectedVersion)){
   for(const width of [320,390,844,1280]){

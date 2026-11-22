@@ -1,0 +1,363 @@
+{
+  "edits": [
+    [
+      "    <div class=\"muted\" id=\"whoami\" style=\"font-size:12px;\">sin sesión</div>\n",
+      ""
+    ],
+    [
+      "    <button class=\"btn small\" id=\"btnAccount\"",
+      "    <div class=\"muted\" id=\"whoami\" hidden></div>\n    <button class=\"btn small\" id=\"btnAccount\""
+    ],
+    [
+      "  $(\"#whoami\").textContent = \"sin sesión\";",
+      "  $(\"#whoami\").hidden = true;\n  $(\"#whoami\").textContent = \"\";"
+    ],
+    [
+      "  $(\"#whoami\").textContent = `${session.name || session.username} • ${session.role}`;",
+      "  $(\"#whoami\").hidden = false;\n  $(\"#whoami\").textContent = session.name || \"\";"
+    ],
+    [
+      "    el.innerHTML = `bioquimico • ${me.name} ${count>0 ? \"🔴 \"+count+\" pendientes\" : \"\"}`;",
+      "    el.title = count>0 ? `${count} solicitudes pendientes` : \"\";"
+    ],
+    [
+      "if(account){window.HC310?.avatar(account,U());account.setAttribute('aria-haspopup','menu');account.setAttribute('aria-controls',menu.id);if(!account.hasAttribute('aria-expanded'))account.setAttribute('aria-expanded','false');const who=q('#whoami');if(who&&account.parentElement){const u=U(),text=(u.name||session?.name||'')+' · @'+(u.username||session?.username||'');if(session&&who.textContent!==text)who.textContent=text;}}",
+      "if(account){const active=session?.localSeed?(findUserByUsername(session.username)||session):U();window.HC310?.avatar(account,active);account.setAttribute('aria-label','Cuenta');account.title='Cuenta';account.setAttribute('aria-haspopup','menu');account.setAttribute('aria-controls',menu.id);if(!account.hasAttribute('aria-expanded'))account.setAttribute('aria-expanded','false');const who=q('#whoami'),name=active?.name||session?.name||'';if(who){who.hidden=!session||!name;if(who.textContent!==name)who.textContent=name;}if(session?.role==='admin')account.style.display='inline-flex';}"
+    ],
+    [
+      "body.hcSeedTool #btnAccount{display:none!important}body.hcSeedTool #hcSettingsNav [data-hcs-section]:not([data-hcs-section=\"members\"]){display:none!important}",
+      ""
+    ],
+    [
+      " if(session?.localSeed){const a=$('#btnAccount');if(a)a.style.display='none';}\n",
+      ""
+    ],
+    [
+      "  const settingsNav=()=>settingsWorkspace?WORKSPACE_NAV:NAV;",
+      "  const settingsNav=()=>settingsWorkspace?WORKSPACE_NAV:NAV.filter(item=>session?.role!==\"admin\"||item.id!==\"signature\");"
+    ],
+    [
+      "    ...NAV.filter(item=>item.group===\"Cuenta\"),",
+      "    ...NAV.filter(item=>item.group===\"Cuenta\"),\n    {group:\"Atención\",id:\"private-workspaces\",icon:\"◇\",label:\"Cambiar lugar de atención\",sub:\"Modalidades e instituciones\"},"
+    ],
+    [
+      "    if(settingsWorkspace&&(id===\"agenda\"||id===\"alerts\")){",
+      "    if(settingsWorkspace&&id===\"private-workspaces\"){\n      const button=document.createElement(\"button\");\n      button.type=\"button\";button.className=\"hcSettingsBtn\";button.textContent=\"Cambiar lugar de atención\";\n      button.onclick=settingsWorkspace.hc320Switch;\n      box.replaceChildren(button);\n      return;\n    }\n    if(settingsWorkspace&&(id===\"agenda\"||id===\"alerts\")){"
+    ],
+    [
+      "const accountEntries=workspace?[['Perfil','account'],['Avisos','notifications'],['Configuración','settings'],['SALIR','logout']]:",
+      "const accountEntries=workspace?[['Cambiar lugar de atención','private-workspaces'],['Días, horarios y tarifas','agenda'],['Perfil','account'],['Avisos','notifications'],['Configuración','settings'],['SALIR','logout']]:"
+    ],
+    [
+      "&&(id!=='private-workspaces'||(!client&&window.hc297IsProfessional?.(U())))",
+      "&&(id!=='private-workspaces'||!!workspace||(!client&&window.hc297IsProfessional?.(U())))"
+    ],
+    [
+      "['Atención', ['private-workspaces', 'shift',",
+      "['Atención', ['private-workspaces', 'agenda', 'shift',"
+    ],
+    [
+      " }if(!window.HC310.touch(e)||!menu.hidden&&menuTrigger===account){",
+      " }if(account.id==='btnAccount'||account.matches('[data-pro-profile]')){\n   if(window.HC310.touch(e)&&!menu.hidden&&menuTrigger===account)closeMenu();else openMenu(account);\n   return;\n }if(!window.HC310.touch(e)||!menu.hidden&&menuTrigger===account){"
+    ],
+    [
+      "$('#hc289AccountMenu').hidden=true;window.hcSettingsClose?.();hcInstitutionChooserOpen",
+      "$('#hc289AccountMenu').hidden=true;const workspace=$('#hc297Workspace');if(workspace)return workspace.hc320Switch();window.hcSettingsClose?.();hcInstitutionChooserOpen"
+    ],
+    [
+      " nativeChooser(rows,opts);\n const list=",
+      " const workspace=$('#hc297Workspace');\n nativeChooser(rows,opts);\n if(workspace){\n   workspace.inert=true;\n   $('#btnCloseInstitutionChooser').focus();\n   for(const button of document.querySelectorAll('#institutionChooserList [data-institution-id]')){\n     const clean=button.cloneNode(true);\n     button.replaceWith(clean);\n     clean.onclick=async()=>{\n       const controls=[...document.querySelectorAll('#institutionChooserList button,#btnCloseInstitutionChooser')];\n       controls.forEach(control=>control.disabled=true);\n       try{if(await hcGlobalEnterInstitution(clean.dataset.institutionId))workspace.remove();}\n       finally{controls.forEach(control=>control.disabled=false);}\n     };\n   }\n }\n const list="
+    ],
+    [
+      "const modal=document.getElementById(\"institutionChooserModal\");modal?.classList.remove(\"show\");modal?.setAttribute(\"aria-hidden\",\"true\");",
+      "const modal=document.getElementById(\"institutionChooserModal\"),wasOpen=modal?.classList.contains(\"show\");modal?.classList.remove(\"show\");modal?.setAttribute(\"aria-hidden\",\"true\");\n  const workspace=document.getElementById(\"hc297Workspace\");\n  if(wasOpen&&workspace){workspace.inert=false;workspace.querySelector(\"[data-pro-profile]\")?.focus({preventScroll:true});}"
+    ],
+    [
+      "+'</b><small>'+E(user().name)+'</small></div><button type=\"button\" data-settings>'+window.hc289Icon('settings')+'<span>Configuración</span></button><button type=\"button\" data-pro-profile aria-label=\"Perfil\" aria-haspopup=\"menu\" aria-expanded=\"false\">Perfil</button><button type=\"button\" data-switch>Cambiar lugar de atención</button></header>",
+      "+'</b></div><div class=\"hc320AccountGroup\"><small data-workspace-name>'+E(user().name)+'</small><button type=\"button\" data-pro-profile aria-label=\"Cuenta\" aria-haspopup=\"menu\" aria-expanded=\"false\">Cuenta</button></div></header>"
+    ],
+    [
+      " $('[data-settings]',root).onclick=()=>window.hcSettingsOpen('agenda',root);\n",
+      ""
+    ],
+    [
+      "settings:'personalization',notifications:'alerts'",
+      "settings:'personalization',notifications:'alerts',agenda:'agenda'"
+    ],
+    [
+      " $('[data-switch]',root).onclick=()=>{root.remove();hcInstitutionChooserOpen(hcGlobalStoredInstitutions?.()||[],{required:!session,switching:!!session});};",
+      " root.hc320Switch=()=>{window.hcSettingsClose?.();hcInstitutionChooserOpen(hcGlobalStoredInstitutions?.()||[],{switching:true});};"
+    ],
+    [
+      "#hc297Workspace > header > div > small",
+      "#hc297Workspace [data-workspace-name]"
+    ],
+    [
+      "      <button class=\"btn small\" type=\"submit\">Buscar historia clínica</button>\n",
+      ""
+    ],
+    [
+      "      <input id=\"hc270PatientQuery\" type=\"search\" placeholder=\"DNI o apellido y nombre\" autocomplete=\"off\" />",
+      "      <div class=\"hc320PatientQuery\"><input id=\"hc270PatientQuery\" type=\"search\" placeholder=\"DNI o apellido y nombre\" autocomplete=\"off\" /><button class=\"btn small\" type=\"submit\" aria-label=\"Buscar historia clínica\">Buscar historia clínica</button></div>"
+    ],
+    [
+      "\"+ Nueva prescripción\"",
+      "\"Nueva prescripción\""
+    ],
+    [
+      "edit.textContent='Acciones';edit.title=",
+      "edit.innerHTML=window.hc289Icon('edit');edit.classList.add('hc312IconOnly');edit.title="
+    ],
+    [
+      "<script id=\"hc-v308-ui\">\n/* Use the same clinical navigation buttons and role rules for the mobile picker. */\n(() => {\n  const tabs = document.querySelector('#hc306ClinicalHeader .medModuleTabs');\n  if (!tabs) return;\n  const picker = document.createElement('select');\n  picker.className = 'hc308ModulePicker';\n  picker.setAttribute('aria-label', 'Ir a un módulo de la historia clínica');\n  const groups = [\n    ['Historia clínica', ['ingreso', 'historia', 'evolucion', 'epicrisis', 'consentimientos']],\n    ['Atención diaria', ['prescripciones', 'sv', 'bal', 'invasiones', 'informes_enfermeria', 'monitoreos', 'escalas']],\n    ['Estudios y servicios', ['laboratorio', 'micro', 'imagenes', 'nutricion', 'hemoterapia', 'kinesiologia', 'foja_quirurgica', 'consultorios']]\n  ];\n  function availableTabs() {\n    return [...tabs.querySelectorAll('button[data-medtab]')].filter(button =>\n      !button.disabled && !button.hidden && !button.closest('[inert]') &&\n      getComputedStyle(button).display !== 'none' && getComputedStyle(button).visibility !== 'hidden'\n    );\n  }\n  function syncPicker() {\n    const buttons = availableTabs();\n    const prompt = new Option('Módulos', '');\n    prompt.disabled = true;\n    picker.replaceChildren(prompt);\n    const assigned = new Set();\n    for (const [name, keys] of groups) {\n      const group = document.createElement('optgroup');\n      group.label = name;\n      for (const button of buttons.filter(item => keys.includes(item.dataset.medtab))) {\n        group.append(new Option(button.textContent.trim(), button.dataset.medtab));\n        assigned.add(button);\n      }\n      if (group.childElementCount) picker.append(group);\n    }\n    for (const button of buttons.filter(item => !assigned.has(item))) {\n      picker.append(new Option(button.textContent.trim(), button.dataset.medtab));\n    }\n    picker.value = '';\n    picker.hidden = !buttons.length || tabs.hidden || getComputedStyle(tabs).display === 'none';\n  }\n  picker.onchange = () => {\n    const chosen = availableTabs().find(button => button.dataset.medtab === picker.value);\n    picker.value = '';\n    chosen?.click();\n  };\n  tabs.before(picker);\n  syncPicker();\n  picker.addEventListener('pointerdown', syncPicker);\n  picker.addEventListener('focus', syncPicker);\n  new MutationObserver(syncPicker).observe(tabs, {\n    childList: true, subtree: true, attributes: true, attributeFilter: ['style','hidden','disabled']\n  });\n})();\n</script>\n",
+      ""
+    ],
+    [
+      " const dayPanel=$('[data-agenda-day]',host), status=$('[data-agenda-status]',host);",
+      " const dayPanel=$('[data-agenda-day]',host), status=$('[data-agenda-status]',host), monthHost=$('[data-agenda-month]',host);\n const title=$('#hc318AgendaTitle',host);\n function showOverview(){\n   dayPanel.hidden=true;monthHost.hidden=false;title.hidden=false;\n   $('[data-day-key][aria-pressed=true]:not([disabled])',monthHost)?.focus({preventScroll:true});\n }\n function openDay(key){\n   monthHost.hidden=true;title.hidden=true;dayPanel.hidden=false;\n   showDay(key);\n   $('h2',dayPanel)?.focus({preventScroll:true});\n }\n dayPanel.addEventListener('click',event=>{if(event.target.closest('[data-day-back]'))showOverview();});"
+    ],
+    [
+      "   const content='<h3>'+E(window.HC313.dayLabel(key))+'</h3>'+",
+      "   const content='<div class=\"hc320DayHeader\"><h2 tabindex=\"-1\">'+E(window.HC313.dayLabel(key))+'</h2><button type=\"button\" data-day-back class=\"hc311Close\" aria-label=\"Volver al calendario\" title=\"Volver al calendario\">'+window.hc289Icon('close')+'</button></div>'+"
+    ],
+    [
+      "     (rows.length?rows.map(visit=>'<button type=\"button\" class=\"hc318AgendaVisit\"",
+      "     (rows.length?rows.map(visit=>'<article class=\"hc320DayVisit\"><button type=\"button\" class=\"hc318AgendaVisit\""
+    ],
+    [
+      "' · '+E(STATES[visit.status]||visit.status)+'</small></span></button>').join(''):",
+      "' · '+E(STATES[visit.status]||visit.status)+'</small></span></button>'+window.HC320Route.markup(visit,'provider')+'</article>').join(''):"
+    ],
+    [
+      "   dayPanel.innerHTML=content;\n   for",
+      "   dayPanel.innerHTML=content;\n   window.HC320Route.bind(dayPanel,rows,'provider');\n   for"
+    ],
+    [
+      "   onDay:showDay,\n   getEvents:key=>eventsFor",
+      "   onDay:openDay,\n   getEvents:key=>eventsFor"
+    ],
+    [
+      "<section data-agenda-day></section>",
+      "<section data-agenda-day hidden></section>"
+    ],
+    [
+      "dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML=window.HC314.sectionHeader(window.HC313.dayLabel(key))+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'');updatePortalNavigation();}",
+      "dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);const markup=window.HC314.sectionHeader(window.HC313.dayLabel(key))+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'');if(main().hc320DayMarkup!==markup||!main().querySelector('.hc314SectionHead')){main().hc320DayMarkup=markup;main().innerHTML=markup;window.HC320Route.bind(main(),rows,'client');}updatePortalNavigation();}"
+    ],
+    [
+      "+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class=\"hc305AppointmentActions\">'",
+      "+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+((main()?.dataset.view==='day')?window.HC320Route.markup(b,'client'):'')+'<div class=\"hc305AppointmentActions\">'"
+    ],
+    [
+      "+'</button><h2></h2><button type=\"button\" class=\"hc312IconOnly\" data-next",
+      "+'</button><h2><button type=\"button\" data-month-picker aria-label=\"Elegir mes y año\"></button></h2><button type=\"button\" class=\"hc312IconOnly\" data-next"
+    ],
+    [
+      "$('.hc310MonthHeader h2',host).textContent=",
+      "$('[data-month-picker]',host).textContent="
+    ],
+    [
+      "    $('[data-prev]',host).onclick=()=>move(-1,true);",
+      "    $('[data-month-picker]',host).onclick=event=>window.HC320Month.open(event.currentTarget,month,date=>move((date.getFullYear()-month.getFullYear())*12+date.getMonth()-month.getMonth(),false));\n    $('[data-prev]',host).onclick=()=>move(-1,true);"
+    ],
+    [
+      "  function hcHandleMlHourArrow(id, direction){\n    const idx = items.findIndex(x => x.id === id);\n    if(idx < 0) return;\n\n    const item = items[idx];",
+      "  function hcHandleMlHourArrow(id, direction, trigger){\n    if(String(selectedPatientId)!==String(pid)||!isCurrentPlanView)return;\n    const latest=getPresData(pid);\n    const item=latest.cur.prescripciones.infusionesContinuas?.find(x=>x.id===id);\n    if(!item||!window.hc306IsCurrentPrescription(item))return;"
+    ],
+    [
+      "    setClinical(cl2);\n    logAction(`Ajustó ml/h",
+      "    setClinical(latest.cl);\n    window.hc224MarkClinicalFieldDirty?.(pid,\"prescripciones\");\n    hcBackendMarkLocalSavedSoon();\n    hcBackendScheduleUrgentPush();\n    const rendered=items.find(x=>x.id===id);\n    if(rendered)Object.assign(rendered,item);\n    const original=cur.prescripciones.infusionesContinuas?.find(x=>x.id===id);\n    if(original)Object.assign(original,item);\n    logAction(`Ajustó ml/h"
+    ],
+    [
+      "    renderPrescripciones();\n  }\n\n  root.querySelectorAll(\"[data-pr-action='dose-up']\")",
+      "    const row=trigger.closest('.hcRxCompactItem');\n    const template=document.createElement('template');\n    template.innerHTML=buildRows([item]);\n    for(const selector of ['.hcRxCompactPrep','.hcRxCompactMlh','.hcRxCompactSchedule']){\n      const current=row?.querySelector(selector),updated=template.content.querySelector(selector);\n      if(current&&updated)current.replaceWith(updated);\n    }\n    window.hc306AcceptPrescriptionRowUpdate?.(root);\n  }\n\n  root.querySelectorAll(\"[data-pr-action='dose-up']\")"
+    ],
+    [
+      "btn.getAttribute(\"data-pr-id\"), +1);",
+      "btn.getAttribute(\"data-pr-id\"), +1, btn);"
+    ],
+    [
+      "btn.getAttribute(\"data-pr-id\"), -1);",
+      "btn.getAttribute(\"data-pr-id\"), -1, btn);"
+    ],
+    [
+      "let lastTasks='';window.hc306RefreshPrescriptions=()=>{",
+      "window.hc306AcceptPrescriptionRowUpdate=root=>{if(rxRoot===root)rxSignature=signature(root);};\nlet lastTasks='';window.hc306RefreshPrescriptions=()=>{"
+    ],
+    [
+      "  function buildRows(items, options = {}){\n  const historicalView = !!options.historicalView;",
+      "  function buildRows(items, options = {}){\n  const historicalView = !!options.historicalView;\n  const selectedPrescriptionDate=options.selectedDate||hcCurrentMedicationPlanDate();"
+    ],
+    [
+      "  function hcOpenPrescriptionDetailsModal(itemId, options = {}){",
+      "  function hcOpenPrescriptionDetailsModal(itemId, options = {}){\n    const selectedPrescriptionDate=document.getElementById('medPres')?.dataset.prScheduleDate||hcCurrentMedicationPlanDate();"
+    ],
+    [
+      "{ historicalView: !isCurrentPlanView })}",
+      "{ historicalView: !isCurrentPlanView, selectedDate: selectedPrescriptionDate })}"
+    ],
+    [
+      "  return{name:given&&surname?",
+      "  return{given,surname,name:given&&surname?"
+    ],
+    [
+      "function initialDniTurns(img){",
+      "window.hc320ReadIntakeDni=async function(file,turns){\n const T=await loadOCR();const worker=await createDniWorker(T,()=>{});\n try{\n   const canvas=await identityCanvas(file,true,turns);\n   const result=await deadline(worker.recognize(canvas,{rotateAuto:true}),25000,'La lectura tardó demasiado.');\n   return parseIdentity(result.data.text);\n }finally{await worker.terminate();}\n};\nfunction initialDniTurns(img){"
+    ],
+    [
+      "  const lastName = $(\"#pLast\").value.trim();\n  const firstNames",
+      "  const documentRef=window.HC320Dni?.reference();\n  const lastName = $(\"#pLast\").value.trim();\n  const firstNames"
+    ],
+    [
+      "    adm.admDateTime = admDateTimeForSave;\n\n    setPatients",
+      "    adm.admDateTime = admDateTimeForSave;\n    if(documentRef!==undefined)p.dniDocument=documentRef;\n\n    setPatients"
+    ],
+    [
+      "    dni, dob, sex, os, aff, famPhone,\n    street, streetNo, neighborhood, city, province\n  });",
+      "    dni, dob, sex, os, aff, famPhone,\n    street, streetNo, neighborhood, city, province,\n    ...(documentRef?{dniDocument:documentRef}:{})\n  });"
+    ],
+    [
+      "function clearInternForm(){",
+      "function clearInternForm(){\n  window.HC320Dni?.reset();"
+    ],
+    [
+      "  editingPatientId = adm.patientId;\n\n  $(\"#pLast\")",
+      "  editingPatientId = adm.patientId;\n  window.HC320Dni?.reset(p?.dniDocument);\n\n  $(\"#pLast\")"
+    ],
+    [
+      "  setPatients(patients);setRegistry(reg);setAppointments(arr);\n  logAction(`Internó desde Guardia",
+      "  const documentRef=window.HC320Dni?.reference();\n  if(documentRef!==undefined)pp.dniDocument=documentRef;\n  setPatients(patients);setRegistry(reg);setAppointments(arr);\n  logAction(`Internó desde Guardia"
+    ],
+    [
+      "  frame.srcdoc = html;\n  modal.classList.add(\"show\");",
+      "  frame.srcdoc = window.HC320Rich?.print(html)||html;\n  modal.classList.add(\"show\");"
+    ],
+    [
+      "const signedHTML = hcEnsurePrintSignatureHTML(html);",
+      "const signedHTML = window.HC320Rich?.print(hcEnsurePrintSignatureHTML(html))||hcEnsurePrintSignatureHTML(html);"
+    ],
+    [
+      "  if(window.hc280EditorActive?.() || window.hc280Locked)return true;",
+      "  if(window.hc280EditorActive?.() || window.hc280Locked||document.activeElement?.closest('.hc320Rich'))return true;"
+    ],
+    [
+      "$(\"#btnAdmit\")?.addEventListener(\"click\", admitFromUI);",
+      "$(\"#btnAdmit\")?.addEventListener(\"click\", ()=>window.HC320Dni?window.HC320Dni.submit(admitFromUI):admitFromUI());"
+    ],
+    [
+      "  editingPatientId=p.id;\n  const set=",
+      "  editingPatientId=p.id;\n  window.HC320Dni?.reset(p.dniDocument);\n  const set="
+    ]
+  ],
+  "extras": "\n\n<style id=\"hc-v320-ui\">\n#institutionChooserModal {z-index:1000010}\n#institutionChooserModal [disabled] {cursor:wait}\nbody .hc304Mainbar #whoami {order:3;flex:0 1 auto;width:auto;min-width:0;text-align:right;max-width:220px}\nbody .hc304Mainbar #btnAccount {order:4;flex:none}\n#hc297Workspace > header {justify-content:space-between}\n#hc297Workspace > header .hc320AccountGroup {display:flex;align-items:center;gap:8px;min-width:0;margin-inline-start:auto}\n#hc297Workspace > header [data-workspace-name] {overflow:hidden;text-overflow:ellipsis;max-width:38vw;white-space:nowrap}\n#hc297Workspace > header [data-pro-profile] {flex:none}\n#hc289Portal > header .hc289PortalWho {margin-inline-start:auto;text-align:right}\n.hc320PatientQuery {display:flex;gap:5px;align-items:stretch}\n.hc320PatientQuery input {flex:1;min-width:0}\n.hc320PatientQuery button {flex:none}\n.hc320IconButton {display:inline-flex;align-items:center;justify-content:center}\n.hc320IconButton svg {width:18px;height:18px;flex:none}\n.hc320DayHeader {display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}\n.hc320DayHeader h2 {margin:0}\n.hc320DayVisit {margin:0 0 9px}\n#hc297Workspace [data-agenda-day][hidden],#hc297Workspace [data-agenda-month][hidden],#hc297Workspace #hc318AgendaTitle[hidden] {display:none!important}\nbody :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal) .hc310MonthHeader [data-month-picker],.hc310MonthHeader [data-month-picker] {width:auto;min-width:0;padding:3px 8px;font:inherit;text-transform:capitalize}\n.hc320Dialog {max-width:min(93vw,580px);box-sizing:border-box;max-height:90dvh;overflow:auto;padding:18px;border:1px solid var(--hc-theme-line,#668);border-radius:12px;color:var(--hc-theme-text,#f3f7fc);background:var(--hc-theme-surface,#163044)}\n.hc320Dialog::backdrop {background:#040916c2;backdrop-filter:blur(7px)}\n.hc320Dialog header {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}\n.hc320MonthFields,.hc320DniFields {display:flex;flex-wrap:wrap;gap:10px;align-items:end}\n.hc320MonthFields label {flex:1 1 120px}\n.hc320Route {margin:8px 0}\n.hc320Route summary {cursor:pointer;font-weight:700}\n.hc320Route a {color:inherit}\n.hc320Route [role=status]:empty {display:none}\n.hc320Route ol {padding-inline-start:24px}\n.hc320Rich {border:1px solid var(--hc-theme-line,#6083a0);border-radius:7px;min-width:0}\n.hc320RichTools {display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:4px;border-bottom:1px solid var(--hc-theme-line,#6083a0)}\n.hc320RichTools button,.hc320RichTools select {min-width:32px;width:auto;min-height:32px;padding:3px 7px;font:inherit}\n.hc320RichInput {min-height:80px;padding:8px;white-space:pre-wrap;overflow-wrap:anywhere}\n.hc320RichInput:focus-visible {outline:2px solid var(--hc-theme-accent,#55afff);outline-offset:-2px}\n.hc320RichInput ol,.hc320RichInput ul,.hc320RichOutput ol,.hc320RichOutput ul {margin-block:0;padding-inline-start:1.7em}\n.hc320RichOutput {white-space:pre-wrap}\ntextarea.hc320RichSource {display:none!important}\n.hc320DniFields fieldset {flex:1 1 190px;max-width:100%;min-width:0}\n.hc320DniFields fieldset img {display:block;max-width:100%;max-height:145px;object-fit:contain;margin:5px 0}\n.hc320DniFields fieldset img[hidden],.hc320DniFields video[hidden] {display:none}\n.hc320DniFields video {width:100%;max-height:225px;object-fit:contain}\n#medPanel #pacHdrBar:has(.hc320DniThumb) {padding-inline-end:60px!important;position:relative}\n.hc320DniThumb {position:absolute;right:6px;top:50%;transform:translateY(-50%);height:36px;width:49px;padding:2px;background:var(--hc-theme-surface,#123);border:1px solid var(--hc-theme-line,#678);border-radius:5px;cursor:zoom-in}\n.hc320DniThumb img {width:100%;height:100%;object-fit:contain}\n.hc320ProfileZoom {cursor:zoom-in}\ndialog.hc320Lightbox {position:fixed;inset:0;margin:0;width:100%;height:100%;max-width:none;max-height:none;padding:0;border:0;background:transparent;color:#fff;overflow:hidden}\n.hc320Lightbox[open] {display:grid;place-items:center}\n.hc320Lightbox::backdrop {background:#03070dd9;backdrop-filter:blur(10px)}\n.hc320Lightbox > .hc311Close {position:fixed;z-index:2;top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));background:#1c293d;color:white;border-color:#9ba6bc}\n.hc320Lightbox figure {display:grid;position:relative;align-items:center;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;margin:0;max-width:98%;touch-action:pan-y}\n.hc320Lightbox img {grid-column:2;max-width:min(84vw,1060px);max-height:83dvh;object-fit:contain;border-radius:7px}\n.hc320Lightbox [data-photo-prev] {grid-column:1;grid-row:1}\n.hc320Lightbox [data-photo-next] {grid-column:3;grid-row:1}\n.hc320Lightbox figure > button {border:1px solid #71819e;background:#172233;color:white;width:32px;height:38px;border-radius:7px;padding:4px}\n.hc320Lightbox figure > button[hidden] {display:none}\n.hc320Lightbox figure > button:disabled {opacity:.35}\n@media(max-width:760px) {\n  body .hc304Mainbar > div:last-child {justify-content:flex-start}\n  body .hc304Mainbar #whoami {margin-inline-start:auto;text-align:right;max-width:43vw}\n  body .hc304Mainbar #btnAccount {order:4}\n  body .hc304Mainbar #btnAccount:not([style*=\"display: none\"]) {margin-inline-start:0}\n  body #hc306ClinicalHeader {position:static!important;top:auto!important;z-index:auto}\n  body #hc306ClinicalHeader .medModuleTabs {width:100%;grid-column:auto;overflow-x:auto}\n}\n@media print {.hc320DniThumb,.hc320RichTools {display:none!important}}\n</style>\n\n<script id=\"hc-v320-navigation\">\n(()=>{\n'use strict';\nconst q=(selector,root=document)=>root.querySelector(selector);\nconst esc=value=>escHTML(value);\nconst icon=name=>window.hc289Icon(name);\nfunction closeButton(label='Cerrar'){\n return '<button type=\"button\" class=\"hc311Close\" data-hc320-close title=\"'+esc(label)+'\" aria-label=\"'+esc(label)+'\">'+icon('close')+'</button>';\n}\nfunction openDialog(markup,label,extra=''){\n const dialog=document.createElement('dialog');\n dialog.className='hc320Dialog '+extra;\n dialog.setAttribute('aria-label',label);\n dialog.innerHTML=markup;\n const previous=document.activeElement;\n document.body.append(dialog);\n dialog.addEventListener('click',event=>{\n   if(event.target===dialog||event.target.closest('[data-hc320-close]'))dialog.close();\n });\n dialog.addEventListener('close',()=>{\n   dialog.remove();\n   if(previous?.isConnected)previous.focus({preventScroll:true});\n },{once:true});\n dialog.showModal();\n return dialog;\n}\nwindow.HC320UI={openDialog,closeButton};\nwindow.HC320Month={open(trigger,current,select){\n const months=Array.from({length:12},(_,index)=>'<option value=\"'+index+'\">'+new Date(2000,index,1).toLocaleDateString('es-AR',{month:'long'})+'</option>').join('');\n const dialog=openDialog('<header><b>Ir a un mes</b>'+closeButton()+'</header><form class=\"hc320MonthFields\"><label>Mes<select name=\"month\">'+months+'</select></label><label>Año<input type=\"number\" name=\"year\" required min=\"1900\" max=\"2200\" inputmode=\"numeric\"></label><button type=\"submit\" class=\"btn primary\">Ir</button></form>','Elegir mes y año');\n const form=q('form',dialog);\n form.elements.month.value=current.getMonth();\n form.elements.year.value=current.getFullYear();\n form.onsubmit=event=>{\n   event.preventDefault();\n   const date=new Date(Number(form.elements.year.value),Number(form.elements.month.value),1);\n   dialog.close();\n   select(date);\n };\n q('[name=month]',form).focus();\n}};\nconst allowedDirections=(visit,side)=>visit?.id&&['confirmed','active','finished','attended'].includes(visit.status)&&\n (side==='client'?visit.privateVisit&&visit.mode==='office':['office','home'].includes(visit.mode));\nfunction routeMarkup(visit,side){\n if(!allowedDirections(visit,side))return '';\n const label=visit.mode==='home'?'Cómo llegar al domicilio':'Cómo llegar al consultorio';\n return '<details class=\"hc320Route\" data-route-visit=\"'+esc(visit.id)+'\"><summary>'+label+'</summary>'+\n '<div data-route-content></div></details>';\n}\nfunction bindRoutes(host,visits,side){\n for(const details of host.querySelectorAll('[data-route-visit]')){\n  const visit=visits.find(item=>String(item.id)===details.dataset.routeVisit);\n  if(!allowedDirections(visit,side))continue;\n  const pane=q('[data-route-content]',details);\n  const load=async ()=>{\n    let location=String(visit.location_snapshot||'');\n    if(!location){\n      const result=await window.hc292Tele.api('visit',{visitId:visit.id});\n      location=String(result.visit?.location_snapshot||'');\n    }\n    if(!pane.isConnected)return;\n    if(!location){pane.textContent='El turno no tiene una dirección registrada.';return;}\n    const address=visit.mode==='office'?location.split(' · ').filter(Boolean).at(-1):location;\n    const destination=document.createElement('p');\n    destination.textContent=location;\n    const button=document.createElement('button');\n    button.type='button';button.className='btn small';\n    button.textContent='Calcular desde mi ubicación';\n    const maps=document.createElement('a');\n    maps.href=window.HC299Geo.mapURL({address});\n    maps.textContent='Abrir en Google Maps';\n    maps.target='_blank';maps.rel='noopener noreferrer';\n    const actions=document.createElement('div');actions.className='hc320MonthFields';actions.append(button,maps);\n    const status=document.createElement('p');status.setAttribute('role','status');\n    const steps=document.createElement('ol');\n    pane.replaceChildren(destination,actions,status,steps);\n    button.onclick=async ()=>{\n      button.disabled=true;status.textContent='Obteniendo tu ubicación…';steps.replaceChildren();\n      try{\n       const origin=await window.HC299Geo.locate();\n       if(!pane.isConnected||!details.open)return;\n       status.textContent='Calculando el recorrido en auto…';\n       const result=await window.hc292Tele.api('visitDirections',{visitId:visit.id,origin});\n       if(!pane.isConnected||!details.open)return;\n       status.textContent=new Intl.NumberFormat('es-AR',{maximumFractionDigits:1}).format(result.distance/1000)+' km · '+Math.max(1,Math.round(result.duration/60))+' min aprox.';\n       steps.replaceChildren(...result.steps.map(instruction=>{\n         const item=document.createElement('li');item.textContent=instruction;return item;\n       }));\n      }catch(error){if(pane.isConnected)status.textContent=error.message;}\n      finally{button.disabled=false;}\n    };\n  };\n  details.addEventListener('toggle',()=>{\n    if(!details.open||details.dataset.routeRequested)return;\n    details.dataset.routeRequested='1';\n    pane.textContent='Buscando la dirección…';\n    load().catch(error=>{pane.textContent=error.message;delete details.dataset.routeRequested;});\n  });\n }\n}\nwindow.HC320Route={markup:routeMarkup,bind:bindRoutes};\n\nfunction decorateButtons(root){\n const buttons=root.matches?.('button,input[type=button],input[type=submit]')?[root]:root.querySelectorAll?.('button,input[type=button],input[type=submit]')||[];\n for(const original of buttons){\n   if(original.closest('#hc289AccountMenu,.hc320RichTools')||original.matches('[data-hc320-icon]'))continue;\n   const label=(original.getAttribute('aria-label')||original.title||original.value||original.textContent).trim();\n   const visible=(original.tagName==='INPUT'?original.value:original.textContent).trim();\n   const close=/^cerrar(?:$|\\s+(?!(?:la\\s+)?sesi[oó]n\\b)(?!(?:la\\s+)?jornada\\b).+)/i;\n   const print=/^(?:abrir\\s*\\/\\s*)?imprimir\\b/i;\n   const which=print.test(visible)||print.test(label)?'print':\n     close.test(visible)||close.test(label)||visible==='×'?'close':\n     original.matches('#hc270PatientSearch button[type=submit]')?'search':'';\n   if(!which)continue;\n   if(original.tagName!=='BUTTON')continue;\n   if(which==='close'&&original.closest('form')&&/cerrar sesi[oó]n|cerrar jornada/i.test(visible))continue;\n   original.dataset.hc320Icon=which;\n   original.classList.add('hc320IconButton');\n   if(which==='close')original.classList.add('hc311Close');\n   const accessible=label&&label!=='×'?label:which==='close'?'Cerrar':'Imprimir';\n   original.title=accessible;\n   original.setAttribute('aria-label',accessible);\n   original.innerHTML=icon(which);\n }\n}\nwindow.HC320UI.decorateButtons=decorateButtons;\ndocument.addEventListener('keydown',event=>{\n if(event.key!=='Escape'||document.querySelector('dialog[open]'))return;\n const chooser=q('#institutionChooserModal.show #btnCloseInstitutionChooser');\n if(chooser&&!chooser.disabled){event.preventDefault();chooser.click();}\n},true);\n})();\n</script>\n\n<script id=\"hc-v320-rich-text\">\n(()=>{\n'use strict';\nconst nativeValue=Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value');\nconst marker=/⟦hc320:([A-Za-z0-9+/=]{1,90000})⟧/g;\nconst tagNames=new Map([\n ['B','strong'],['STRONG','strong'],['I','em'],['EM','em'],['U','u'],['S','s'],['STRIKE','s'],\n ['BR','br'],['DIV','div'],['P','div'],['OL','ol'],['UL','ul'],['LI','li'],['FONT','span'],['SPAN','span']\n]);\nconst excluded='[data-hc320-plain],#hcsDiagnosticsText,#hcBackendRaw,#accSignature,.hc320Dialog';\nfunction safeTree(source,doc){\n const out=doc.createDocumentFragment();\n function visit(from,to){\n   for(const child of from.childNodes){\n     if(child.nodeType===Node.TEXT_NODE){to.append(doc.createTextNode(child.data));continue;}\n     if(child.nodeType!==Node.ELEMENT_NODE||['SCRIPT','STYLE','TEMPLATE'].includes(child.tagName))continue;\n     const name=tagNames.get(child.tagName);\n     if(!name){visit(child,to);continue;}\n     const element=doc.createElement(name);\n     if(name==='span'){\n       const size=child.getAttribute('size');\n       const font=/^(12|14|16|18|24|32)px$/.test(child.style.fontSize)?child.style.fontSize:\n         ({2:'12px',3:'14px',4:'18px',5:'24px',6:'32px'})[size];\n       if(font)element.style.fontSize=font;\n       else{visit(child,to);continue;}\n     }\n     visit(child,element);\n     to.append(element);\n   }\n }\n visit(source,out);\n return out;\n}\nfunction decode(token,doc){\n const bytes=Uint8Array.from(atob(token),char=>char.charCodeAt(0));\n const t=doc.createElement('template');\n t.innerHTML=new TextDecoder('utf-8',{fatal:true}).decode(bytes);\n return safeTree(t.content,doc);\n}\nfunction fragment(value,doc=document){\n const result=doc.createDocumentFragment();\n let last=0;\n for(const match of value.matchAll(marker)){\n   try{\n     const content=decode(match[1],doc);\n     result.append(doc.createTextNode(value.slice(last,match.index)),content);\n     last=match.index+match[0].length;\n   }catch{}\n }\n result.append(doc.createTextNode(value.slice(last)));\n return result;\n}\nfunction encode(markup){\n const bytes=new TextEncoder().encode(markup);\n if(bytes.length>65000)return '';\n let raw='';\n for(const byte of bytes)raw+=String.fromCharCode(byte);\n return '⟦hc320:'+btoa(raw)+'⟧';\n}\nfunction hydrate(root){\n const doc=root.ownerDocument;\n const walker=doc.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:node=>\n   node.data.includes('⟦hc320:')&&!node.parentElement?.closest('textarea,input,script,style,template,[contenteditable],.hc320RichOutput')\n     ?NodeFilter.FILTER_ACCEPT:NodeFilter.FILTER_REJECT});\n const matching=[];\n if(root.nodeType===Node.TEXT_NODE){\n   if(root.data.includes('⟦hc320:')&&!root.parentElement?.closest('textarea,input,script,style,template,[contenteditable],.hc320RichOutput'))matching.push(root);\n }else while(walker.nextNode())matching.push(walker.currentNode);\n for(const node of matching){\n   if(![...node.data.matchAll(marker)].length)continue;\n   const span=doc.createElement('span');\n   span.className='hc320RichOutput';\n   span.append(fragment(node.data,doc));\n   node.replaceWith(span);\n }\n}\nfunction plain(value){\n if(!String(value||'').includes('⟦hc320:'))return String(value||'');\n const el=document.createElement('div');\n el.append(fragment(String(value)));\n for(const br of el.querySelectorAll('br'))br.replaceWith('\\n');\n for(const block of el.querySelectorAll('div,li,p'))block.append('\\n');\n return el.textContent.trimEnd();\n}\nfunction print(html){\n if(!html.includes('⟦hc320:')&&!html.includes('window.print()'))return html;\n const doc=new DOMParser().parseFromString(html,'text/html');\n hydrate(doc.body);\n window.HC320UI.decorateButtons(doc.body);\n const style=doc.createElement('style');\n style.textContent='.hc320RichOutput{white-space:pre-wrap}.hc320RichOutput ol,.hc320RichOutput ul{margin-block:0}.hc320IconButton svg{width:18px;height:18px}';\n doc.head.append(style);\n return '<!doctype html>\\n'+doc.documentElement.outerHTML;\n}\nfunction mount(textarea){\n if(textarea.hc320Editor||textarea.disabled||textarea.readOnly||textarea.matches(excluded)||textarea.closest(excluded))return;\n const source=()=>nativeValue.get.call(textarea);\n const wrapper=document.createElement('div');\n wrapper.className='hc320Rich';\n wrapper.innerHTML='<div class=\"hc320RichTools\" role=\"group\" aria-label=\"Formato del texto\">'+\n '<button type=\"button\" data-command=\"bold\" title=\"Negrita\" aria-label=\"Negrita\"><b>B</b></button>'+\n '<button type=\"button\" data-command=\"italic\" title=\"Cursiva\" aria-label=\"Cursiva\"><i>I</i></button>'+\n '<button type=\"button\" data-command=\"underline\" title=\"Subrayado\" aria-label=\"Subrayado\"><u>U</u></button>'+\n '<button type=\"button\" data-command=\"strikeThrough\" title=\"Tachado\" aria-label=\"Tachado\"><s>T</s></button>'+\n '<select aria-label=\"Tamaño del texto\" title=\"Tamaño del texto\"><option value=\"\">Tamaño</option><option value=\"2\">12</option><option value=\"3\">14</option><option value=\"4\">18</option><option value=\"5\">24</option><option value=\"6\">32</option></select>'+\n '<button type=\"button\" data-command=\"insertOrderedList\" title=\"Lista numerada\" aria-label=\"Lista numerada\">1. ≡</button>'+\n '<button type=\"button\" data-command=\"insertUnorderedList\" title=\"Lista con viñetas\" aria-label=\"Lista con viñetas\">• ≡</button>'+\n '<button type=\"button\" data-command=\"removeFormat\" title=\"Quitar formato\" aria-label=\"Quitar formato\">Tx</button></div>'+\n '<div class=\"hc320RichInput\" contenteditable=\"true\" role=\"textbox\" aria-multiline=\"true\"></div>';\n const editor=wrapper.lastElementChild, tools=wrapper.firstElementChild;\n const label=textarea.getAttribute('aria-label')||textarea.labels?.[0]?.textContent||textarea.previousElementSibling?.matches('label')&&textarea.previousElementSibling.textContent||textarea.placeholder||'Texto libre';\n editor.setAttribute('aria-label',label.trim());\n editor.style.minHeight=Math.max(72,Number.parseInt(textarea.style.minHeight,10)||0)+'px';\n let selection=null;\n function render(){\n   selection=null;\n   editor.replaceChildren(fragment(source()));\n }\n Object.defineProperty(textarea,'value',{\n   configurable:true,\n   get:source,\n   set(value){nativeValue.set.call(this,value);render();}\n });\n textarea.hc320Editor={wrapper,editor,render};\n function sync(){\n   let value=editor.innerText;\n   const limit=textarea.maxLength>0?textarea.maxLength:textarea.closest('#hc297Workspace')?12000:Infinity;\n   const formatted=editor.querySelector('b,strong,i,em,u,s,strike,ol,ul,font,span[style]');\n   if(formatted&&value.trim()){\n     const holder=document.createElement('div');\n     holder.append(safeTree(editor,document));\n     const encoded=encode(holder.innerHTML);\n     if(encoded&&encoded.length<=limit)value=encoded;\n     else if(Number.isFinite(limit))wrapper.title='Para guardar el formato, reducí la longitud del texto.';\n   }\n   nativeValue.set.call(textarea,value.slice(0,limit));\n   textarea.dispatchEvent(new Event('input',{bubbles:true}));\n }\n const remember=()=>{\n   const current=document.getSelection();\n   if(current.rangeCount&&editor.contains(current.anchorNode)&&editor.contains(current.focusNode))selection=current.getRangeAt(0).cloneRange();\n };\n const command=(key,value=null)=>{\n   if(textarea.disabled||textarea.readOnly)return;\n   const saved=selection;\n   editor.focus({preventScroll:true});\n   if(saved&&editor.contains(saved.commonAncestorContainer)){\n     const current=document.getSelection();\n     current.removeAllRanges();current.addRange(saved);\n   }\n   document.execCommand(key,false,value);\n   remember();sync();\n };\n for(const event of ['keyup','pointerup','focusout'])editor.addEventListener(event,remember);\n editor.addEventListener('input',()=>{remember();sync();});\n editor.addEventListener('paste',event=>{\n   if(!event.clipboardData)return;\n   event.preventDefault();document.execCommand('insertText',false,event.clipboardData.getData('text/plain'));\n });\n editor.addEventListener('drop',event=>event.preventDefault());\n editor.addEventListener('blur',()=>textarea.dispatchEvent(new Event('change',{bubbles:true})));\n tools.addEventListener('pointerdown',event=>{remember();if(event.target.closest('button'))event.preventDefault();});\n tools.addEventListener('click',event=>{\n   const button=event.target.closest('[data-command]');\n   if(button)command(button.dataset.command);\n });\n const size=tools.querySelector('select');\n size.onchange=()=>{if(size.value)command('fontSize',size.value);size.value='';};\n textarea.insertAdjacentElement('afterend',wrapper);\n textarea.classList.add('hc320RichSource');\n render();\n}\nfunction scan(node){\n if(node.tagName==='TEXTAREA')mount(node);\n else node.querySelectorAll?.('textarea').forEach(mount);\n hydrate(node);\n}\ndocument.addEventListener('reset',event=>queueMicrotask(()=>event.target.querySelectorAll('textarea').forEach(field=>field.hc320Editor?.render())),true);\nnew MutationObserver(records=>{\n for(const record of records){\n   if(record.type==='attributes'){\n     const field=record.target;\n     if(field.tagName!=='TEXTAREA')continue;\n     if(!field.hc320Editor){mount(field);continue;}\n     const readOnly=field.disabled||field.readOnly;\n     field.hc320Editor.editor.contentEditable=String(!readOnly);\n     field.hc320Editor.wrapper.firstElementChild.hidden=readOnly;\n   }else if(record.type==='characterData'){\n     hydrate(record.target);\n   }else{\n     for(const node of record.addedNodes){\n       if(node.nodeType===Node.ELEMENT_NODE){\n         scan(node);\n         window.HC320UI.decorateButtons(node);\n       }else if(node.nodeType===Node.TEXT_NODE){\n         hydrate(node);\n         if(node.parentElement?.matches('button'))window.HC320UI.decorateButtons(node.parentElement);\n       }\n     }\n   }\n }\n}).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['readonly','disabled']});\nwindow.HC320Rich={plain,print};\nscan(document.body);\nwindow.HC320UI.decorateButtons(document.body);\n})();\n</script>\n\n<script id=\"hc-v320-identity-photos\">\n(()=>{\n'use strict';\nconst q=(selector,root=document)=>root.querySelector(selector);\nconst {openDialog,closeButton}=window.HC320UI;\nconst icon=name=>window.hc289Icon(name);\nconst request=(action,params)=>window.hc283ServicesRequest(action,params);\nconst canRead=()=>['admin','administrativo','medico','enfermero'].includes(session?.role);\nconst identityScope=()=>[session?.institutionId,session?.username,session?.localSeed?localStorage.getItem(LS.seedAdminToken):hcGlobalAuthToken()].join('|');\nconst validRef=ref=>ref&&/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(ref.id);\nconst imageData=/^data:image\\/(?:jpeg|jpg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/i;\nlet saved,stage=null,revision=0,submitting=false;\nlet frontCache=new Map(),cacheScope='';\nfunction reset(ref){\n if(!validRef(ref))ref=undefined;\n saved=ref;\n stage=null;\n revision++;\n paintIntake();\n}\nfunction reference(){return stage?.ref;}\nfunction urlFor(ref,side){\n const scope=identityScope();\n if(cacheScope!==scope){frontCache.clear();cacheScope=scope;}\n if(!canRead()||!validRef(ref))return Promise.reject(Error('El DNI no está disponible.'));\n const key=ref.id+':'+side,previous=frontCache.get(key);\n if(previous&&previous.until>Date.now())return previous.value;\n const value=request('readIntakeDni',{id:ref.id,side}).then(result=>{\n   if(scope!==identityScope())throw Error('Cambió la sesión.');\n   if(!/^https:\\/\\//.test(result.url))throw Error('La imagen no está disponible.');\n   return result.url;\n }).catch(error=>{frontCache.delete(key);throw error;});\n if(frontCache.size>32)frontCache.delete(frontCache.keys().next().value);\n frontCache.set(key,{value,until:Date.now()+40000});\n return value;\n}\nfunction showPhotos(front,back){\n const dialog=openDialog(closeButton()+'<figure>'+\n '<button type=\"button\" data-photo-prev aria-label=\"Ver frente\">'+icon('left')+'</button>'+\n '<img draggable=\"false\" alt=\"\">'+\n '<button type=\"button\" data-photo-next aria-label=\"Ver dorso\">'+icon('right')+'</button></figure>',\n back?'Fotos del DNI':'Foto ampliada','hc320Lightbox');\n const frame=q('figure',dialog),img=q('img',frame),prev=q('[data-photo-prev]',frame),next=q('[data-photo-next]',frame);\n let current=0,gesture=null,generation=0;\n prev.hidden=next.hidden=!back;\n async function show(index,direction=0){\n   const turn=++generation;\n   try{\n     const source=await (index?back():front());\n     const incoming=new Image();\n     incoming.src=source;await incoming.decode();\n     if(!dialog.open||turn!==generation)return;\n     current=index;img.src=source;\n     img.alt=back?(index?'Dorso del DNI':'Frente del DNI'):'Foto ampliada';\n     prev.disabled=index===0;next.disabled=!back||index===1;\n     if(direction&&!matchMedia('(prefers-reduced-motion: reduce)').matches)\n       img.animate([{transform:'translateX('+(direction*22)+'%) scale(.9)',opacity:.35},{transform:'translateX(0) scale(1)',opacity:1}],{duration:220,easing:'ease-out'});\n   }catch(error){if(dialog.open)window.hc289Toast(error.message||'No se pudo abrir la imagen.');}\n }\n prev.onclick=()=>show(0,-1);next.onclick=()=>show(1,1);\n dialog.addEventListener('keydown',event=>{\n   if(back&&['ArrowLeft','ArrowRight'].includes(event.key)){\n     event.preventDefault();\n     if(event.key==='ArrowLeft'&&current===1)prev.click();\n     if(event.key==='ArrowRight'&&current===0)next.click();\n   }\n });\n if(back){\n   frame.onpointerdown=event=>{if(event.target===img&&event.button===0)gesture={id:event.pointerId,x:event.clientX,y:event.clientY};};\n   frame.onpointermove=event=>{\n     if(gesture?.id!==event.pointerId)return;\n     const dx=event.clientX-gesture.x;\n     if(Math.abs(dx)<8||Math.abs(dx)<Math.abs(event.clientY-gesture.y))return;\n     frame.setPointerCapture(event.pointerId);\n     img.style.transform='translateX('+Math.max(-90,Math.min(dx,90))+'px)';\n   };\n   frame.onpointerup=event=>{\n     if(gesture?.id!==event.pointerId)return;\n     const dx=event.clientX-gesture.x;\n     gesture=null;img.style.transform='';\n     if(dx < -45&&current===0)next.click();\n     if(dx > 45&&current===1)prev.click();\n   };\n   frame.onpointercancel=()=>{gesture=null;img.style.transform='';};\n }\n prev.disabled=true;\n next.disabled=!back;\n show(0);\n return dialog;\n}\nfunction openDni(ref,photo){\n showPhotos(()=>photo||urlFor(ref,'front'),ref.back?()=>urlFor(ref,'back'):null);\n}\nfunction paintIntake(){\n const thumb=q('#hc320IntakeThumb');\n if(!thumb)return;\n const ref=stage?.ref||saved,data=stage?.front?.data;\n thumb.hidden=!ref&&!data;\n if(thumb.hidden){q('img',thumb).removeAttribute('src');return;}\n if(data)q('img',thumb).src=data;\n else urlFor(ref,'front').then(url=>{if((stage?.ref||saved)===ref)q('img',thumb).src=url;}).catch(()=>{});\n thumb.onclick=()=>stage?.front?\n   showPhotos(()=>stage.front.data,stage.back?()=>stage.back.data:null):\n   openDni(ref,q('img',thumb).getAttribute('src')||undefined);\n}\nasync function prepare(file,turns=0){\n if(file.size>15*1024*1024)throw Error('Elegí una foto de hasta 15 MB.');\n const url=URL.createObjectURL(file);\n try{\n   const img=new Image();img.src=url;await img.decode();\n   const scale=Math.min(1,1440/Math.max(img.naturalWidth,img.naturalHeight));\n   const canvas=document.createElement('canvas');\n   canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));\n   canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));\n   const ctx=canvas.getContext('2d');ctx.fillStyle='white';ctx.fillRect(0,0,canvas.width,canvas.height);\n   ctx.drawImage(img,0,0,canvas.width,canvas.height);\n   const oriented=window.HC292OCR.rotate(canvas,turns);\n   let data=oriented.toDataURL('image/jpeg',.8);\n   if(data.length>550000)data=oriented.toDataURL('image/jpeg',.56);\n   if(data.length>550000)throw Error('La foto todavía es demasiado grande. Acercá el DNI y volvé a sacar la foto.');\n   return {file,turns,data};\n }finally{URL.revokeObjectURL(url);}\n}\nfunction scanner(){\n const openRevision=revision,openScope=identityScope(),working={front:stage?.front,back:stage?.back};\n const dialog=openDialog('<header><b>Escanear DNI</b>'+closeButton()+'</header><div class=\"hc320DniFields\">'+\n ['front','back'].map(side=>'<fieldset data-dni-side=\"'+side+'\"><legend>'+ (side==='front'?'Frente':'Dorso')+'</legend><img hidden alt=\"Vista previa\"><input data-file type=\"file\" accept=\"image/*\" hidden><input data-native-camera type=\"file\" accept=\"image/*\" capture=\"environment\" hidden><button type=\"button\" class=\"btn small\" data-pick>Elegir foto</button> <button type=\"button\" class=\"btn small\" data-camera>Cámara</button> <button type=\"button\" class=\"btn small\" data-rotate disabled title=\"Girar 90 grados\">↻</button><video autoplay playsinline muted hidden></video><button type=\"button\" class=\"btn small\" data-capture hidden>Sacar foto</button></fieldset>').join('')+\n '</div><p role=\"status\"></p><div class=\"hc320MonthFields\"><button class=\"btn\" type=\"button\" data-ocr>Leer datos del DNI</button><button class=\"btn primary\" type=\"button\" data-apply>Adjuntar fotos</button></div>','Escanear DNI');\n let stream,video,activeCamera=0;\n const status=q('[role=status]',dialog),ocr=q('[data-ocr]',dialog),apply=q('[data-apply]',dialog);\n const busy=new Set();\n const current=()=>dialog.open&&revision===openRevision&&identityScope()===openScope;\n function stopCamera(){\n   activeCamera++;\n   stream?.getTracks().forEach(track=>track.stop());stream=null;\n   if(video){video.srcObject=null;video.hidden=true;video.parentElement.querySelector('[data-capture]').hidden=true;video=null;}\n }\n const stopOnHide=()=>{if(document.hidden)stopCamera();};\n document.addEventListener('visibilitychange',stopOnHide);\n window.addEventListener('pagehide',stopCamera);\n dialog.addEventListener('close',()=>{\n   stopCamera();document.removeEventListener('visibilitychange',stopOnHide);window.removeEventListener('pagehide',stopCamera);\n },{once:true});\n function update(){\n   for(const panel of dialog.querySelectorAll('[data-dni-side]')){\n     const photo=working[panel.dataset.dniSide],img=q('img',panel);\n     img.hidden=!photo;\n     if(photo)img.src=photo.data;\n     q('[data-rotate]',panel).disabled=!photo||busy.has(panel.dataset.dniSide);\n   }\n   apply.disabled=ocr.disabled=!working.front||busy.size>0;\n }\n async function select(side,file,turns=0){\n   if(!file||busy.has(side))return;\n   busy.add(side);update();status.textContent='Preparando foto…';\n   try{\n     const photo=await prepare(file,turns);\n     if(!current())return;\n     working[side]=photo;status.textContent='';\n   }catch(error){status.textContent=error.message;}\n   finally{busy.delete(side);update();}\n }\n for(const panel of dialog.querySelectorAll('[data-dni-side]')){\n   const side=panel.dataset.dniSide,file=q('[data-file]',panel),nativeCamera=q('[data-native-camera]',panel);\n   for(const input of [file,nativeCamera])input.onchange=()=>{const selected=input.files?.[0];input.value='';select(side,selected);};\n   q('[data-pick]',panel).onclick=()=>file.click();\n   q('[data-rotate]',panel).onclick=()=>select(side,working[side].file,(working[side].turns+1)%4);\n   const camera=q('[data-camera]',panel),capture=q('[data-capture]',panel);\n   camera.onclick=async ()=>{\n     stopCamera();\n     if(matchMedia('(pointer:coarse)').matches||!navigator.mediaDevices?.getUserMedia){nativeCamera.click();return;}\n     const sequence=activeCamera;\n     try{\n       const candidate=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}},audio:false});\n       if(!current()||sequence!==activeCamera){candidate.getTracks().forEach(track=>track.stop());return;}\n       stream=candidate;video=q('video',panel);video.srcObject=stream;video.hidden=false;\n       capture.hidden=false;\n     }catch{if(current())status.textContent='No se pudo abrir la cámara. Revisá el permiso o elegí una foto.';}\n   };\n   capture.onclick=()=>{\n     if(!video?.videoWidth)return;\n     const canvas=document.createElement('canvas');\n     canvas.width=video.videoWidth;canvas.height=video.videoHeight;\n     canvas.getContext('2d').drawImage(video,0,0);stopCamera();\n     canvas.toBlob(blob=>{if(blob&&current())select(side,new File([blob],'dni.jpg',{type:'image/jpeg'}));},'image/jpeg',.86);\n   };\n }\n let parsed={};\n ocr.onclick=async ()=>{\n   if(!working.front||busy.size)return;\n   busy.add('ocr');update();status.textContent='Leyendo el DNI…';\n   try{\n     for(const side of ['front','back']){\n       const photo=working[side];\n       if(!photo||!current())continue;\n       const found=await window.hc320ReadIntakeDni(photo.file,photo.turns);\n       if(!current())return;\n       for(const key of ['surname','given','dni','dob'])if(!parsed[key]&&found[key])parsed[key]=found[key];\n     }\n     status.textContent=Object.keys(parsed).length?'Datos detectados. Revisalos en el formulario antes de ingresar al paciente.':'No pude leer los datos. Podés cargarlos a mano.';\n   }catch(error){status.textContent=error.message||'No se pudo leer el DNI.';}\n   finally{busy.delete('ocr');update();}\n };\n apply.onclick=()=>{\n   if(!current()||!working.front)return;\n   stage={...working};revision++;\n   for(const [key,id] of Object.entries({surname:'#pLast',given:'#pFirst',dni:'#pDni',dob:'#pDob'})){\n     const field=q(id);\n     if(parsed[key]&&field&&!field.value){\n       field.value=parsed[key];field.dispatchEvent(new Event('change',{bubbles:true}));\n     }\n   }\n   if(parsed.dob&&q('#pDob')?.value===parsed.dob)q('#pAge').value=String(calcAge(parsed.dob));\n   paintIntake();dialog.close();\n };\n update();\n}\nasync function submit(save){\n if(submitting)return;\n if(!stage||stage.ref){save();return;}\n const dni=q('#pDni')?.value.trim(),bed=q('#pBed')?.value;\n if(!dni||!q('#pLast')?.value.trim()||!bed){save();return;}\n const occupied=getAdmissionByBedId(bed);\n if(occupied&&occupied.id!==editingAdmId){save();return;}\n const button=q('#btnAdmit'),status=q('#hc320IntakeDniStatus'),scope=identityScope(),draft=stage;\n submitting=true;button.disabled=true;\n status.textContent='Guardando las fotos del DNI…';\n try{\n   const result=await request('saveIntakeDni',{front:draft.front.data,back:draft.back?.data});\n   if(scope!==identityScope()||stage!==draft)return;\n   if(!validRef(result.document))throw Error('No se confirmó el guardado del DNI.');\n   draft.ref=result.document;\n   status.textContent='';\n   save();\n }catch(error){if(stage===draft)status.textContent=error.message||'No se pudieron guardar las fotos del DNI.';}\n finally{submitting=false;button.disabled=false;}\n}\nconst downloadHeader=window.renderPatientHeader;\nrenderPatientHeader=window.renderPatientHeader=function(){\n const result=downloadHeader.apply(this,arguments), header=q('#pacHdrBar');\n if(!header||!canRead())return result;\n const patient=selectedPatientId?findPatient(selectedPatientId):null,ref=patient?.dniDocument;\n if(!validRef(ref)||header.querySelector('.hc320DniThumb')||medTab==='historia'&&window.hc270HistoryOnly?.())return result;\n const button=document.createElement('button');\n button.className='hc320DniThumb';button.type='button';button.title='Ampliar foto del DNI';button.setAttribute('aria-label',button.title);\n button.innerHTML=icon('user')+'<img alt=\"\" hidden>';\n button.onclick=()=>openDni(ref,q('img',button).getAttribute('src')||undefined);\n header.append(button);\n urlFor(ref,'front').then(url=>{\n   if(!button.isConnected)return;\n   const image=q('img',button);image.src=url;image.hidden=false;q('svg',button)?.remove();\n }).catch(()=>{});\n return result;\n};\nwindow.HC320Dni={reference,reset,submit};\nconst intake=q('#pDni')?.closest('.field');\nif(intake){\n const actions=document.createElement('div');\n actions.className='hc320IntakeActions';\n actions.innerHTML='<button type=\"button\" class=\"btn small\" id=\"hc320ScanDni\">Escanear DNI</button><button type=\"button\" class=\"btn small\" id=\"hc320IntakeThumb\" hidden aria-label=\"Ampliar foto del DNI\" title=\"Ampliar foto del DNI\"><img alt=\"\"></button><span id=\"hc320IntakeDniStatus\" role=\"status\"></span>';\n intake.append(actions);q('#hc320ScanDni').onclick=scanner;\n}\nconst portraits='.hc314ProfilePhoto img,.hcSettingsAvatar img,.hc296Portrait,.hc289MemberPhoto img';\nfunction preparePortraits(node){\n const images=node.matches?.(portraits)?[node]:node.querySelectorAll?.(portraits)||[];\n for(const image of images){\n   if(image.closest('button,a')||image.matches('.hc320ProfileZoom')||!imageData.test(image.getAttribute('src')||''))continue;\n   image.classList.add('hc320ProfileZoom');image.tabIndex=0;image.setAttribute('role','button');image.setAttribute('aria-label','Ampliar foto de perfil');\n   image.addEventListener('click',()=>showPhotos(()=>image.src,null));\n   image.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();image.click();}});\n }\n}\nnew MutationObserver(records=>{for(const record of records){for(const node of record.addedNodes)if(node.nodeType===Node.ELEMENT_NODE)preparePortraits(node);}}).observe(document.body,{subtree:true,childList:true});\npreparePortraits(document.body);\n})();\n</script>\n",
+  "revisions": [
+    [
+      "function hcInstitutionChooserClose(){",
+      "function hcInstitutionChooserClose(cancelled=false){"
+    ],
+    [
+      "  const workspace=document.getElementById(\"hc297Workspace\");\n  if(wasOpen&&workspace){workspace.inert=false;workspace.querySelector(\"[data-pro-profile]\")?.focus({preventScroll:true});}",
+      "  const workspace=document.getElementById(\"hc297Workspace\"),onCancel=modal?.hc320OnCancel;\n  if(modal)modal.hc320OnCancel=null;\n  if(wasOpen&&workspace){\n    workspace.inert=false;\n    if(cancelled&&onCancel)onCancel();\n    else workspace.querySelector(\"[data-pro-profile]\")?.focus({preventScroll:true});\n  }"
+    ],
+    [
+      "if(e.target.closest(\"#btnCloseInstitutionChooser\"))hcInstitutionChooserClose();",
+      "if(e.target.closest(\"#btnCloseInstitutionChooser\"))hcInstitutionChooserClose(true);"
+    ],
+    [
+      " nativeChooser(rows,opts);\n if(workspace){",
+      " nativeChooser(rows,opts);\n $('#institutionChooserModal').hc320OnCancel=opts.onCancel;\n if(workspace){"
+    ],
+    [
+      "root.hc320Switch=()=>{window.hcSettingsClose?.();hcInstitutionChooserOpen(hcGlobalStoredInstitutions?.()||[],{switching:true});};",
+      "root.hc320Switch=()=>{\n   const returnToSettings=!!$('#hcSettingsModal.show.hc319WorkspaceSettings');\n   window.hcSettingsClose?.();\n   hcInstitutionChooserOpen(hcGlobalStoredInstitutions?.()||[],{switching:true,\n     onCancel:returnToSettings?()=>window.hcSettingsOpen('private-workspaces',root):null});\n };"
+    ],
+    [
+      "'#institutionChooserList button,#btnCloseInstitutionChooser')];",
+      "'#institutionChooserModal button')];"
+    ],
+    [
+      "</button><h3>'+E(agendaMonth.toLocaleDateString('es-AR',{month:'long',year:'numeric'}))+'</h3><button data-agenda-month=\"1\">",
+      "</button><button type=\"button\" data-agenda-month-picker aria-label=\"Elegir mes y año\">'+E(agendaMonth.toLocaleDateString('es-AR',{month:'long',year:'numeric'}))+'</button><button data-agenda-month=\"1\">"
+    ],
+    [
+      "q('#hc289AgendaCalendar').querySelectorAll('[data-agenda-month]').forEach",
+      "q('#hc289AgendaCalendar [data-agenda-month-picker]').onclick=event=>window.HC320Month.open(event.currentTarget,agendaMonth,date=>{agendaMonth=date;draw().catch(e=>q('#hc289AgendaStatus').textContent=e.message);});q('#hc289AgendaCalendar').querySelectorAll('[data-agenda-month]').forEach"
+    ],
+    [
+      "      item.updatedAt=isoNowLocalFull();\n      window.hc224MarkClinicalFieldDirty?.(pid,\"prescripciones\");\n      hcBackendMarkLocalSavedSoon();\n      hcBackendScheduleUrgentPush();\n    }else if(!hcUpdateInfusionItemFromMlHour",
+      "      item.updatedAt=isoNowLocalFull();\n    }else if(!hcUpdateInfusionItemFromMlHour"
+    ],
+    [
+      "dialog.close();\n   select(date);",
+      "dialog.close();\n   select(date);\n   if(trigger.isConnected)trigger.focus({preventScroll:true});"
+    ],
+    [
+      "    pane.replaceChildren(destination,actions,status,steps);",
+      "    const attribution=document.createElement('small');attribution.textContent='Google Maps';attribution.hidden=true;\n    pane.replaceChildren(destination,actions,status,steps,attribution);"
+    ],
+    [
+      "button.disabled=true;status.textContent='Obteniendo tu ubicación…';steps.replaceChildren();",
+      "button.disabled=true;status.textContent='Obteniendo tu ubicación…';steps.replaceChildren();attribution.hidden=true;"
+    ],
+    [
+      "       steps.replaceChildren(...result.steps.map(instruction=>{",
+      "       attribution.hidden=false;\n       steps.replaceChildren(...result.steps.map(instruction=>{"
+    ],
+    [
+      "body .hc304Mainbar #whoami {order:3",
+      "body .hc304Mainbar #whoami[hidden] {display:none!important}\nbody .hc304Mainbar #whoami {order:3"
+    ],
+    [
+      ".hc320RichInput:focus-visible",
+      ".hc320RichInput:empty[data-placeholder]::before {content:attr(data-placeholder);color:var(--hc-theme-muted,#91a5b7);pointer-events:none}\n.hc320RichInput:focus-visible"
+    ],
+    [
+      "textarea.hc320RichSource {display:none!important}",
+      "textarea.hc320RichSource {position:absolute!important;width:1px!important;height:1px!important;min-height:0!important;min-width:0!important;padding:0!important;border:0!important;clip-path:inset(100%);overflow:hidden}\n.hc320RichTools[hidden] {display:none!important}"
+    ],
+    [
+      " editor.setAttribute('aria-label',label.trim());",
+      " editor.setAttribute('aria-label',label.trim()||'Texto libre');\n if(textarea.placeholder)editor.dataset.placeholder=textarea.placeholder;\n textarea.tabIndex=-1;\n textarea.addEventListener('focus',()=>editor.focus());"
+    ],
+    [
+      ".hc320DniThumb img {width:100%;height:100%;object-fit:contain}",
+      ".hc320DniThumb img {width:100%;height:100%;object-fit:contain}\n.hc320DniThumb img[hidden],#hc320IntakeThumb[hidden] {display:none!important}\n.hc320IntakeActions {display:flex;flex-wrap:wrap;align-items:center;gap:4px;margin-top:4px}\n#hc320IntakeThumb img {display:block;width:37px;height:26px;object-fit:contain}"
+    ],
+    [
+      "const marker=/⟦hc320:([A-Za-z0-9+/=]{1,90000})⟧/g;",
+      "const marker=/⟦hc320:(\\d{1,5}):([A-Za-z0-9+/=]{1,90000})⟧/g;\nconst partial=/⟦hc320:[\\d:A-Za-z0-9+/=]*$/;"
+    ],
+    [
+      "     const content=decode(match[1],doc);\n     result.append(doc.createTextNode(value.slice(last,match.index)),content);\n     last=match.index+match[0].length;\n   }catch{}\n }\n result.append(doc.createTextNode(value.slice(last)));",
+      "     const start=match.index-Number(match[1]);\n     if(start<last)result.append(doc.createTextNode(value.slice(last,match.index)));\n     else result.append(doc.createTextNode(value.slice(last,start)),decode(match[2],doc));\n   }catch{result.append(doc.createTextNode(value.slice(last,match.index)));}\n   last=match.index+match[0].length;\n }\n result.append(doc.createTextNode(value.slice(last).replace(partial,'')));"
+    ],
+    [
+      "function encode(markup){\n const bytes",
+      "function encode(markup,plain){\n const bytes"
+    ],
+    [
+      " return '⟦hc320:'+btoa(raw)+'⟧';",
+      " return plain+'⟦hc320:'+plain.length+':'+btoa(raw)+'⟧';"
+    ],
+    [
+      "   if(![...node.data.matchAll(marker)].length)continue;",
+      "   if(!partial.test(node.data)&&![...node.data.matchAll(marker)].length)continue;"
+    ],
+    [
+      "     const encoded=encode(holder.innerHTML);",
+      "     const encoded=encode(holder.innerHTML,value.trim());"
+    ],
+    [
+      "    const actions=document.createElement('div');actions.className='hc320MonthFields';actions.append(button,maps);\n    const status",
+      "    const actions=document.createElement('div');actions.className='hc320MonthFields';actions.append(button,maps);\n    const locationNote=document.createElement('small');locationNote.textContent='El cálculo usa Google Maps con tu ubicación y la dirección del turno.';\n    const status"
+    ],
+    [
+      "    pane.replaceChildren(destination,actions,status,steps,attribution);",
+      "    pane.replaceChildren(destination,actions,locationNote,status,steps,attribution);"
+    ],
+    [
+      "  const CURRENT_VERSION = 317;",
+      "  const CURRENT_VERSION = 320;"
+    ]
+  ]
+}
