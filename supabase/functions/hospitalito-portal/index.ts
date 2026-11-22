@@ -101,10 +101,15 @@ async function provider(c:any,id:string){const p=ok(await c.from('hc_portal_prov
 async function providerAuthority(c:any,a:any,p:any){staff(a);if(!a.global&&p.institution_id!==a.institutionId)throw Error('Agenda de otra institución.');if(!a.global&&a.role!=='admin'&&p.username!==a.username)throw Error('Sólo podés modificar tu propia agenda.');}
 async function busyFor(c:any,p:any,from:string,to:string){
  const others=ok(await c.from('hc_portal_providers').select('id').eq('username',p.username));const ids=others.map((x:any)=>x.id);
- const [br,bl]=await Promise.all([c.from('hc_portal_bookings').select('starts_at,ends_at,status').in('provider_id',ids).in('status',['pending','confirmed']).gte('starts_at',from).lt('starts_at',to),c.from('hc_portal_blocks').select('starts_at,ends_at').in('provider_id',ids).lt('starts_at',to).gt('ends_at',from)]);
+ const [br,bl,priv]=await Promise.all([
+   c.from('hc_portal_bookings').select('starts_at,ends_at,status').in('provider_id',ids).in('status',['pending','confirmed']).gt('ends_at',from).lt('starts_at',to),
+   c.from('hc_portal_blocks').select('starts_at,ends_at').in('provider_id',ids).lt('starts_at',to).gt('ends_at',from),
+   c.rpc('hc317_private_busy',{who:p.username,first_at:from,last_at:to})
+ ]);
  const busy=[...ok(br),...ok(bl)].map((x:any)=>({start:x.starts_at,end:x.ends_at}));
+ busy.push(...ok(priv).map((x:any)=>({start:x.start_at,end:x.end_at})));
  const memberships=ok(await c.from('hc_auth_memberships').select('institution_id').eq('username',p.username).eq('active',true));const institutions=memberships.length?ok(await c.from('hc_auth_institutions').select('data_institution_id').in('id',memberships.map((m:any)=>m.institution_id)).eq('active',true)):[];
- for(const inst of institutions){const arr=await stateValue(c,inst.data_institution_id,'appointments');for(const a of Array.isArray(arr)?arr:[]){if(a.doctorId!==p.username||['cancelado','cancelled','anulado'].includes(a.status))continue;const start=new Date(String(a.date)+'T'+String(a.time)+'-03:00');if(Number.isFinite(+start)&&+start>=Date.parse(from)&&+start<Date.parse(to))busy.push({start:start.toISOString(),end:new Date(+start+(Number(a.durationMinutes||a.minutes)||30)*60000).toISOString()});}}
+ for(const inst of institutions){const arr=await stateValue(c,inst.data_institution_id,'appointments');for(const a of Array.isArray(arr)?arr:[]){if(a.doctorId!==p.username||['cancelado','cancelled','anulado'].includes(a.status))continue;const start=new Date(String(a.date)+'T'+String(a.time)+'-03:00');const finish=+start+(Number(a.durationMinutes||a.minutes)||30)*60000;if(Number.isFinite(+start)&&finish>Date.parse(from)&&+start<Date.parse(to))busy.push({start:start.toISOString(),end:new Date(finish).toISOString()});}}
  return busy;
 }
 async function effectiveWeekly(c:any,p:any){if(p.private_practice)return p.weekly;const i=await institution(c,p.institution_id),s=await stateValue(c,i.data_institution_id,'doctorSchedules'),n=s?.[p.username];return n?.days&&Date.parse(n.updatedAt?(/(Z|[+-]\d{2}:\d{2})$/.test(n.updatedAt)?n.updatedAt:n.updatedAt+'-03:00'):'1970-01-01Z')>Date.parse(p.weekly?.updatedAt||'1970-01-01')?n:p.weekly;}
@@ -151,7 +156,49 @@ Deno.serve(async(req:Request)=>{
  if(action==='calendar'){const p=await provider(c,text(b.providerId));if(a.role==='cliente'){const d=await directory(c);if(!d.providers.some((x:any)=>x.id===p.id))throw Error('Agenda no publicada.');}else await providerAuthority(c,a,p);return response(await calendar(c,p,text(b.month,7)));}
  if(action==='book'){client(a);const p=await provider(c,text(b.providerId)),startLocal=text(b.startLocal,16);if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(startLocal))throw Error('Horario inválido.');p.weekly=await effectiveWeekly(c,p);const day=new Date(startLocal.slice(0,10)+'T12:00Z').getUTCDay(),span=Number(p.weekly?.days?.[day]?.minutes)||30,start=new Date(startLocal+':00-03:00');if(!Number.isFinite(+start))throw Error('Horario inválido.');const booking=ok(await c.from('hc_portal_bookings').insert({provider_id:p.id,username:a.username,starts_at:start.toISOString(),ends_at:new Date(+start+span*60000).toISOString(),reason:text(b.reason,1000),telemedicine:!!b.telemedicine}).select('id,starts_at,ends_at,status').single());await audit(c,a,'book',p.institution_id,booking.id);return response({ok:true,booking});}
  if(action==='listBookings'){staff(a);const providers=ok(await c.from('hc_portal_providers').select('id,username').eq('institution_id',inst));const allowed=providers.filter((p:any)=>a.global||a.role==='admin'||p.username===a.username).map((p:any)=>p.id);const bookings=allowed.length?ok(await c.from('hc_portal_bookings').select('*').in('provider_id',allowed).order('starts_at',{ascending:false}).limit(300)):[];const names=[...new Set(bookings.map((b:any)=>b.username))],clients=names.length?ok(await c.from('hc_portal_clients').select('username,legal_name,dni').in('username',names)):[];return response({ok:true,bookings:bookings.map((b:any)=>({...b,client:clients.find((p:any)=>p.username===b.username)}))});}
- if(action==='bookingStatus'){const booking=ok(await c.from('hc_portal_bookings').select('*').eq('id',text(b.id)).single()),p=await provider(c,booking.provider_id),status=text(b.status);if(a.role==='cliente'){if(booking.username!==a.username||status!=='cancelled')throw Error('Reserva no autorizada.');}else{await providerAuthority(c,a,p);if(!['confirmed','cancelled','attended'].includes(status))throw Error('Estado inválido.');}ok(await c.from('hc_portal_bookings').update({status,updated_at:new Date().toISOString()}).eq('id',booking.id));await audit(c,a,'booking_'+status,p.institution_id,booking.id);return response({ok:true});}
+ if(action==='joinWaitlist'||action==='myWaitlist'||action==='leaveWaitlist'){
+   client(a);
+   if(action==='joinWaitlist'){
+     const firstDay=text(b.date,10);
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(firstDay))throw Error('Fecha inválida');
+     const entry=ok(await c.rpc('hc317_join_waitlist',{
+       patient:a.username,care_mode:text(b.mode,30),care_role:text(b.role,30),care_specialty:text(b.specialty,150),first_day:firstDay
+     }));
+     return response({ok:true,entry});
+   }
+   if(action==='leaveWaitlist'){
+     ok(await c.from('hc_appointment_waitlist').delete().eq('id',text(b.id,40)).eq('username',a.username));
+     return response({ok:true});
+   }
+   const today=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+   const entries=ok(await c.from('hc_appointment_waitlist').select('id,mode,role,specialty,from_day,until_day').eq('username',a.username).gte('until_day',today).order('from_day'));
+   return response({ok:true,entries});
+ }
+ if(action==='rescheduleBooking'){
+   client(a);
+   const start=text(b.startLocal,16),previous=text(b.previousStart,40);
+   if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(start)||!Number.isFinite(Date.parse(previous)))throw Error('Horario inválido');
+   const booking=ok(await c.rpc('hc317_change_institution_booking',{
+     patient:a.username,booking:text(b.id,40),previous_start:previous,new_start:start+':00-03:00'
+   }));
+   return response({ok:true,booking});
+ }
+ if(action==='bookingStatus'){
+   const booking=ok(await c.from('hc_portal_bookings').select('*').eq('id',text(b.id)).single());
+   const status=text(b.status);
+   if(a.role==='cliente'){
+     if(booking.username!==a.username||status!=='cancelled')throw Error('Reserva no autorizada.');
+     ok(await c.rpc('hc317_change_institution_booking',{
+       patient:a.username,booking:booking.id,previous_start:typeof b.previousStart==='string'?text(b.previousStart,40):booking.starts_at,new_start:null
+     }));
+   }else{
+     const p=await provider(c,booking.provider_id);await providerAuthority(c,a,p);
+     if(!['confirmed','cancelled','attended'].includes(status))throw Error('Estado inválido.');
+     ok(await c.from('hc_portal_bookings').update({status,updated_at:new Date().toISOString()}).eq('id',booking.id));
+     await audit(c,a,'booking_'+status,p.institution_id,booking.id);
+   }
+   return response({ok:true});
+ }
  if(action==='linkedClients'){staff(a);await institution(c,inst);const links=ok(await c.from('hc_portal_verifications').select('username,patient_id').eq('institution_id',inst).eq('status','verified').limit(300));const users=links.length?ok(await c.from('hc_portal_clients').select('username,legal_name,dni').in('username',links.map((l:any)=>l.username))):[];return response({ok:true,clients:users});}
  if(action==='listOrders'){staff(a);let q=c.from('hc_portal_orders').select('*').eq('institution_id',inst).order('created_at',{ascending:false}).limit(300);if(['bioquimico','microbiologo','imagenologo'].includes(a.role))q=q.eq('kind',Object.keys(reportRoles).find(k=>reportRoles[k]===a.role));else if(!a.global&&!['admin','medico'].includes(a.role))throw Error('Bandeja no autorizada.');return response({ok:true,orders:ok(await q)});}
  if(action==='createOrder'){if(a.role!=='medico')throw Error('La solicitud debe emitirla un médico de la institución.');await verified(c,text(b.username),inst);if(!reportRoles[b.kind]||!text(b.text,4000))throw Error('Indicá servicio y estudios.');const order=ok(await c.from('hc_portal_orders').insert({institution_id:inst,username:text(b.username),kind:b.kind,requested_text:text(b.text,4000),requested_by:a.username}).select('*').single());await audit(c,a,'order',inst,order.id);return response({ok:true,order});}

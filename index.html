@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v316 · Historia Clínica Digital</title>
+<title>Hospitalito v317 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v316</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v317</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -47474,7 +47474,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 316;
+  const CURRENT_VERSION = 317;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -50549,7 +50549,9 @@ function appointmentsView(loading=false){
  const root=main();if(!root)return;root.dataset.view='appointments';bookingUI=null;
  let rows=allBookings().filter(b=>appointmentsTab==='history'?['past','cancelled'].includes(bookingColor(b)):['future','pending'].includes(bookingColor(b)));
  if(appointmentsTab==='history')rows=rows.slice().reverse();
- root.innerHTML=window.HC314.sectionHeader('Mis Turnos','<button type="button" class="hc314Ghost" data-hc305-refresh '+(loading?'disabled':'')+'>Actualizar</button>')+'<p class="hc289Notice">Turnos de instituciones, Telemedicina y Consultorio Privado en una sola lista.</p><div class="hc305AppointmentTabs" role="group" aria-label="Filtrar mis turnos"><button type="button" data-hc305-filter="upcoming" aria-pressed="'+(appointmentsTab==='upcoming')+'">Próximos</button><button type="button" data-hc305-filter="history" aria-pressed="'+(appointmentsTab==='history')+'">Historial</button></div><p id="hc305AppointmentStatus" role="status"></p><div id="hc305AppointmentList">'+(rows.length?rows.map(bookingRow).join(''):appointmentEmpty(loading))+'</div>';
+ root.innerHTML=window.HC314.sectionHeader('Mis Turnos','<button type="button" class="hc314Ghost" data-hc305-refresh '+(loading?'disabled':'')+'>Actualizar</button>')+'<p class="hc289Notice">Turnos de instituciones, Telemedicina y Consultorio Privado en una sola lista.</p><div class="hc305AppointmentTabs" role="group" aria-label="Filtrar mis turnos"><button type="button" data-hc305-filter="upcoming" aria-pressed="'+(appointmentsTab==='upcoming')+'">Próximos</button><button type="button" data-hc305-filter="history" aria-pressed="'+(appointmentsTab==='history')+'">Historial</button></div><p id="hc305AppointmentStatus" role="status"></p><div id="hc305AppointmentList">'+(rows.length?rows.map(bookingRow).join(''):appointmentEmpty(loading))+'</div><details class="hc289Panel" data-waitlist-panel><summary>Lista de espera</summary><div data-waitlist-entries></div></details>';
+ const waitPanel=root.querySelector('[data-waitlist-panel]');
+ waitPanel.ontoggle=()=>{if(waitPanel.open)window.HC317.waitlist(waitPanel.querySelector('[data-waitlist-entries]'));};
  updatePortalNavigation();
 }
 async function openMyAppointments(){
@@ -50645,7 +50647,7 @@ function changeMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1)
 function dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML=window.HC314.sectionHeader(window.HC313.dayLabel(key))+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'');updatePortalNavigation();}
 function bookingRow(b){
  const p=directory.providers.find(p=>p.id===b.provider_id),color=bookingColor(b),privateVisit=!!b.privateVisit,name=b.peer_name||p?.name||b.provider_name||'Profesional';
- return '<article class="hc289Row hc304Appointment '+color+'"><div><b>'+E(name)+'</b><p>'+E(format(b.starts_at))+' · '+E(privateVisit?(window.HC310.modeLabel(b.mode)):b.telemedicine?'Telemedicina institucional':'Institución')+'</p><span class="hc305Status '+color+'">'+E(statusLabel(b.status))+'</span>'+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class="hc305AppointmentActions">'+(privateVisit?'<button type="button" data-304-visit="'+E(b.id)+'">Ver consulta y pagos</button>':'')+'<button type="button" data-hc305-date="'+E(localDate(b.starts_at))+'">Ver en calendario</button>'+(!privateVisit&&['pending','confirmed'].includes(b.status)?'<button type="button" data-289-cancel="'+E(b.id)+'">Cancelar turno</button>':'')+'</div></div></article>';
+ return '<article class="hc289Row hc304Appointment '+color+'"><div><b>'+E(name)+'</b><p>'+E(format(b.starts_at))+' · '+E(privateVisit?(window.HC310.modeLabel(b.mode)):b.telemedicine?'Telemedicina institucional':'Institución')+'</p><span class="hc305Status '+color+'">'+E(statusLabel(b.status))+'</span>'+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class="hc305AppointmentActions">'+(privateVisit?'<button type="button" data-304-visit="'+E(b.id)+'">Ver consulta y pagos</button>':'')+'<button type="button" data-hc305-date="'+E(localDate(b.starts_at))+'">Ver en calendario</button>'+(window.HC317.canChange(b)?'<button type="button" data-appointment-action="move" data-appointment-id="'+E(b.id)+'">Reprogramar turno</button><button type="button" data-appointment-action="cancel" data-appointment-id="'+E(b.id)+'">Cancelar turno</button>':'')+'</div></div></article>';
 }
 function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML=window.HC314.sectionHeader('Mis Estudios')+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(window.HC313.dateTime(r.date))+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
 window.hc310ReleaseBooking=()=>{bookingUI=null;};
@@ -50768,7 +50770,7 @@ async function clientAccount(section){
 }
 window.hc289ClientAccount=clientAccount;
 async function logoutClient(){const saved=window.hc289ClientSession;localStorage.removeItem('hc289.client');window.hc289ClientSession=null;requestSerial++;locked=false;q('#hc289Portal')?.remove();q('#hc289Dialog')?.remove();q('#hc289ClientLock')?.remove();document.body.classList.remove('hc289Client');location.reload();}
-document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-hc314-close-section')){calendarView();main().querySelector('.hc310CalendarViewport')?.focus({preventScroll:true});return;}if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(window.HC313.dateTime(a.date))+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
+document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.dataset.appointmentAction){const booking=allBookings().find(item=>String(item.id)===b.dataset.appointmentId);if(booking&&window.HC317.canChange(booking))window.HC317.manage(booking,b.dataset.appointmentAction);else window.hc289Toast('El turno cambió. Actualizá Mis Turnos.');return;}if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-hc314-close-section')){calendarView();main().querySelector('.hc310CalendarViewport')?.focus({preventScroll:true});return;}if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(window.HC313.dateTime(a.date))+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
 for(const event of ['pointerdown','keydown','touchstart'])document.addEventListener(event,()=>{if(!locked)lastActivity=Date.now();},{passive:true});
 setInterval(()=>{if(!window.hc289ClientSession||document.hidden)return;if(!locked&&Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username)||0)>0&&Date.now()-lastActivity>Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username))*60000){locked=true;q('#hc289Portal').inert=true;q('#hc289AccountMenu').hidden=true;const preserved=q('#hc289Dialog');if(preserved){preserved.id='hc289PreservedDialog';preserved.inert=true;}const el=dialog('Sesión bloqueada','<p>Confirmá tu contraseña para continuar. Tu formulario se conserva.</p><form><input type="password" name="password" autocomplete="current-password" aria-label="Contraseña" required><p><button type="submit">Continuar</button><button type="button" id="hc289LockedDevice">Huella, rostro o PIN</button><button type="button" id="hc289LockedExit">SALIR</button></p><p role="status"></p></form>');el.id='hc289ClientLock';el.style.zIndex=2147483646;el.querySelector('[data-289-close]').remove();el.querySelector('#hc289LockedExit').onclick=logoutClient;const device=el.querySelector('#hc289LockedDevice');device.disabled=location.origin!=='https://walterrigoni.github.io'||!window.PublicKeyCredential;device.onclick=e=>run(e.currentTarget,async()=>{const a=await window.hc280Access.authenticate(window.hc289ClientSession.user.username);if(a.user.role!=='cliente')throw Error('Cuenta no habilitada para el portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:e.target.elements.password.value});if(a.user.role!=='cliente')throw Error('Esta cuenta ya no tiene acceso al portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));};}else if(!locked)refresh();},8000);
 let saved;try{saved=JSON.parse(localStorage.getItem('hc289.client')||'null');}catch{}if(saved?.token&&saved.user?.role==='cliente')setTimeout(()=>window.hc289EnterClient(saved),50);
@@ -50895,9 +50897,22 @@ const options=(r,extra=[])=>[...new Set([...(catalog[r]||[]),...extra].filter(Bo
 window.hc292SpecialtyOptions=(r,extra=[])=>options(r,extra);
 window.hc292Tele={api,money,when,dialog,run,E,roles};
 window.hc296Notifications=async function({fullscreen=false}={}){
- const el=dialog('Avisos','<p>'+(window.hc289ClientSession?'Recibí aquí un aviso 24 horas antes de tus turnos confirmados.':'Acá aparecen las nuevas solicitudes de turno.')+'</p><button type="button" data-read>Marcar como leídos</button><div data-reminders role="status">Cargando…</div>',{fullscreen});
+ const el=dialog('Avisos','<p>'+(window.hc289ClientSession?'Acá aparecen tus recordatorios, cambios de turnos y avisos de la lista de espera.':'Acá aparecen las solicitudes y los cambios de turno.')+'</p><button type="button" data-read>Marcar como leídos</button><div data-reminders role="status">Cargando…</div>',{fullscreen});
  const box=el.querySelector('[data-reminders]');let messages=[];
- const refresh=async()=>{try{const j=await api('notifications');if(!el.isConnected)return;messages=j.notifications||[];box.innerHTML=messages.map(n=>'<article class="hc289Panel"><b>'+E(n.title)+(n.read_at?'':' · Nuevo')+'</b><p>'+E(n.body)+'</p><button type="button" data-reminder-visit="'+E(n.payload?.visitId||'')+'" data-institution-visit="'+E(n.payload?.bookingId||'')+'" data-visit-mode="'+E(n.payload?.mode||'')+'">Ver turno</button></article>').join('')||'<p>No tenés recordatorios todavía.</p>';box.querySelectorAll('[data-reminder-visit]').forEach(b=>b.onclick=()=>{
+ const refresh=async()=>{try{const j=await api('notifications');if(!el.isConnected)return;messages=j.notifications||[];box.innerHTML=messages.map((n,i)=>{
+  const payload=n.payload||{};
+  const action=n.kind==='appointment_waitlist'
+    ?'<button type="button" data-waitlist-offer="'+i+'">Consultar disponibilidad</button>'
+    :payload.visitId||payload.bookingId&&window.hc289ClientSession
+      ?'<button type="button" data-reminder-visit="'+E(payload.visitId||'')+'" data-institution-visit="'+E(payload.bookingId||'')+'" data-visit-mode="'+E(payload.mode||'')+'">Ver turno</button>':'';
+  return '<article class="hc289Panel"><b>'+E(n.title)+(n.read_at?'':' · Nuevo')+'</b><p>'+E(n.body)+'</p>'+action+'</article>';
+ }).join('')||'<p>No tenés avisos todavía.</p>';
+ box.querySelectorAll('[data-waitlist-offer]').forEach(b=>b.onclick=()=>{
+  const offer=messages[Number(b.dataset.waitlistOffer)]?.payload;
+  if(!offer?.local||!window.hc289ClientSession)return;
+  window.hc292Search({mode:offer.mode,day:offer.local.slice(0,10),role:offer.role,specialty:offer.specialty,providerId:offer.providerId,startLocal:offer.local,minutes:offer.minutes});
+ });
+ box.querySelectorAll('[data-reminder-visit]').forEach(b=>b.onclick=()=>{
   if(b.dataset.institutionVisit){el.hc311Dismiss?.();return window.hc310InstitutionVisit(b.dataset.institutionVisit);}
   if(window.hc289ClientSession||!b.dataset.visitMode)return window.hc292Visit(b.dataset.reminderVisit);
   el.remove();window.HC310.openProfessionalVisit(b.dataset.reminderVisit,b.dataset.visitMode);
@@ -50924,13 +50939,16 @@ window.hc292Search=async function(initial={}){
  },
  verifyInstitution:id=>window.hc289PortalApi('requestVerification',{institutionId:id}),
    getAvailability:(profiles,mode,date)=>api('availability',{providers:profiles.map(p=>p.username),mode,date}),
+   nextPrivate:(profiles,mode,firstDay,lastDay)=>api('nextSlots',{providers:profiles.map(p=>p.username),mode,firstDay,lastDay}),
+   joinWaitlist:filter=>window.hc289PortalApi('joinWaitlist',filter),
    getInstitutionSlots:(providerId,month)=>window.hc289PortalApi('calendar',{providerId,month}),
    bookInstitution:(providerId,slot,reason)=>window.hc289PortalApi('book',{providerId,startLocal:slot.local,reason,telemedicine:false}),
-   detail:(provider,mode,date)=>detail(provider,mode,date)
+   detail:(provider,mode,date,preselected)=>detail(provider,mode,date,preselected)
  });
- async function detail(p,mode,date){const box=q('#hc292Provider'),m=p.modes[mode],trial=p.trialAvailable===true;box.innerHTML='<section class="hc289Panel"><nav class="hc300ProfileNav" aria-label="Navegación de la ficha"><button type="button" data-hc300-back-profile title="Volver al listado" aria-label="Volver al listado de profesionales">↩</button><button type="button" data-hc300-close-profile title="Cerrar ficha" aria-label="Cerrar ficha del profesional">×</button></nav>'+portrait(p)+'<h2>'+E(p.name)+'</h2><p><b>'+E(p.specialty)+'</b> · '+E(roles[p.role])+'</p><p>Matrícula declarada: '+E(p.credential)+'</p><p>'+E(p.description)+'</p>'+window.hc297BankInfo(p,mode)+'<p>'+E(mode==='office'?'Elegí el horario y la ubicación del consultorio.':mode==='home'?'Elegí el horario e indicá la dirección de la visita.':'Atención por videollamada privada')+'</p><label>Duración y precio<select id="hc292Plan">'+m.rates.map(r=>'<option value="'+r.minutes+'">'+r.minutes+' minutos · '+(trial?'Gratis · $0':money(r.amount_cents))+'</option>').join('')+'</select></label><p id="hc292PaymentSummary"></p><h3>Horarios · '+E(window.HC313.date(date))+'</h3><div id="hc292Slots" class="hc289Slots"></div>'+(mode==='home'?'<label>Dirección del domicilio<input id="hc310Address" autocomplete="street-address" maxlength="500" required></label>':'')+'<label>Motivo de consulta<textarea id="hc292Reason" rows="2" maxlength="1000"></textarea></label><details><summary>Condiciones de cancelación</summary><p>'+E(directory.cancellationPolicy||'Pendientes de configurar por Hospitalito.')+'</p></details><label class="hc289Check"><input type="checkbox" id="hc292Accept">Acepto el precio y las condiciones de esta reserva.</label><p><button id="hc292Reserve" class="hc289Primary" disabled>'+E(trial?'Confirmar reserva gratuita':'Reservar y elegir medio de pago')+'</button></p><p id="hc292ReserveStatus" role="status"></p><a class="hc299Map" id="hc299Route" target="_blank" rel="noopener noreferrer" hidden>↗ Cómo llegar</a></section>';box.classList.add('hc309SelectedProfile');
+ async function detail(p,mode,date,preselected){const box=q('#hc292Provider'),m=p.modes[mode],trial=p.trialAvailable===true;box.innerHTML='<section class="hc289Panel"><nav class="hc300ProfileNav" aria-label="Navegación de la ficha"><button type="button" data-hc300-back-profile title="Volver al listado" aria-label="Volver al listado de profesionales">↩</button><button type="button" data-hc300-close-profile title="Cerrar ficha" aria-label="Cerrar ficha del profesional">×</button></nav>'+portrait(p)+'<h2>'+E(p.name)+'</h2><p><b>'+E(p.specialty)+'</b> · '+E(roles[p.role])+'</p><p>Matrícula declarada: '+E(p.credential)+'</p><p>'+E(p.description)+'</p>'+window.hc297BankInfo(p,mode)+'<p>'+E(mode==='office'?'Elegí el horario y la ubicación del consultorio.':mode==='home'?'Elegí el horario e indicá la dirección de la visita.':'Atención por videollamada privada')+'</p><label>Duración y precio<select id="hc292Plan">'+m.rates.map(r=>'<option value="'+r.minutes+'">'+r.minutes+' minutos · '+(trial?'Gratis · $0':money(r.amount_cents))+'</option>').join('')+'</select></label><p id="hc292PaymentSummary"></p><h3>Horarios · '+E(window.HC313.date(date))+'</h3><div id="hc292Slots" class="hc289Slots"></div>'+(mode==='home'?'<label>Dirección del domicilio<input id="hc310Address" autocomplete="street-address" maxlength="500" required></label>':'')+'<label>Motivo de consulta<textarea id="hc292Reason" rows="2" maxlength="1000"></textarea></label><details><summary>Condiciones de cancelación</summary><p>'+E(directory.cancellationPolicy||'Pendientes de configurar por Hospitalito.')+'</p></details><label class="hc289Check"><input type="checkbox" id="hc292Accept">Acepto el precio y las condiciones de esta reserva.</label><p><button id="hc292Reserve" class="hc289Primary" disabled>'+E(trial?'Confirmar reserva gratuita':'Reservar y elegir medio de pago')+'</button></p><p id="hc292ReserveStatus" role="status"></p><a class="hc299Map" id="hc299Route" target="_blank" rel="noopener noreferrer" hidden>↗ Cómo llegar</a></section>';box.classList.add('hc309SelectedProfile');
  box.querySelector('h2').tabIndex=-1;box.querySelector('h2').focus();
  box.scrollIntoView({block:'start'});let selected=null,revision=p.revision,slotSerial=0,requestId=crypto.randomUUID(),reserving=false;const plan=q('#hc292Plan'),reserve=q('#hc292Reserve'),status=q('#hc292ReserveStatus');
+ if(preselected?.minutes&&m.rates.some(rate=>rate.minutes===preselected.minutes))plan.value=String(preselected.minutes);
  const closeProfile=()=>{slotSerial++;selected=null;box.replaceChildren();const trigger=[...q('#hc292Directory').querySelectorAll('[data-result]')].find(b=>b.querySelector('b')?.textContent===p.name);trigger?.focus({preventScroll:true});q('#hc292Directory').scrollIntoView({block:'nearest'});};box.querySelector('[data-hc300-back-profile]').onclick=closeProfile;box.querySelector('[data-hc300-close-profile]').onclick=closeProfile;
  const address=box.querySelector('#hc310Address');
  const officeReady=()=>mode!=='office'||directory.officePaymentsReady===true;const can=()=>reserve.disabled=reserving||!selected||(address&&address.value.trim().length<5)||!q('#hc292Accept').checked||!trial&&(!directory.paymentsReady||!p.paymentsConnected||!officeReady());
@@ -50944,7 +50962,14 @@ window.hc292Search=async function(initial={}){
  }
  revision=j.profileRevision;q('#hc292Slots').innerHTML=j.slots.map((s,i)=>'<button data-tele-slot="'+i+'" '+(!s.available?'disabled':'')+'>'+E(window.HC313.time(s.local))+(s.address?'<br><small>'+E(s.location||'Consultorio')+' · '+E(s.address)+'</small>':'')+(!s.available?' · ocupado':'')+'</button>').join('')||'No quedan horarios para esa duración.';q('#hc292Slots').querySelectorAll('button').forEach(b=>b.onclick=()=>{const slot=j.slots[Number(b.dataset.teleSlot)];
  if(selected?.start!==slot.start){requestId=crypto.randomUUID();q('#hc292Accept').checked=false;}
- selected=slot;status.dataset.location='true';status.textContent=selected.address?'Ubicación elegida: '+selected.address:'';const route=q('#hc299Route'),url=window.HC299Geo.mapURL(selected);route.hidden=!url;if(url)route.href=url;q('#hc292Slots').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));can();});}catch(e){if(attempt===slotSerial&&plan.isConnected)q('#hc292Slots').textContent=e.message;}}
+ selected=slot;status.dataset.location='true';status.textContent=selected.address?'Ubicación elegida: '+selected.address:'';const route=q('#hc299Route'),url=window.HC299Geo.mapURL(selected);route.hidden=!url;if(url)route.href=url;q('#hc292Slots').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));can();});
+ if(preselected){
+   const index=j.slots.findIndex(slot=>slot.available&&slot.local===preselected.local);
+   if(index>=0)box.querySelector('[data-tele-slot="'+index+'"]')?.click();
+   else status.textContent='Ese horario ya no está disponible. Podés elegir otro.';
+   preselected=null;
+ }
+ }catch(e){if(attempt===slotSerial&&plan.isConnected)q('#hc292Slots').textContent=e.message;}}
  plan.onchange=load;if(address)address.oninput=can;q('#hc292Accept').onchange=can;reserve.onclick=async()=>{
    if(reserving||reserve.disabled)return;
    reserving=true;const accept=q('#hc292Accept');
@@ -51651,7 +51676,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v316";document.title="Hospitalito · Historia Clínica Digital · v316";
+window.HC_DEMO_VERSION="v317";document.title="Hospitalito · Historia Clínica Digital · v317";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -52320,7 +52345,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v316</small></button>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v317</small></button>'+
       '<span class="hc289PortalWho">'+E(user.name)+'</span><div class="hc314AccountActions"><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button><button id="hc314AccountMenuTrigger" type="button" class="hc314Ghost hc312IconOnly" aria-haspopup="menu" aria-expanded="false" aria-label="Opciones de cuenta" title="Opciones de cuenta">'+window.hc289Icon('down')+'</button></div></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
@@ -52560,12 +52585,13 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
       '<form id="hc292SearchForm" class="hc289Form" hidden><label>Profesional<select name="role">'+
       Object.entries(api.roles).map(([role,label])=>'<option value="'+role+'">'+E(label)+'</option>').join('')+'</select></label>'+
       '<label>Especialidad<select name="specialty"></select></label><button type="submit" class="hc289Primary">Buscar</button></form>'+
-      '<p id="hc292Status" role="status"></p><div id="hc292Directory"></div><div id="hc292Provider"></div></div></div>';
+      '<p id="hc292Status" role="status"></p><div id="hc292Directory"></div><section class="hc317Alternative" data-hc317-alternative hidden></section><div id="hc292Provider"></div></div></div>';
     const root=$('.hc310Booking',main), form=$('form',root), list=$('#hc292Directory',root), details=$('#hc292Provider',root);
     const status=$('#hc292Status',root), submit=$('[type=submit]',form);
     const locationBox=$('.hc315Location',root), locateButton=$('[data-search-location]',root);
     const locationNote=$('[data-location-note]',root), locationStatus=$('[data-location-status]',root);
-    let localPosition=null, lastSearch=null;
+    let localPosition=null, lastSearch=null, initialOffer=api.initial.providerId?api.initial:null;
+    const alternatives=$('[data-hc317-alternative]',root);
     const searchPosition=()=>localPosition||api.patientPosition?.();
     const alive=number=>root.isConnected&&api.alive()&&number===revision;
     form.elements.role.value=api.initial.role||'medico';
@@ -52576,7 +52602,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     }
     function reset() {
       revision++;lastSearch=null;list.replaceChildren();details.replaceChildren();
-      status.textContent='';submit.disabled=false;updateLocationNote();
+      status.textContent='';submit.disabled=false;updateLocationNote();alternatives.replaceChildren();alternatives.hidden=true;
     }
     function updateLocationNote() {
       locationNote.textContent=localPosition?'Distancias en línea recta desde tu ubicación actual.'
@@ -52591,7 +52617,10 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
         localPosition=point;
         locationStatus.textContent='';
         updateLocationNote();
-        if(mode==='office'&&lastSearch)renderResults(lastSearch);
+        if(lastSearch){
+          if(mode==='office')renderResults(lastSearch);
+          if(lastSearch.offers)renderOffers(lastSearch);
+        }
       }catch{
         if(root.isConnected)locationStatus.textContent='No pudimos obtener tu ubicación actual. Revisá los permisos de ubicación y volvé a intentar.';
       }finally{locateButton.disabled=false;}
@@ -52610,10 +52639,15 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     specialties();chooseMode();
     form.elements.role.onchange=()=>{specialties();reset();};
     form.elements.specialty.onchange=reset;
+    const bookable=key=>/^\d{4}-\d{2}-\d{2}$/.test(key||'')&&key>=today&&toDate(key)-toDate(today)<=90*86400000;
+    const chooseDay=key=>{reset();day=key;$('#hc310ChosenDate',root).textContent=dayLabel(key);form.hidden=false;form.elements.role.focus();};
     calendar($('#hc310BookingCalendar',root),{
-      month:toDate(today),disabled:key=>key<today||toDate(key)-toDate(today)>90*86400000,
-      onDay:key=>{reset();day=key;$('#hc310ChosenDate',root).textContent=dayLabel(key);form.hidden=false;form.elements.role.focus();}
+      month:toDate(bookable(api.initial.day)?api.initial.day:today),selected:bookable(api.initial.day)?api.initial.day:'',
+      disabled:key=>!bookable(key),onDay:key=>{initialOffer=null;chooseDay(key);}
     });
+    if(api.initial.specialty)specialties([api.initial.specialty]);
+    if(api.initial.specialty)form.elements.specialty.value=api.initial.specialty;
+    if(bookable(api.initial.day))chooseDay(api.initial.day);
     form.onsubmit=async event=>{
       event.preventDefault();if(!day||submit.disabled)return;
       reset();const current=revision, selectedMode=mode, selectedDay=day;
@@ -52660,9 +52694,56 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
         if(!alive(current))return;
         lastSearch={results,partial,institution,directory,selectedMode,selectedDay};
         renderResults(lastSearch);
+        if(initialOffer){
+          const offer=initialOffer;initialOffer=null;
+          const record=results.find(item=>(institution?item.profile.id:item.profile.username)===offer.providerId);
+          if(record){
+            if(institution)institutionDetail(record,directory,details,selectedDay,api,offer.startLocal);
+            else api.detail(record.profile,selectedMode,selectedDay,{local:offer.startLocal,minutes:offer.minutes});
+          }else status.textContent='Ese horario ya no figura disponible. Podés consultar otras opciones.';
+        }
+        if(!results.length&&!partial){
+          const search=lastSearch;
+          alternatives.hidden=false;
+          alternatives.innerHTML='<h3>Próximos turnos disponibles</h3><p data-next-status role="status">Consultando las próximas dos semanas…</p><div data-next-results></div>'+
+            '<p>Si se libera un turno para esta búsqueda dentro de las próximas dos semanas, te avisamos en Avisos.</p>'+
+            '<button type="button" data-join-waitlist>Anotarme en lista de espera</button><p data-wait-status role="status"></p>';
+          const join=$('[data-join-waitlist]',alternatives),waitStatus=$('[data-wait-status]',alternatives);
+          join.onclick=async()=>{
+            join.disabled=true;
+            try{
+              await api.joinWaitlist({mode:selectedMode,role,specialty,date:selectedDay});
+              if(join.isConnected)waitStatus.textContent='Quedaste en la lista. Podés salir desde Mis Turnos.';
+            }catch(error){
+              if(join.isConnected){waitStatus.textContent=error.message;join.disabled=false;}
+            }
+          };
+          const next=await window.HC317.nextOffers({
+            providers,institution,directory,mode:selectedMode,day:selectedDay,today,
+            monthFor:api.getInstitutionSlots,privateSlots:api.nextPrivate,isCurrent:()=>alive(current)
+          });
+          if(alive(current)&&search===lastSearch){
+            Object.assign(search,{offers:next.offers,nextPartial:next.partial,nextLast:next.last});
+            renderOffers(search);
+          }
+        }
       }catch(error){if(alive(current))status.textContent=error.message+' Podés volver a buscar.';}
       finally{if(alive(current))submit.disabled=false;}
     };
+
+    if(initialOffer&&day)form.requestSubmit();
+
+    function renderOffers({offers,nextPartial,nextLast,institution,directory,selectedMode,selectedDay}) {
+      const status=$('[data-next-status]',alternatives);
+      if(!status)return;
+      status.textContent=nextPartial?'La búsqueda quedó incompleta. Podés volver a intentar.':
+        nextLast<=selectedDay?'Llegaste al final del calendario de reservas.':
+        offers.length?'Opciones hasta el '+dayLabel(nextLast)+'.':'No encontramos otros turnos hasta el '+dayLabel(nextLast)+'.';
+      window.HC317.offerList($('[data-next-results]',alternatives),offers,directory,selectedMode,searchPosition(),offer=>{
+        if(institution)institutionDetail({profile:offer.profile,slots:[offer.slot]},directory,details,offer.day,api,offer.slot.local);
+        else api.detail(offer.profile,selectedMode,offer.day,{local:offer.slot.local,minutes:offer.minutes});
+      });
+    }
 
     function renderResults({results,partial,institution,directory,selectedMode,selectedDay}) {
       const origin=selectedMode==='office'?searchPosition():null;
@@ -52684,7 +52765,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     }
   }
 
-  function institutionDetail(record, directory, root, date, api) {
+  function institutionDetail(record, directory, root, date, api, preferredLocal) {
     const {profile, slots}=record, institution=directory.institutions?.find(i=>i.id===profile.institution_id);
     root.innerHTML='<section class="hc310ResultDetail"><button type="button" class="hc311Close" data-close-detail aria-label="Cerrar ficha" title="Cerrar ficha">'+window.hc289Icon('close')+'</button><h3>'+E(profile.name)+'</h3><p>'+
       E(profile.specialty)+' · '+E(institution?.name||'Institución')+'</p><h4>'+E(dayLabel(date))+
@@ -52709,6 +52790,11 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
       selected=slots[Number(button.dataset.slotIndex)];reserve.disabled=!verified;
       root.querySelectorAll('[data-slot-index]').forEach(b=>b.setAttribute('aria-pressed',String(b===button)));
     });
+    if(preferredLocal){
+      const index=slots.findIndex(slot=>slot.local===preferredLocal);
+      if(index>=0)$('[data-slot-index="'+index+'"]',root)?.click();
+      else if(verified)status.textContent='Ese horario ya no está disponible. Podés elegir otro.';
+    }
     reserve.onclick=async()=>{
       if(!selected||saving||!verified)return;
       saving=true;reserve.disabled=true;
@@ -52814,9 +52900,9 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     try{
       const result=await window.hc292Tele.api('notifications');
       if(alertAccount!==user.username||window.hc289ClientSession)return;
-      const next=(result.notifications||[]).filter(n=>n.kind==='tele_booking'&&!n.read_at);
+      const next=(result.notifications||[]).filter(n=>['tele_booking','appointment_change'].includes(n.kind)&&!n.read_at);
       if(wasLoaded&&next.some(notice=>!unreadAlerts.some(previous=>previous.id===notice.id)))
-        window.hc289Toast('Tenés una nueva solicitud de turno.');
+        window.hc289Toast('Tenés un nuevo aviso de turnos.');
       unreadAlerts=next;renderAlerts();
     }catch{}finally{alertBusy=false;}
   }
@@ -53574,6 +53660,214 @@ body #hc289Portal .hc315Location [data-location-status]:empty {display:none;}
   }
 
   window.HC316Dni = {readDirection};
+})();
+</script>
+<style id="hc-v317-appointments">
+.hc317Actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:12px 0;
+}
+.hc317Alternative {
+  margin:14px 0;
+}
+.hc317Alternative [data-next-offer] small:empty {
+  display:none;
+}
+</style>
+<script id="hc-v317-bookings">
+(() => {
+  'use strict';
+  const q = (root, selector) => root.querySelector(selector);
+  const esc = value => window.hc289Esc(value);
+  const portal = (...args) => window.hc289PortalApi(...args);
+  const privateCare = (...args) => window.hc292Tele.api(...args);
+  const argentina = 'America/Argentina/Buenos_Aires';
+  const dateKey = new Intl.DateTimeFormat('fr-CA',{timeZone:argentina,year:'numeric',month:'2-digit',day:'2-digit'});
+  const shifted = (day, amount) => new Date(Date.parse(day+'T12:00:00Z')+amount*86400000).toISOString().slice(0,10);
+  const label = mode => mode==='institution'?'Instituciones':window.HC310.modeLabel(mode);
+  const dayLabel = day => window.HC313.date(day);
+  const timeLabel = local => window.HC313.time(local);
+  const validDay = day => /^\d{4}-\d{2}-\d{2}$/.test(day||'');
+
+  function canChange(booking) {
+    const status = booking.privateVisit?['confirmed','awaiting_payment']:['confirmed','pending'];
+    return status.includes(booking.status)&&Date.parse(booking.starts_at)>Date.now()&&
+      (booking.status!=='awaiting_payment'||!booking.hold_until||Date.parse(booking.hold_until)>Date.now());
+  }
+
+  function manage(booking, operation) {
+    const moving = operation==='move';
+    const appointment = esc(window.HC313.dateTime(booking.starts_at,{timeZone:argentina}));
+    const title = moving?'Reprogramar turno':'Cancelar turno';
+    const pane = window.hc289Dialog(title,'<p>Turno actual · '+appointment+'</p>'+
+      (moving?'<p>Elegí un nuevo horario con el mismo profesional.</p><label>Fecha nueva <input type="date" data-new-date required></label><div class="hc289Slots" data-new-slots></div>':
+        '<p>El horario quedará disponible para otro paciente.'+(booking.privateVisit&&!booking.is_trial?' Si ya pagaste, se registrará una revisión del reintegro según las condiciones de tu reserva.':'')+'</p>')+
+      '<div class="hc317Actions"><button type="button" data-appointment-confirm '+(moving?'disabled':'')+'>'+esc(moving?'Confirmar reprogramación':'Confirmar cancelación')+'</button>'+
+      '<button type="button" class="hc314Ghost" data-back-appointments>Volver a Mis Turnos</button></div><p role="status"></p>');
+    const back = () => window.hc305ShowAppointments();
+    q(pane,'[data-289-close]').onclick = back;
+    q(pane,'[data-back-appointments]').onclick = back;
+    const confirm = q(pane,'[data-appointment-confirm]'), status = q(pane,'[role=status]');
+    const date = q(pane,'[data-new-date]'), times = q(pane,'[data-new-slots]');
+    let selection=null, revision=0, saving=false;
+
+    async function load() {
+      const attempt=++revision;
+      selection=null;
+      confirm.disabled=true;
+      status.textContent='';
+      times.replaceChildren();
+      if(!date.checkValidity()||!validDay(date.value))return;
+      const day=date.value;
+      status.textContent='Consultando horarios…';
+      try {
+        const response = booking.privateVisit?
+          await privateCare('rescheduleSlots',{visitId:booking.id,date:day}):
+          await portal('calendar',{providerId:booking.provider_id,month:day.slice(0,7)});
+        if(attempt!==revision||!pane.isConnected)return;
+        const open = (booking.privateVisit?response.slots:response.days?.find(item=>item.date===day)?.slots)||[];
+        const slots=open.filter(slot=>slot.available&&(slot.start?Date.parse(slot.start)!==Date.parse(booking.starts_at):true));
+        status.textContent=slots.length?'':'No hay otros horarios disponibles ese día.';
+        slots.forEach(slot=>{
+          const button=document.createElement('button');
+          button.type='button';
+          button.textContent=[timeLabel(slot.local),slot.location,slot.address].filter(Boolean).join(' · ');
+          button.setAttribute('aria-pressed','false');
+          button.onclick=()=>{
+            if(saving)return;
+            times.querySelectorAll('button[aria-pressed=true]').forEach(item=>item.setAttribute('aria-pressed','false'));
+            button.setAttribute('aria-pressed','true');
+            selection=slot;
+            confirm.disabled=false;
+          };
+          times.append(button);
+        });
+      } catch(error) {
+        if(attempt===revision&&pane.isConnected)status.textContent=error.message;
+      }
+    }
+    if(date){
+      date.min=dateKey.format(new Date());
+      date.max=shifted(date.min,booking.privateVisit?90:180);
+      const sameDay=dateKey.format(new Date(booking.starts_at));
+      date.value=sameDay>date.max?date.min:sameDay;
+      date.onchange=load;
+      load();
+    }
+    confirm.onclick=async()=>{
+      if(saving||moving&&!selection)return;
+      saving=true;
+      confirm.disabled=true;
+      if(date)date.disabled=true;
+      status.textContent='Guardando…';
+      const previousStart=booking.starts_at;
+      const session=window.hc289ClientSession;
+      try {
+        const result=booking.privateVisit?
+          await privateCare(moving?'reschedule':'cancel',{visitId:booking.id,previousStart,...(moving?{start:selection.start}:{})}):
+          await portal(moving?'rescheduleBooking':'bookingStatus',{id:booking.id,previousStart,...(moving?{startLocal:selection.local}:{status:'cancelled'})});
+        if(session!==window.hc289ClientSession)return;
+        window.hc289Toast(moving?'Turno reprogramado.':result.refundPending?'Turno cancelado. Reintegro en revisión.':'Turno cancelado.');
+        if(pane.isConnected)await back();
+        else window.hc304RefreshPortal();
+      } catch(error) {
+        if(pane.isConnected)status.textContent=error.message;
+      } finally {
+        saving=false;
+        confirm.disabled=false;
+        if(date)date.disabled=false;
+      }
+    };
+  }
+
+  function waitlist(root) {
+    root.innerHTML='<h3>Lista de espera</h3><p role="status">Cargando…</p><div data-entries></div>';
+    const list=q(root,'[data-entries]'), status=q(root,'[role=status]');
+    const refresh=async()=>{
+      try {
+        const response=await portal('myWaitlist');
+        if(!root.isConnected)return;
+        const entries=response.entries||[];
+        status.textContent=entries.length?'':'Podés anotarte en Nuevo Turno cuando el día que elegiste esté completo.';
+        list.innerHTML=entries.map((entry,index)=>'<article class="hc289Panel"><b>'+esc(entry.specialty||'Todas las especialidades')+'</b><p>'+
+          esc(label(entry.mode)+' · '+(window.hc292Tele.roles[entry.role]||entry.role)+' · '+dayLabel(entry.from_day)+' al '+dayLabel(entry.until_day))+
+          '</p><button type="button" data-leave="'+index+'">Salir de esta lista</button></article>').join('');
+        list.querySelectorAll('[data-leave]').forEach(button=>button.onclick=async()=>{
+          button.disabled=true;
+          try {
+            await portal('leaveWaitlist',{id:entries[Number(button.dataset.leave)].id});
+            if(root.isConnected)await refresh();
+          } catch(error) {
+            status.textContent=error.message;
+            button.disabled=false;
+          }
+        });
+      } catch(error) { if(root.isConnected)status.textContent=error.message; }
+    };
+    refresh();
+  }
+
+  async function nextOffers({providers,institution,directory,mode,day,today,monthFor,privateSlots,isCurrent}) {
+    const first=shifted(day,1), last=[shifted(day,14),shifted(today,90)].sort()[0];
+    const offers=[];
+    let partial=false;
+    if(first>last)return {offers,partial,last};
+    if(institution){
+      const verified=new Set((directory.verifications||[]).filter(v=>v.status==='verified').map(v=>v.institution_id));
+      const eligible=providers.filter(p=>!p.private_practice&&verified.has(p.institution_id));
+      const months=[...new Set([first.slice(0,7),last.slice(0,7)])];
+      for(let i=0;i<eligible.length&&isCurrent();i+=6){
+        const found=await Promise.allSettled(eligible.slice(i,i+6).map(async profile=>{
+          const calendars=await Promise.all(months.map(month=>monthFor(profile.id,month)));
+          const slots=calendars.flatMap(j=>j.days||[]).filter(d=>d.date>=first&&d.date<=last)
+            .flatMap(d=>d.slots||[]).filter(s=>s.available);
+          return slots.slice(0,2).map(slot=>({profile,slot,day:slot.local.slice(0,10),minutes:null}));
+        }));
+        for(const item of found){
+          if(item.status==='rejected')partial=true;
+          else offers.push(...item.value);
+        }
+      }
+    }else{
+      const eligible=providers.filter(p=>p.modes?.[mode]?.enabled&&p.modes[mode].rates?.length);
+      for(let i=0;i<eligible.length&&isCurrent();i+=20){
+        const group=eligible.slice(i,i+20);
+        try {
+          const response=await privateSlots(group,mode,first,last);
+          for(const result of response.providers||[]){
+            if(result.failed){partial=true;continue;}
+            const profile=group.find(p=>p.username===result.id);
+            if(profile)for(const slot of result.slots||[])
+              offers.push({profile,slot,day:slot.local.slice(0,10),minutes:Math.min(...profile.modes[mode].rates.map(r=>r.minutes))});
+          }
+        } catch { partial=true; }
+      }
+    }
+    return {offers,partial,last};
+  }
+
+  function offerList(root, offers, directory, mode, origin, select) {
+    const ordered=offers.map(offer=>{
+      const institution=directory.institutions?.find(item=>item.id===offer.profile.institution_id);
+      const site=mode==='institution'?institution:offer.slot;
+      return {...offer,site:{location:site?.location||institution?.name,address:site?.address||offer.profile.address,latitude:site?.latitude,longitude:site?.longitude}};
+    });
+    const distance=offer=>window.HC299Geo.distance(origin,offer.site);
+    ordered.sort((a,b)=>a.slot.local.localeCompare(b.slot.local)||(distance(a)??Infinity)-(distance(b)??Infinity)||a.profile.name.localeCompare(b.profile.name,'es'));
+    const shown=ordered.slice(0,8);
+    root.innerHTML=shown.map((item,index)=>{
+      const place=item.site.address||item.site.location?[item.site.location,item.site.address].filter(Boolean).join(' · '):'';
+      const km=distance(item);
+      const near=km===null?'':new Intl.NumberFormat('es-AR',{maximumFractionDigits:1}).format(km)+' km';
+      return '<button type="button" class="hc310ProviderLine" data-next-offer="'+index+'"><b>'+esc(dayLabel(item.day)+' · '+timeLabel(item.slot.local))+
+        '</b><span>'+esc(item.profile.name+(item.profile.specialty?' · '+item.profile.specialty:''))+'</span><small>'+esc([place,near].filter(Boolean).join(' · '))+'</small></button>';
+    }).join('');
+    root.querySelectorAll('[data-next-offer]').forEach(button=>button.onclick=()=>select(shown[Number(button.dataset.nextOffer)]));
+  }
+
+  window.HC317={canChange,manage,waitlist,nextOffers,offerList};
 })();
 </script>
 </body>

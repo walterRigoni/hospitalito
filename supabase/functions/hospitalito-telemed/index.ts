@@ -4,6 +4,8 @@ const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'co
 const reply=(body:any,status=200)=>new Response(JSON.stringify(body),{status,headers:cors});
 const base='https://walterrigoni.github.io/hospitalito/',bucket='hospitalito-portal-private';
 const check=(r:any)=>{if(r.error)throw r.error;return r.data;};
+const clientNoticeKinds=['tele_reminder','portal_reminder','appointment_change','appointment_waitlist'];
+const professionalNoticeKinds=['tele_booking','appointment_change'];
 const hex=(b:Uint8Array)=>[...b].map(x=>x.toString(16).padStart(2,'0')).join('');
 const hash=async(s:string)=>hex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))));
 function db(){const keys=JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS')||'{}');return createClient(Deno.env.get('SUPABASE_URL')!,keys.default||Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false,autoRefreshToken:false}});}
@@ -67,6 +69,22 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
  const ids=Array.isArray(b.providers)?b.providers.map((id:any)=>str(id,40)).slice(0,50):[],mode=str(b.mode,30),date=str(b.date,10),directory=(await publicDirectory(c)).filter((p:any)=>ids.includes(p.id)&&p.modes[mode]?.enabled),mapping=directory.length?check(await c.from('hc_tele_profiles').select('id,username').in('id',directory.map((p:any)=>p.id))):[];
  const providers=await Promise.all(directory.map(async(p:any)=>{try{const rows=check(await c.rpc('hc297_available_slots',{who:mapping.find((x:any)=>x.id===p.id)?.username,mode_name:mode,day_date:date,duration:Math.min(...p.modes[mode].rates.map((r:any)=>r.minutes))}));return{id:p.id,available:rows.some((s:any)=>s.available),locations:rows.filter((s:any)=>s.available).map((s:any)=>({address:s.address,location:s.location,latitude:s.latitude,longitude:s.longitude})).filter((s:any,i:number,all:any[])=>all.findIndex(x=>x.address===s.address&&x.latitude===s.latitude&&x.longitude===s.longitude)===i),failed:false};}catch{return{id:p.id,available:false,failed:true};}}));return reply({ok:true,providers});
  }
+ if(act==='nextSlots'){
+   if(a.default_role!=='cliente')throw Error('Acceso de paciente requerido');
+   const ids=Array.isArray(b.providers)?b.providers.filter((id:any)=>typeof id==='string'&&/^[\da-f-]{36}$/i.test(id)).slice(0,20):[];
+   const mode=str(b.mode,30),first=str(b.firstDay,10),last=str(b.lastDay,10);
+   if(!['office','home','telemedicine'].includes(mode)||![first,last].every(day=>/^\d{4}-\d{2}-\d{2}$/.test(day)))throw Error('Búsqueda inválida');
+   const directory=(await publicDirectory(c)).filter((p:any)=>ids.includes(p.id)&&p.modes[mode]?.enabled&&p.modes[mode].rates?.length);
+   const mapping=directory.length?check(await c.from('hc_tele_profiles').select('id,username').in('id',directory.map((p:any)=>p.id))):[];
+   const providers=await Promise.all(directory.map(async(p:any)=>{
+     const {data,error}=await c.rpc('hc317_next_private_slots',{
+       who:mapping.find((row:any)=>row.id===p.id)?.username,care_mode:mode,first_day:first,last_day:last,
+       duration:Math.min(...p.modes[mode].rates.map((r:any)=>r.minutes))
+     });
+     return {id:p.id,slots:data||[],failed:!!error};
+   }));
+   return reply({ok:true,providers});
+ }
  if(act==='slots')return reply(await slots(c,str(b.provider,150),str(b.mode,30),str(b.date,10),integer(b.minutes,15,60)));
  if(act==='reserve'){
  if(a.default_role!=='cliente')throw Error('La reserva debe realizarla el paciente');
@@ -80,8 +98,8 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
  const visit=check(await c.rpc(b.mode==='home'?'hc310_reserve_home':b.mode==='office'?'hc304_reserve':'hc297_reserve',{...(b.mode==='office'?{expected_deposit_bps:trial?null:integer(b.expectedDepositBps,1,9999)}:b.mode==='home'?{home_address:str(b.homeAddress,500)}:{}),who,patient:a.username,mode_name:str(b.mode,30),at_start:str(b.start,40),duration:integer(b.minutes,15,60),request_key:str(b.requestId,40),visit_reason:str(b.reason,1000),expected_revision:integer(b.profileRevision,1,10000000),expected_trial:trial}));
  await audit(c,a,'reserve',visit.id,{trial:visit.is_trial});return reply({ok:true,visit});
  }
- if(act==='notifications'){const notifications=check(await c.from('hc_notifications').select('id,kind,title,body,payload,read_at,created_at').eq('username',a.username).in('kind',a.default_role==='cliente'?['tele_reminder','portal_reminder']:['tele_booking']).order('created_at',{ascending:false}).limit(100));return reply({ok:true,notifications});}
- if(act==='readNotifications'){const ids=Array.isArray(b.ids)?b.ids.filter((x:any)=>typeof x==='string').slice(0,100):[];if(ids.length)check(await c.from('hc_notifications').update({read_at:new Date().toISOString()}).eq('username',a.username).in('kind',a.default_role==='cliente'?['tele_reminder','portal_reminder']:['tele_booking']).in('id',ids));return reply({ok:true});}
+ if(act==='notifications'){const notifications=check(await c.from('hc_notifications').select('id,kind,title,body,payload,read_at,created_at').eq('username',a.username).in('kind',a.default_role==='cliente'?clientNoticeKinds:professionalNoticeKinds).order('created_at',{ascending:false}).limit(100));return reply({ok:true,notifications});}
+ if(act==='readNotifications'){const ids=Array.isArray(b.ids)?b.ids.filter((x:any)=>typeof x==='string').slice(0,100):[];if(ids.length)check(await c.from('hc_notifications').update({read_at:new Date().toISOString()}).eq('username',a.username).in('kind',a.default_role==='cliente'?clientNoticeKinds:professionalNoticeKinds).in('id',ids));return reply({ok:true});}
  if(act==='clinicalRecord'||act==='saveClinicalRecord'){
  const {v,side}=await access(c,a,str(b.visitId,40));if(side!=='provider')throw Error('La historia clínica privada sólo está disponible para el profesional tratante');
  if(act==='saveClinicalRecord'){
@@ -106,7 +124,26 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
  if(act==='requestExtension'){if(side!=='client'||v.status!=='active')throw Error('Sólo el paciente de una consulta activa puede solicitar más tiempo');const minutes=integer(b.minutes,15,60);if(![15,30,45,60].includes(minutes))throw Error('Duración inválida');check(await c.from('hc_tele_visits').update({requested_minutes:minutes}).eq('id',v.id).eq('status','active'));return reply({ok:true});}
  if(act==='offerExtension'){if(side!=='provider')throw Error('El profesional debe habilitar la extensión');const payment=check(await c.rpc('hc292_offer_extension',{visit:v.id,duration:integer(b.minutes,15,60)}));await audit(c,a,'offer_extension',v.id,{minutes:payment.minutes,amount:payment.amount_cents});return reply({ok:true,payment});}
  if(act==='finish'){if(!['confirmed','active'].includes(v.status))throw Error('La consulta ya finalizó');if(side==='client'&&v.mode!=='telemedicine')throw Error('El profesional registra la atención presencial');if(v.mode==='office'&&v.payment_model==='office_staged'&&!v.active_at)throw Error('Registrá primero el inicio de la atención presencial');check(await c.from('hc_tele_visits').update({status:'finished',finished_at:new Date().toISOString(),client_connected:false,provider_connected:false}).eq('id',v.id).in('status',['confirmed','active']));await audit(c,a,'finish',v.id);return reply({ok:true});}
- if(act==='cancel'){if(!['awaiting_payment','confirmed'].includes(v.status))throw Error('Esta consulta ya comenzó o finalizó');check(await c.from('hc_tele_visits').update({status:'cancelled',finished_at:new Date().toISOString()}).eq('id',v.id).in('status',['awaiting_payment','confirmed']));const paid=check(await c.from('hc_tele_payments').select('id').eq('visit_id',v.id).eq('status','approved'));for(const p of paid)check(await c.from('hc_tele_refund_requests').upsert({payment_id:p.id,requested_by:a.username,reason:side==='provider'?'Cancelación del profesional':'Cancelación del paciente; revisar condiciones aceptadas'},{onConflict:'payment_id'}));await audit(c,a,'cancel',v.id);return reply({ok:true,refundPending:paid.length>0});}
+ if(act==='rescheduleSlots'||act==='reschedule'){
+   if(side!=='client')throw Error('Reprogramación no autorizada');
+   if(!['awaiting_payment','confirmed'].includes(v.status)||Date.parse(v.starts_at)<=Date.now())throw Error('El turno ya comenzó o finalizó');
+   if(act==='rescheduleSlots'){
+     const date=str(b.date,10);
+     if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw Error('Fecha inválida');
+     const profile=check(await c.from('hc_tele_profiles').select('id').eq('username',v.provider).single());
+     return reply(await slots(c,profile.id,v.mode,date,v.minutes));
+   }
+   const at=str(b.start,40),previous=str(b.previousStart,40);
+   if(!Number.isFinite(Date.parse(at))||!Number.isFinite(Date.parse(previous)))throw Error('Horario inválido');
+   const result=check(await c.rpc('hc317_change_private_visit',{account:a.username,visit:v.id,previous_start:previous,new_start:at}));
+   return reply({ok:true,visit:result});
+ }
+ if(act==='cancel'){
+   const result=check(await c.rpc('hc317_change_private_visit',{
+     account:a.username,visit:v.id,previous_start:typeof b.previousStart==='string'?str(b.previousStart,40):v.starts_at,new_start:null
+   }));
+   return reply({ok:true,refundPending:result.refundPending});
+ }
  if(act==='documents')return reply({ok:true,documents:check(await c.from('hc_tele_documents').select('id,name,kind,mime,published_at').eq('visit_id',v.id).order('published_at',{ascending:false}))});
  if(act==='uploadDocument'){if(side!=='provider'||!['confirmed','active','finished'].includes(v.status))throw Error('Sólo el profesional de una consulta atendida puede publicar documentos');const role=await pro(c,a),kind=str(b.kind,40);if(!['prescription','certificate','preoperative','report'].includes(kind)||kind!=='report'&&role!=='medico')throw Error('Ese documento requiere un médico');if(b.confirmSigned!==true)throw Error('Confirmá que revisaste y firmaste el documento');const data=str(b.file?.data,7000000),m=data.match(/^data:application\/pdf;base64,([A-Za-z0-9+/=]+)$/);if(!m)throw Error('Adjuntá el PDF firmado');const bin=atob(m[1]);if(!bin.startsWith('%PDF-')||bin.length>5000000)throw Error('PDF inválido o mayor de 5 MB');const id=crypto.randomUUID(),path='telemedicine/'+v.id+'/'+id+'.pdf';check(await c.storage.from(bucket).upload(path,Uint8Array.from(bin,x=>x.charCodeAt(0)),{contentType:'application/pdf',upsert:false}));const row=await c.from('hc_tele_documents').insert({id,visit_id:v.id,author:a.username,kind,path,mime:'application/pdf',name:str(b.file?.name||'documento.pdf',150)});if(row.error){await c.storage.from(bucket).remove([path]);throw row.error;}await audit(c,a,'publish_document',id,{visitId:v.id,kind});return reply({ok:true,id});}
  if(act==='documentFile'){const doc=check(await c.from('hc_tele_documents').select('*').eq('id',str(b.documentId,40)).eq('visit_id',v.id).single()),url=check(await c.storage.from(bucket).createSignedUrl(doc.path,60));await audit(c,a,'download_document',doc.id,{visitId:v.id});return reply({ok:true,url:url.signedUrl,name:doc.name});}

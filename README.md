@@ -1,9 +1,9 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión actual **v316**, basada en v315.
+Sistema Digital de Historia Clínica. Versión actual **v317**, basada en v316.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Archivo HTML v316](Hospitalito_v316.html)
+- [Archivo HTML v317](Hospitalito_v317.html)
 - [Guía v307](Hospitalito_v307_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)

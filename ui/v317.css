@@ -1,0 +1,12 @@
+.hc317Actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:12px 0;
+}
+.hc317Alternative {
+  margin:14px 0;
+}
+.hc317Alternative [data-next-offer] small:empty {
+  display:none;
+}

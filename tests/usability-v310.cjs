@@ -10,6 +10,8 @@ const screenshotDir = process.env.HC_VISUAL_DIR;
 const date = new Date();
 const argentina = new Intl.DateTimeFormat('fr-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'});
 const today=argentina.format(date);
+const tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
+const alternativeSlot={local:tomorrow+'T09:00',start:tomorrow+'T12:00:00Z',available:true,address:'Calle de prueba 100',location:'Consultorio',latitude:-31.4,longitude:-64.2};
 const provider = {id:'qa',role:'medico',name:'Profesional de prueba',institution_id:'inst',specialty:'Cardiología',private_practice:false};
 const nearProvider={...provider,id:'near',username:'near',name:'Zoe Consultorios'};
 const unmappedProvider={...provider,id:'unknown',username:'unknown',name:'Ana Consultorios'};
@@ -76,6 +78,7 @@ async function run() {
         })};
       });
       let failDirectory=true,changedQuote=true,resolveNote;
+      let fullyBooked=false, waitlist=[];
       let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test',latitude:-31.4,longitude:-64.2};
       let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
       const profileRequest=()=>({client:{...patient,profile:personal},verifications:[{institution_id:'inst',status:'verified'}]});
@@ -94,15 +97,32 @@ async function run() {
           publicBranding:{settings:{programName:'Hospitalito'}},
           directory:{providers:[provider],institutions:[{id:'inst',name:'Centro de prueba'}]},
           me:profileRequest(),
-          calendar:{days:[{date:today,free:1,total:1,slots:[{local:today+'T22:00',available:true}]}]},
+          calendar:{days:[{date:today,free:1,total:1,slots:[{local:today+'T22:00',available:true}]},
+            {date:tomorrow,free:1,total:1,slots:[alternativeSlot]}]},
           calendarVisits:{visits:[upcoming]},
           myReports:{reports:[{id:'r1',visit_id:'visita-de-prueba',name:'Informe de prueba'}]},
           myPrescriptions:{prescriptions:[{id:'rx1',visit_id:'visita-de-prueba',name:'Receta de prueba.pdf'}]},
           documentFile:{url:'https://frbuhczonftjtvmviehw.supabase.co/storage/v1/object/sign/test/rx.pdf',name:'Receta de prueba.pdf'},
           myIdentityDocuments:{documents:identityPhotos},
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
-          myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings}
+          myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings},
+          myWaitlist:{entries:waitlist}
         };
+        if(b.action==='joinWaitlist'){
+          waitlist=[{id:'wait-test',from_day:b.date,until_day:tomorrow,mode:b.mode,role:b.role,specialty:b.specialty}];
+          return route.fulfill({json:{ok:true,entry:waitlist[0]}});
+        }
+        if(b.action==='leaveWaitlist'){
+          waitlist=waitlist.filter(entry=>entry.id!==b.id);
+          return route.fulfill({json:{ok:true}});
+        }
+        if(b.action==='rescheduleBooking'||b.action==='bookingStatus'){
+          const found=bookings.find(v=>v.id===b.id);
+          assert.equal(b.previousStart,found.starts_at);
+          if(b.action==='rescheduleBooking')found.starts_at=new Date(b.startLocal+':00-03:00').toISOString();
+          else found.status='cancelled';
+          return route.fulfill({json:{ok:true,booking:found}});
+        }
         if(b.action==='updateClientProfile'){
           personal={...personal,...b.profile};
           return route.fulfill({json:{ok:true,...profileRequest()}});
@@ -120,11 +140,24 @@ async function run() {
           ]}});
           if(b.action==='availability'){
             availabilityRequests.push(b);
+            if(fullyBooked&&b.date===today)return route.fulfill({json:{ok:true,providers:[]}});
             return route.fulfill({json:{ok:true,providers:[
               {id:'qa',available:true,locations:[farOffice]},
               {id:'near',available:true,locations:[{latitude:-31.6,longitude:-64.6},nearOffice]},
               {id:'unknown',available:true,locations:[]}
             ]}});
+          }
+          if(b.action==='nextSlots'){
+            assert.equal(b.firstDay,tomorrow);
+            return route.fulfill({json:{ok:true,providers:[{id:'qa',slots:[alternativeSlot]}]}});
+          }
+          if(b.action==='rescheduleSlots')return route.fulfill({json:{ok:true,slots:[alternativeSlot]}});
+          if(b.action==='reschedule'||b.action==='cancel'){
+            const found=visits.find(v=>v.id===b.visitId);
+            assert.equal(b.previousStart,found.starts_at);
+            if(b.action==='reschedule')found.starts_at=b.start;
+            else found.status='cancelled';
+            return route.fulfill({json:{ok:true,visit:found}});
           }
           if(b.action==='slots'){
             const profileRevision=changedQuote?2:1;
@@ -140,7 +173,10 @@ async function run() {
           if(b.action==='myVisits'&&!b.token)return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
           if(b.action==='notifications'&&b.token)return route.fulfill({json:{ok:true,notifications:[{
             id:'recordatorio-ficticio',kind:'tele_reminder',title:'Recordatorio de turno · 24 horas',body:'Turno de prueba'
-          }]}});
+          },...waitlist.map(()=>({
+            id:'wait-notice-ficticio',kind:'appointment_waitlist',title:'Se liberó un turno',body:'Horario ficticio',
+            payload:{mode:'office',providerId:'qa',role:'medico',specialty:'Cardiología',local:alternativeSlot.local,minutes:15}
+          }))]}});
           if(b.action==='notifications'&&!b.token)return route.fulfill({json:{ok:true,notifications:[{
             id:'aviso-ficticio',kind:'tele_booking',title:'Nueva solicitud de turno',body:'Atención a Domicilio',
             payload:{visitId:'aviso-domicilio',mode:'home'}
@@ -622,6 +658,41 @@ async function run() {
       await portal.locator('[data-result]').first().click();
       await portal.locator('[data-slot-index]').first().click();
       assert(await portal.getByRole('button',{name:'Solicitar turno'}).isEnabled());
+      fullyBooked=true;
+      await portal.locator('[data-care-mode=office]').click();
+      await mainPane.getByLabel('Especialidad').selectOption('Cardiología');
+      await search.click();
+      const alternative=mainPane.locator('[data-next-offer]').first();
+      await alternative.waitFor();
+      assert.match(await alternative.innerText(),/09:00.*Profesional de prueba.*Calle de prueba 100.*0 km/s);
+      await alternative.click();
+      await mainPane.locator('#hc292Slots button[aria-pressed=true]').waitFor();
+      assert(await mainPane.locator('#hc292Reserve').isDisabled());
+      await mainPane.getByRole('button',{name:'Anotarme en lista de espera'}).click();
+      await mainPane.getByText(/Quedaste en la lista/).waitFor();
+      await openSidebar();
+      await portal.locator('[data-portal-section=alerts]').click();
+      await portal.getByRole('button',{name:'Consultar disponibilidad'}).click();
+      await mainPane.locator('#hc292Slots button[aria-pressed=true]').waitFor();
+      assert.equal(await mainPane.locator('#hc292Plan').inputValue(),'15');
+      bookings.push({id:'institucional-prueba',provider_id:'qa',starts_at:next.toISOString(),status:'confirmed',provider_name:'Profesional institucional de prueba'});
+      await openSidebar();
+      await portal.locator('[data-portal-section=turns]').click();
+      await mainPane.locator('[data-waitlist-panel] summary').click();
+      await mainPane.getByRole('button',{name:'Salir de esta lista'}).click();
+      await mainPane.getByText(/Podés anotarte en Nuevo Turno/).waitFor();
+      for(const id of ['visita-de-prueba','institucional-prueba']){
+        const trigger=action=>mainPane.locator('[data-appointment-id="'+id+'"][data-appointment-action="'+action+'"]');
+        await trigger('move').click();
+        await mainPane.getByLabel('Fecha nueva').fill(tomorrow);
+        await mainPane.locator('[data-new-slots] button').first().click();
+        await mainPane.getByRole('button',{name:'Confirmar reprogramación'}).click();
+        await trigger('cancel').click();
+        await mainPane.getByRole('button',{name:'Confirmar cancelación'}).click();
+        await mainPane.getByRole('heading',{name:'Mis Turnos'}).waitFor();
+      }
+      assert.equal(visits[0].status,'cancelled');
+      assert.equal(bookings[0].status,'cancelled');
       assert.deepEqual(errors,[]);
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
       console.log('PASS',width,'ingreso, navegación, guardado, cuenta y reserva con cambio de día y cierre');
