@@ -358,6 +358,10 @@
     [
       "  const CURRENT_VERSION = 317;",
       "  const CURRENT_VERSION = 320;"
+    ],
+    [
+      "${showRxPanel ? \"Cerrar panel\" : \"Nueva prescripción\"}",
+      "${showRxPanel ? \"Cerrar panel\" : \"+ Nueva prescripción\"}"
     ]
   ]
 }

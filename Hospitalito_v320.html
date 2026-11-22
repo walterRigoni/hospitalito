@@ -25569,7 +25569,7 @@ function patientHasPendingNurseAlert(patientId){
       <div class="presDailyToolbar">
         <div class="presDailyMain">
           <div class="presDailyTitle">Prescripciones del día</div>
-          ${isMedico && isCurrentPlanView ? `<button type="button" class="btn primary hc275NewRxButton" id="btnToggleNewPrescription">${showRxPanel ? "Cerrar panel" : "Nueva prescripción"}</button>` : ``}
+          ${isMedico && isCurrentPlanView ? `<button type="button" class="btn primary hc275NewRxButton" id="btnToggleNewPrescription">${showRxPanel ? "Cerrar panel" : "+ Nueva prescripción"}</button>` : ``}
           <div class="presDailyClock">Plan activo: ${escHTML(activePlanDate)} (06 a 04 h) • Ahora: ${escHTML(dmyhmFromISODateTime(isoNowLocalFull()) || isoNowLocalFull())}</div>
         </div>
         <div class="presDailyActions">

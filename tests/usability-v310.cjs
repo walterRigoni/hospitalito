@@ -216,7 +216,7 @@ async function run() {
       assert.equal(await page.locator('.hc308ModulePicker').count(),0);
       await page.locator('[data-medtab=evolucion]').click();
       await page.locator('#btnNuevaEvo').click();
-      await page.locator('#evo_dx + .hc320Rich .hc320RichInput').fill('Diagnóstico de prueba');
+      await page.locator('#evo_dx').fill('Diagnóstico de prueba');
       await page.locator('#arm_on').check();
       const mode=page.locator('#arm_modo');
       const first=await mode.locator('option').evaluateAll(options=>options.find(o=>o.value)?.value);
