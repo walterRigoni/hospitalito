@@ -144,7 +144,8 @@
       return '<div class="hc310MonthGrid"'+(inactive?' aria-hidden="true" inert':'')+'>'+
         ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].map(day=>'<span>'+day+'</span>').join('')+days.join('')+'</div>';
     }
-    function render() {
+    function render(selected = options.selected) {
+      options.selected = selected;
       $('.hc310MonthHeader h2',host).textContent=month.toLocaleDateString('es-AR',{month:'long',year:'numeric'});
       track.style.transition='none';track.style.transform='translateX(-33.333333%)';
       track.innerHTML=grid(offset(month,-1),true)+grid(month,false)+grid(offset(month,1),true);
@@ -153,7 +154,11 @@
       const sequence=++generation;
       const finish=()=>{
         if(sequence!==generation||!track.isConnected)return;
-        if(direction){month=offset(month,direction);options.onMonth?.(month);}
+        if(direction){
+          month=offset(month,direction);
+          const nextSelection=options.onMonth?.(month);
+          if(typeof nextSelection==='string')options.selected=nextSelection;
+        }
         render();
       };
       if(!animate||matchMedia('(prefers-reduced-motion:reduce)').matches){finish();return;}
@@ -202,9 +207,11 @@
     return {render};
   }
 
-  function settingsMarkup(theme) {
-    return '<div class="hcSettingsShell hc310Settings"><nav class="hcSettingsNav" aria-label="Configuración"><button type="button" data-client-settings="account">Perfil</button><button type="button" class="active" aria-current="page">Apariencia</button><button type="button" data-client-settings="privacy">Seguridad</button></nav>'+
-      '<div class="hcSettingsStage">'+theme+'</div></div>';
+  function settingsMarkup(content, selected, sections = {account:'Perfil',settings:'Apariencia',privacy:'Seguridad'}) {
+    return '<div class="hcSettingsShell hc310Settings"><nav class="hcSettingsNav" aria-label="Configuración">'+
+      Object.entries(sections).map(([key,label])=>'<button type="button" data-client-settings="'+key+'"'+
+        (key===selected?' class="active" aria-current="page"':'')+'>'+E(label)+'</button>').join('')+'</nav>'+
+      '<div class="hcSettingsStage">'+content+'</div></div>';
   }
   function bindSettings(el, open) {
     el.querySelectorAll('[data-client-settings]').forEach(b=>b.onclick=()=>open(b.dataset.clientSettings));
@@ -375,8 +382,14 @@
         else window.hc297Workspace(mode).then(()=>window.HC310.workspaceOpen?.(b.dataset.agendaVisit));
       });
     }
+    const currentDay=selected;
     const view=calendar($('[data-pro-month]',shell),{month,selected,
-      onMonth:value=>{month=value;load();},onDay:showDay,
+      onMonth:value=>{
+        month=value;visits=[];
+        showDay(keyOf(month).slice(0,7)===currentDay.slice(0,7)?currentDay:keyOf(month));
+        load();
+        return selected;
+      },onDay:showDay,
       getEvents:key=>visits.filter(v=>argentina.format(new Date(v.starts_at))===key).map(v=>
         v.status==='awaiting_payment'?'pending':past.has(v.status)?'past':'future')
     });
@@ -387,39 +400,68 @@
       try{
         const value=await window.hc292Tele.api('calendarVisits',{month:keyOf(month).slice(0,7),mode});
         if(n!==serial||!shell.isConnected)return;
-        visits=value.visits||[];view.render();showDay(selected);
+        visits=value.visits||[];view.render(selected);showDay(selected);
       }catch(error){if(n===serial&&shell.isConnected)pending.textContent='Turnos de la agenda: '+error.message;}
     }
     load();
   }
 
-  function professionalProfile(mode,user) {
-    const el=window.hc289Dialog('Perfil','<div class="hc310Profile"></div><button type="button" data-profile-edit>Editar perfil profesional</button>');
+  function professionalProfile(mode,user,section='account') {
+    const profile='<div class="hc310Profile"></div><button type="button" data-profile-edit>Editar perfil profesional</button>';
+    const titles={account:'Perfil',settings:'Apariencia',agenda:'Agenda y tarifas'};
+    if(section==='agenda')return window.hc292Professional(mode);
+    const el=window.hc289Dialog(titles[section],settingsMarkup(
+      section==='account'?profile:window.hc289Personalization(),section,titles));
+    bindSettings(el,key=>professionalProfile(mode,user,key));
+    if(section==='settings'){
+      const previous=window.hc289PersonalizeRefresh;
+      window.hc289PersonalizeRefresh=()=>{
+        const page=$('.hcSettingsPage',el);
+        if(el.isConnected&&page)page.outerHTML=window.hc289Personalization();
+        else previous?.();
+      };
+      return;
+    }
     const box=$('.hc310Profile',el);
     const image=document.createElement('span');avatar(image,user);box.append(image);
     const name=document.createElement('h3');name.textContent=user.name||user.username||'Profesional';box.append(name);
     $('[data-profile-edit]',el).onclick=()=>window.hc292Professional(mode);
   }
 
-  function professionalAlerts(root) {
-    const button=$('[data-pro-alerts]',root);if(!button)return;
-    let newer=0, notified, loaded=false, busy=false;
-    button.onclick=()=>window.hc296Notifications();
-    async function check() {
-      if(!root.isConnected||document.hidden||busy)return;
-      busy=true;
-      try{
-        const result=await window.hc292Tele.api('notifications');
-        if(!root.isConnected)return;
-        const unread=(result.notifications||[]).filter(n=>n.kind==='tele_booking'&&!n.read_at);
-        newer=unread.length;button.textContent=newer?'Avisos · '+newer:'Avisos';
-        button.classList.toggle('hc310NewAlerts',!!newer);
-        if(loaded&&unread[0]?.id&&notified!==unread[0].id)window.hc289Toast('Tenés una nueva solicitud de turno.');
-        notified=unread[0]?.id;loaded=true;
-      }catch{}finally{busy=false;}
+  function openProfessionalVisit(id,mode) {
+    if(!id||!['telemedicine','office','home'].includes(mode))return;
+    if($('#hc297Workspace')?.dataset.mode===mode)return window.HC310.workspaceOpen?.(id);
+    return window.hc297Workspace(mode).then(()=>window.HC310.workspaceOpen?.(id));
+  }
+
+  let alertAccount='', alertAt=0, alertBusy=false, unreadAlerts=[];
+  function renderAlerts() {
+    const count=unreadAlerts.length;
+    for(const button of document.querySelectorAll('#btnAccount,[data-pro-profile]')){
+      button.toggleAttribute('data-hc310-unread',count>0);
+      button.title=count?'Perfil · '+count+' solicitudes nuevas':'Perfil';
     }
-    const timer=setInterval(()=>{if(!root.isConnected)clearInterval(timer);else check();},30000);
-    check();
+    const button=$('#hc297Workspace [data-pro-alerts]');
+    if(button){
+      button.textContent=count?'Avisos · '+count:'Avisos';
+      button.classList.toggle('hc310NewAlerts',count>0);
+    }
+  }
+  async function professionalAlerts(user,force=false) {
+    if(!user?.username||document.hidden||!window.hc292Tele)return;
+    if(alertAccount!==user.username){alertAccount=user.username;alertAt=0;unreadAlerts=[];}
+    renderAlerts();
+    if(alertBusy||!force&&Date.now()-alertAt<30000)return;
+    alertBusy=true;
+    const wasLoaded=alertAt>0;alertAt=Date.now();
+    try{
+      const result=await window.hc292Tele.api('notifications');
+      if(alertAccount!==user.username||window.hc289ClientSession)return;
+      const next=(result.notifications||[]).filter(n=>n.kind==='tele_booking'&&!n.read_at);
+      if(wasLoaded&&next.some(notice=>!unreadAlerts.some(previous=>previous.id===notice.id)))
+        window.hc289Toast('Tenés una nueva solicitud de turno.');
+      unreadAlerts=next;renderAlerts();
+    }catch{}finally{alertBusy=false;}
   }
 
   async function privateReports(root) {
@@ -452,5 +494,5 @@
     }catch(error){if(section.isConnected)status.textContent='No se pudieron consultar los informes: '+error.message;}
   }
 
-  window.HC310={avatar,touch,portalMarkup,sidebar,renderSidebar,calendar,settingsMarkup,bindSettings,closePanel,booking,modeLabel,professionalAgenda,professionalProfile,professionalAlerts,privateReports};
+  window.HC310={avatar,touch,portalMarkup,sidebar,renderSidebar,calendar,settingsMarkup,bindSettings,closePanel,booking,modeLabel,professionalAgenda,professionalProfile,professionalAlerts,openProfessionalVisit,privateReports};
 })();

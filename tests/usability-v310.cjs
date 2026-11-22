@@ -36,7 +36,7 @@ async function run() {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
       const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[];
-      let failDirectory=true,resolveNote;
+      let failDirectory=true,changedQuote=true,resolveNote;
       const prior={id:'consulta-anterior',mode:'office',status:'finished',starts_at:new Date(date.getTime()-86400000).toISOString(),minutes:30,is_trial:true,peer_name:'Persona anterior'};
       const upcoming={...prior,id:'consulta-proxima',status:'confirmed',starts_at:new Date(today+'T23:59:00-03:00').toISOString(),peer_name:'Persona próxima'};
       const next = new Date(today+'T23:59:00-03:00');
@@ -60,9 +60,13 @@ async function run() {
         if (route.request().url().includes('hospitalito-telemed')) {
           const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
           if(b.action==='directory' && failDirectory) {failDirectory=false;return route.fulfill({status:503,json:{ok:false,error:'Conexión de prueba interrumpida'}});}
-          if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[{...provider,username:'qa',trialAvailable:true,modes:{office,telemedicine:office,home:office}}]}});
+          if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[{...provider,username:'qa',revision:1,trialAvailable:true,modes:{office,telemedicine:office,home:office}}]}});
           if(b.action==='availability')return route.fulfill({json:{ok:true,providers:[{id:'qa',available:true}]}});
-          if(b.action==='slots')return route.fulfill({json:{ok:true,profileRevision:1,slots:[{start:b.date+'T12:00:00Z',local:b.date+'T09:00',available:true,address:'Calle de prueba 100',location:'Consultorio',latitude:-31.4,longitude:-64.2}]}});
+          if(b.action==='slots'){
+            const profileRevision=changedQuote?2:1;
+            changedQuote=false;
+            return route.fulfill({json:{ok:true,profileRevision,slots:[{start:b.date+'T12:00:00Z',local:b.date+'T09:00',available:true,address:'Calle de prueba 100',location:'Consultorio',latitude:-31.4,longitude:-64.2}]}});
+          }
           if(b.action==='reserve'){
             reserveRequests.push(b);
             const visit={id:'visita-de-prueba',mode:b.mode,client:'test',status:'confirmed',location_snapshot:b.homeAddress||'',starts_at:next.toISOString(),minutes:b.minutes,is_trial:true,total_cents:0,peer_name:provider.name};
@@ -70,6 +74,11 @@ async function run() {
             return route.fulfill({json:{ok:true,visit}});
           }
           if(b.action==='myVisits'&&!b.token)return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
+          if(b.action==='notifications'&&!b.token)return route.fulfill({json:{ok:true,notifications:[{
+            id:'aviso-ficticio',kind:'tele_booking',title:'Nueva solicitud de turno',body:'Atención a Domicilio',
+            payload:{visitId:'aviso-domicilio',mode:'home'}
+          }]}});
+          if(b.action==='visit'&&b.visitId==='aviso-domicilio')return route.fulfill({json:{ok:true,side:'provider',visit:{...upcoming,mode:'home'},peerName:'Paciente de domicilio'}});
           if(b.action==='clinicalRecord')return route.fulfill({json:{ok:true,note:null,history:[]}});
           if(b.action==='saveClinicalRecord'){
             await new Promise(resolve=>{resolveNote=resolve;});
@@ -134,7 +143,26 @@ async function run() {
       assert(menu.x>=0&&menu.x+menu.width<=width+1);
       await capture(page,'cuenta-'+width);
       await page.keyboard.press('Escape');
-      await page.evaluate(()=>hc297Workspace('office'));
+      await page.evaluate(()=>{
+        saveJSON(LS.globalAuthUser,{username:'qa308',name:'Profesional de prueba',role:'medico'});
+        return hc297Workspace('office');
+      });
+      const workspace=page.locator('#hc297Workspace');
+      const professionalAvatar=workspace.locator('[data-pro-profile]');
+      const accountMenu=page.locator('#hc289AccountMenu');
+      if(width<800){
+        await professionalAvatar.tap();
+        await accountMenu.waitFor();
+        await professionalAvatar.tap();
+      }else{
+        await professionalAvatar.hover();
+        await accountMenu.waitFor();
+        await professionalAvatar.click();
+      }
+      await page.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      await page.locator('#hc289Dialog').getByRole('button',{name:'Apariencia',exact:true}).click();
+      await page.locator('#hc289Dialog [data-vmode=dark]').waitFor();
+      await page.locator('#hc289Dialog [data-289-close]').click();
       await page.locator('#hc297Workspace [data-settings]').click();
       const agenda=page.locator('.hc298Compact');
       await agenda.waitFor();
@@ -142,6 +170,11 @@ async function run() {
       const proDate=agenda.locator('.hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]');
       await agenda.getByRole('button',{name:/Persona próxima/}).waitFor();
       assert.equal(await proDate.getAttribute('data-state'),'future');
+      const nextMonth=new Date(Date.UTC(Number(today.slice(0,4)),Number(today.slice(5,7)),1)).toISOString().slice(0,10);
+      await agenda.getByRole('button',{name:'Mes siguiente'}).click();
+      await agenda.locator('.hc310MonthGrid:not([inert]) [data-day-key="'+nextMonth+'"][aria-pressed=true]').waitFor();
+      await agenda.getByRole('button',{name:'Mes anterior'}).click();
+      await agenda.getByRole('button',{name:/Persona próxima/}).waitFor();
       await proDate.click();
       const weekDay=new Date(today+'T12:00:00').getDay();
       const weekday=agenda.locator('[data-day="'+weekDay+'"]');
@@ -163,7 +196,6 @@ async function run() {
       assert((await saved).postDataJSON().profile.modes.office.rates.some(rate=>rate.minutes===30&&rate.amount_cents===180000));
       await agenda.getByText(/Guardado en el servidor/).waitFor();
       await agenda.getByRole('button',{name:/Persona próxima/}).click();
-      const workspace=page.locator('#hc297Workspace');
       await workspace.locator('[data-visit-back]').click();
       await workspace.locator('[data-visit-filter]').selectOption('past');
       assert(await workspace.getByRole('button',{name:/Persona anterior/}).isVisible());
@@ -181,6 +213,10 @@ async function run() {
       await workspace.getByRole('button',{name:/Persona próxima/}).click();
       await note.waitFor();
       assert.equal(await note.inputValue(),'Borrador nuevo');
+      await workspace.getByRole('button',{name:'Avisos · 1'}).click();
+      await page.locator('#hc289Dialog').getByRole('button',{name:'Ver turno',exact:true}).click();
+      await workspace.getByRole('heading',{name:'Paciente de domicilio'}).waitFor();
+      assert.equal(await workspace.getAttribute('data-mode'),'home');
       await page.evaluate(()=>document.querySelector('#hc297Workspace')?.remove());
       await page.evaluate(()=>hc289EnterClient({token:'fixture',user:{username:'test',name:'Paciente de prueba',role:'cliente'}}));
       const portal=page.locator('#hc289Portal');
@@ -225,6 +261,16 @@ async function run() {
         await profile.click();
       }
       await portal.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      if(width<800)await profile.tap();else {
+        await page.mouse.move(0,0);
+        await profile.hover();
+      }
+      await accountMenu.getByRole('menuitem',{name:'Configuración'}).click();
+      const patientSettings=portal.locator('#hc289Dialog .hc310Settings');
+      await patientSettings.getByRole('button',{name:'Seguridad'}).click();
+      await patientSettings.getByLabel('Contraseña actual').waitFor();
+      await patientSettings.getByRole('button',{name:'Apariencia'}).click();
+      await patientSettings.locator('[data-vmode=dark]').waitFor();
       await home.click();
       await openSidebar();
       await portal.getByRole('button',{name:'Mis Estudios'}).click();
@@ -244,6 +290,10 @@ async function run() {
       const search=portal.getByRole('button',{name:'Buscar',exact:true});
       await search.click();
       await portal.getByText(/Conexión de prueba interrumpida/).waitFor();
+      await search.click();
+      await portal.locator('[data-result]').first().click();
+      await portal.getByText(/El profesional actualizó sus tarifas/).waitFor();
+      assert(await portal.locator('#hc292Reserve').isDisabled());
       await search.click();
       await portal.locator('[data-result]').first().click();
       await portal.locator('#hc292Plan').selectOption('30');

@@ -2,7 +2,7 @@
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-page = (root / "Hospitalito_v309.html").read_text()
+page = (root / "Hospitalito_v309.html").read_text(encoding="utf-8")
 
 
 def change(old, new):
@@ -210,12 +210,46 @@ change("""+'<button data-summary>Gestionar consulta</button></div><div data-note
        """+'<button data-summary>Gestionar consulta</button></div>'+(v.mode==='telemedicine'?'<section data-visit-video class="hc310VideoPanel"><h3>Videollamada</h3><p>La sala se habilita diez minutos antes de la consulta.</p><div data-video-room></div></section>':'')+'<div data-notes></div>""")
 change("()=>window.hc292OpenVideo(id));$('[data-summary]',main)",
        "()=>window.hc292OpenVideo(id,$('[data-video-room]',main)));$('[data-summary]',main)")
+# Keep account navigation, alerts and the reservation quote consistent.
+change("async function clientAccount(section){",
+    "async function clientAccount(section,inSettings=false){\n const panel=(title,content)=>{\n   if(!inSettings&&section!=='settings')return dialog(title,content);\n   const el=dialog(title,window.HC310.settingsMarkup(content,section));\n   window.HC310.bindSettings(el,key=>clientAccount(key,true));\n   return el;\n };")
+change("const el=dialog('Seguridad de la cuenta',",
+    "const el=panel('Seguridad de la cuenta',")
+change("const el=dialog('Perfil','<div style=\"text-align:center\">",
+    "const el=panel('Perfil','<div style=\"text-align:center\">")
+change("const el=dialog('Configuración',window.HC310.settingsMarkup(window.hc289Personalization()));window.hc289PersonalizeRefresh=()=>{const page=el.querySelector('.hcSettingsPage');if(page)page.outerHTML=window.hc289Personalization();};window.HC310.bindSettings(el,section=>window.hc289ClientAccount(section));",
+    "const el=panel('Configuración',window.hc289Personalization());\n const previous=window.hc289PersonalizeRefresh;\n window.hc289PersonalizeRefresh=()=>{\n  const page=el.querySelector('.hcSettingsPage');\n  if(el.isConnected&&page)page.outerHTML=window.hc289Personalization();\n  else previous?.();\n };")
+page = page.replace("#btnAccount,#hc289PortalAccount",
+    "#btnAccount,#hc289PortalAccount,[data-pro-profile]")
+change("menu.innerHTML=entries.filter",
+    "const workspace=button.closest('#hc297Workspace');\n const accountEntries=workspace?[['Perfil','account'],['Avisos','notifications'],['Configuración','settings'],['SALIR','logout']]:\n   session&&!session.localSeed&&!client&&window.hc297IsProfessional?.(U())?[...entries,['Solicitudes de turno','booking-alerts']]:entries;\n menu.innerHTML=accountEntries.filter")
+change("['account', 'notifications', 'security', 'settings']",
+    "['account', 'booking-alerts', 'notifications', 'security', 'settings']")
+change("if(!id)return;closeMenu();if(window.hc289ClientSession){",
+    "if(!id)return;const workspace=menuTrigger?.closest('#hc297Workspace');closeMenu();\n if(workspace){workspace.hc310Account(id);return;}\n if(id==='booking-alerts'){window.hc296Notifications();return;}\n if(window.hc289ClientSession){")
+change("closeMenu();if(window.hc289ClientSession)window.hc289ClientAccount('account');",
+    "closeMenu();const workspace=account.closest('#hc297Workspace');\n  if(workspace)workspace.hc310Account('account');\n  else if(window.hc289ClientSession)window.hc289ClientAccount('account');")
+change("apply();window.hc289StaffDecorate?.();",
+    "apply();window.hc289StaffDecorate?.();\n if(session&&!session.localSeed&&!window.hc289ClientSession&&localStorage.getItem(LS.globalAuthToken)&&window.hc297IsProfessional?.(U()))\n   window.HC310?.professionalAlerts(U());")
+change("if(attempt!==slotSerial||!plan.isConnected)return;revision=j.profileRevision;",
+    "if(attempt!==slotSerial||!plan.isConnected)return;\n if(p.revision!=null&&j.profileRevision!==p.revision){\n   q('#hc292Slots').textContent='El profesional actualizó sus tarifas u horarios. Presioná Buscar para verlos antes de reservar.';\n   return;\n }\n revision=j.profileRevision;")
+change("data-institution-visit=\"'+E(n.payload?.bookingId||'')+'\">Ver turno",
+    "data-institution-visit=\"'+E(n.payload?.bookingId||'')+'\" data-visit-mode=\"'+E(n.payload?.mode||'')+'\">Ver turno")
+change("b.onclick=()=>b.dataset.institutionVisit?window.hc310InstitutionVisit(b.dataset.institutionVisit):window.hc292Visit(b.dataset.reminderVisit)",
+    "b.onclick=()=>{\n  if(b.dataset.institutionVisit)return window.hc310InstitutionVisit(b.dataset.institutionVisit);\n  if(window.hc289ClientSession||!b.dataset.visitMode)return window.hc292Visit(b.dataset.reminderVisit);\n  el.remove();window.HC310.openProfessionalVisit(b.dataset.reminderVisit,b.dataset.visitMode);\n }")
+change("await api('readNotifications',{ids:messages.filter(n=>!n.read_at).map(n=>n.id)});await refresh();",
+    "await api('readNotifications',{ids:messages.filter(n=>!n.read_at).map(n=>n.id)});await refresh();\n if(!window.hc289ClientSession)window.HC310.professionalAlerts(JSON.parse(localStorage.getItem(LS.globalAuthUser)||'{}'),true);")
+change("data-pro-profile aria-label=\"Perfil\">Perfil",
+    "data-pro-profile aria-label=\"Perfil\" aria-haspopup=\"menu\" aria-expanded=\"false\">Perfil")
+change(" $('[data-pro-profile]',root).onclick=()=>window.HC310.professionalProfile(mode,user());\n window.HC310.professionalAlerts(root);",
+    " root.hc310Account=section=>{\n   if(section==='logout')return $('[data-exit]',root).click();\n   if(section==='notifications')return window.hc296Notifications();\n   return window.HC310.professionalProfile(mode,user(),section);\n };\n $('[data-pro-alerts]',root).onclick=()=>window.hc296Notifications();\n const alertTimer=setInterval(()=>{if(!root.isConnected)clearInterval(alertTimer);else window.HC310.professionalAlerts(user());},5000);\n window.HC310.professionalAlerts(user());")
+
 assets = ['ui/v310.css', 'ui/v310.js']
 insertion = ''.join(
-    f'<{tag} id="hc-v310-{kind}">\n{(root / file).read_text()}\n</{tag}>\n'
+    f'<{tag} id="hc-v310-{kind}">\n{(root / file).read_text(encoding="utf-8")}\n</{tag}>\n'
     for file, tag, kind in zip(assets, ['style', 'script'], ['styles', 'ui'])
 )
 end = page.rindex('</body>')
 page = page[:end] + insertion + page[end:]
 for filename in ['index.html', 'Hospitalito_v310.html']:
-    (root / filename).write_text(page)
+    (root / filename).write_text(page, encoding="utf-8", newline="\n")
