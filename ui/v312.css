@@ -1,0 +1,55 @@
+/* A 40px square for Cuenta, even when the mobile header styles other buttons. */
+body :is(.hc304Mainbar #btnAccount,#hc289PortalAccount,#hc297Workspace [data-pro-profile]).hc310Avatar {
+  position:relative;
+  box-sizing:border-box;
+  flex:0 0 40px;
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+  max-width:40px!important;
+  min-height:40px!important;
+  padding:0!important;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) {
+  position:relative;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) > :is(svg,img) {
+  position:absolute;
+  inset:0;
+  display:block;
+  margin:auto;
+  pointer-events:none;
+}
+body button.hc310Avatar > img {
+  width:100%;
+  height:100%;
+  max-width:none;
+  max-height:none;
+  object-fit:cover;
+  object-position:center;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) > svg {
+  width:21px;
+  height:21px;
+}
+body #hc289Portal .hc310SideToggle > svg {
+  width:15px;
+  height:15px;
+}
+body #hc297Workspace > header [data-settings] {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  text-align:center;
+}
+body #hc297Workspace > header [data-settings] > svg {
+  display:block;
+  width:17px;
+  height:17px;
+  flex:none;
+  pointer-events:none;
+}
+button[data-hc289-icon] > :is(svg,.hc308ActionLabel) {
+  vertical-align:middle;
+}

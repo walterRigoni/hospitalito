@@ -30,6 +30,21 @@ async function contrast(locator){
   });
   assert(ratio>=4.5,'Insufficient contrast: '+ratio.toFixed(2));
 }
+async function centeredIcon(button, icon='svg') {
+  await button.locator(':scope > '+icon).waitFor();
+  const offset=await button.evaluate((element,selector)=>{
+    const host=element.getBoundingClientRect();
+    const glyph=element.querySelector(selector);
+    const bounds=glyph.getBoundingClientRect();
+    const painted=selector==='svg'?glyph.getBBox():null;
+    return {x:bounds.x+bounds.width/2-host.x-host.width/2,
+      y:bounds.y+bounds.height/2-host.y-host.height/2,
+      opticalX:painted?painted.x+painted.width/2-12:0,
+      opticalY:painted?painted.y+painted.height/2-12:0};
+  },icon);
+  assert(Math.abs(offset.x)<0.6&&Math.abs(offset.y)<0.6&&Math.abs(offset.opticalX)<0.6&&Math.abs(offset.opticalY)<0.6,
+    'Icono descentrado: '+JSON.stringify(offset));
+}
 async function run() {
   const browser = await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE||undefined});
   try {
@@ -143,6 +158,7 @@ async function run() {
       await page.locator('#evoList button').first().click();
       assert.equal(await page.locator('#evoList button[aria-pressed=true]').count(),1);
       await capture(page,'evolucion-'+width);
+      await centeredIcon(page.locator('#btnAccount'));
       if(width<800)await page.locator('#btnAccount').tap();
       else await page.locator('#btnAccount').hover();
       assert(await page.getByRole('group',{name:'Mi cuenta',exact:true}).isVisible());
@@ -156,6 +172,13 @@ async function run() {
       });
       const workspace=page.locator('#hc297Workspace');
       const professionalAvatar=workspace.locator('[data-pro-profile]');
+      await centeredIcon(professionalAvatar);
+      await professionalAvatar.evaluate(button=>{
+        const photo='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=';
+        window.HC310.avatar(button,{photo});
+      });
+      await centeredIcon(professionalAvatar,'img');
+      await professionalAvatar.evaluate(button=>window.HC310.avatar(button,{}));
       const accountMenu=page.locator('#hc289AccountMenu');
       if(width<800){
         await professionalAvatar.tap();
@@ -271,6 +294,10 @@ async function run() {
         assert(await portal.locator('#hc289Registry').evaluate(e=>e.offsetWidth)>sidebarWidth+60);
       }
       const profile=page.locator('#hc289PortalAccount');
+      await centeredIcon(profile);
+      await centeredIcon(portal.getByRole('button',{name:'Mes anterior'}));
+      await centeredIcon(portal.getByRole('button',{name:'Mes siguiente'}));
+      await centeredIcon(portal.locator('.hc310SideToggle'));
       if(width<800){
         await profile.tap();assert(await page.locator('#hc289AccountMenu').isVisible());
         await profile.tap();
@@ -280,11 +307,9 @@ async function run() {
       }
       await portal.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
       const accountPanel=portal.locator('#hc289Dialog');
+      await centeredIcon(accountPanel.getByRole('button',{name:'Cerrar',exact:true}));
       await accountPanel.getByRole('button',{name:'Cerrar',exact:true}).click();
-      if(width<800)await profile.tap();else {
-        await page.mouse.move(0,0);
-        await profile.hover();
-      }
+      await profile.press('ArrowDown');
       await accountMenu.getByRole('menuitem',{name:'Configuración'}).click();
       const patientSettings=portal.locator('#hc289Dialog .hc310Settings');
       const accountBounds=await accountPanel.boundingBox();

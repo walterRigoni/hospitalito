@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v311 · Historia Clínica Digital</title>
+<title>Hospitalito v312 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v311</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v312</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -47237,7 +47237,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 311;
+  const CURRENT_VERSION = 312;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -49705,7 +49705,7 @@ body.hc289Client>header,body.hc289Client>#login,body.hc289Client>#loginView,body
 (()=>{'use strict';
 window.HC_DEMO_VERSION='v305';document.title='Hospitalito · Historia Clínica Digital · HC Demo v305 · Supabase';
 const q=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icon=(name)=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({user:'<circle cx="12" cy="8" r="4"/><path d="M4 22v-3a8 8 0 0116 0v3"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',print:'<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z"/>',edit:'<path d="M4 20l1-6L17 2l5 5L10 19zM14 5l5 5"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="M5 5l14 14M19 5L5 19"/>',search:'<circle cx="10" cy="10" r="7"/><path d="M15 15l7 7"/>',video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-4v12l-6-4"/>',send:'<path d="M2 3l20 9-20 9 4-9zM6 12h16"/>',refresh:'<path d="M20 7A9 9 0 104 19M20 2v6h-6"/>'}[name]||'<path d="M5 12h14"/>')+'</svg>';
+const icon=(name)=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>',left:'<path d="m15 6-6 6 6 6"/>',right:'<path d="m9 6 6 6-6 6"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',print:'<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z"/>',edit:'<path d="M4 20l1-6L17 2l5 5L10 19zM14 5l5 5"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="M5 5l14 14M19 5L5 19"/>',search:'<circle cx="10" cy="10" r="7"/><path d="M15 15l7 7"/>',video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-4v12l-6-4"/>',send:'<path d="M2 3l20 9-20 9 4-9zM6 12h16"/>',refresh:'<path d="M20 7A9 9 0 104 19M20 2v6h-6"/>'}[name]||'<path d="M5 12h14"/>')+'</svg>';
 const U=()=>window.hc289ClientSession?.user||(typeof getCurrentUser==='function'?getCurrentUser():{})||{},name=()=>U().username||session?.username||'local';
 const legacyMap={'blue-dark':['blue','dark'],light:['default','light'],dark:['default','dark'],red:['red','dark'],pink:['pink','light'],lime:['green','dark'],sky:['blue','light'],violet:['violet','dark']};
 const colors={default:['Predeterminado',210],blue:['Azul',214],red:['Rojo',4],green:['Verde',145],violet:['Violeta',269],gray:['Gris',215],orange:['Naranja',30],pink:['Rosado',330]},fonts={default:'Actual',system:'Sistema',arial:'Arial',georgia:'Georgia',verdana:'Verdana'};
@@ -50675,7 +50675,7 @@ window.hc297MountClinical=async function(host,id){
 window.addEventListener('beforeunload',e=>{if(document.querySelector('[data-clinical-dirty=\"1\"]')||[...clinicalDrafts.keys()].some(k=>k.startsWith(owner()+':'))){e.preventDefault();e.returnValue='';}});
 window.hc297Workspace=async function(mode){
  if(!['telemedicine','office','home'].includes(mode))return;hcInstitutionChooserClose();$('#hc297Workspace')?.remove();
- const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.dataset.mode=mode;root.innerHTML='<header><div><b>'+E(window.HC310.modeLabel(mode))+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>✎ Días, horarios y tarifas</button><button type="button" data-pro-alerts>Avisos</button><button type="button" data-pro-profile aria-label="Perfil" aria-haspopup="menu" aria-expanded="false">Perfil</button><button type="button" data-switch>Cambiar lugar de atención</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div><p data-list-status role="status"></p><div data-visits></div></aside><main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main></div>';document.body.append(root);
+ const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.dataset.mode=mode;root.innerHTML='<header><div><b>'+E(window.HC310.modeLabel(mode))+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>'+window.hc289Icon('edit')+'<span>Días, horarios y tarifas</span></button><button type="button" data-pro-alerts>Avisos</button><button type="button" data-pro-profile aria-label="Perfil" aria-haspopup="menu" aria-expanded="false">Perfil</button><button type="button" data-switch>Cambiar lugar de atención</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div><p data-list-status role="status"></p><div data-visits></div></aside><main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main></div>';document.body.append(root);
  $('[data-settings]',root).onclick=()=>window.hc292Professional(mode);
  window.HC310.avatar($('[data-pro-profile]',root),user());
  root.hc310Account=section=>{
@@ -51217,7 +51217,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v311";document.title="Hospitalito · Historia Clínica Digital · v311";
+window.HC_DEMO_VERSION="v312";document.title="Hospitalito · Historia Clínica Digital · v312";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -51888,7 +51888,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v311</small></button>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v312</small></button>'+
       '<span class="hc289PortalWho">'+E(user.name)+'</span><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
@@ -51896,7 +51896,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
       '<div class="hc289RegistryScroll" id="hc289RegistryContent" aria-live="polite"></div>'+
       '<div class="hc310SideFooter"><button type="button" data-hc310-book>＋ Nuevo Turno</button></div></aside>'+
       '<div class="hc310Divider" role="separator" aria-label="Ancho de Mis Turnos" aria-orientation="vertical" tabindex="0"></div>'+
-      '<button type="button" class="hc310SideToggle" aria-controls="hc289Registry">‹</button>'+
+      '<button type="button" class="hc310SideToggle hc312IconOnly" aria-controls="hc289Registry"></button>'+
       '<main id="hc289PortalMain" class="hc289PortalMain"></main></div>';
   }
   let portalActions;
@@ -51913,7 +51913,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     function setOpen(open) {
       layout.classList.toggle('hc310Closed',!open);
       $('#hc289Registry',layout).inert = !open;
-      toggle.textContent = open?'‹':'›';
+      toggle.innerHTML = window.hc289Icon(open?'left':'right');
       toggle.setAttribute('aria-expanded',String(open));
       toggle.setAttribute('aria-label',open?'Ocultar Mis Turnos':'Mostrar Mis Turnos');
     }
@@ -52001,7 +52001,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   function calendar(host, options) {
     let month = new Date(options.month.getFullYear(),options.month.getMonth(),1);
     host.innerHTML = '<section class="hc310Calendar'+(options.tall?' hc310CalendarTall':'')+'"><div class="hc310MonthHeader">'+
-      '<button type="button" data-prev aria-label="Mes anterior">‹</button><h2></h2><button type="button" data-next aria-label="Mes siguiente">›</button></div>'+
+      '<button type="button" class="hc312IconOnly" data-prev aria-label="Mes anterior">'+window.hc289Icon('left')+'</button><h2></h2><button type="button" class="hc312IconOnly" data-next aria-label="Mes siguiente">'+window.hc289Icon('right')+'</button></div>'+
       '<div class="hc310CalendarViewport" aria-label="Calendario" tabindex="0"><div class="hc310CalendarTrack"></div></div>'+
       (options.warning?'<p role="status" class="hc310Muted">'+E(options.warning)+'</p>':'')+'</section>';
     const view=$('.hc310CalendarViewport',host), track=$('.hc310CalendarTrack',host);
@@ -52671,5 +52671,62 @@ body #hc289Portal #hc310UrgentHelp a:hover {background:#98182e;}
     patientReminderPopups, editPatientReminders, prescriptions};
 })();
 </script>
+<style id="hc-v312-icons">
+/* A 40px square for Cuenta, even when the mobile header styles other buttons. */
+body :is(.hc304Mainbar #btnAccount,#hc289PortalAccount,#hc297Workspace [data-pro-profile]).hc310Avatar {
+  position:relative;
+  box-sizing:border-box;
+  flex:0 0 40px;
+  width:40px!important;
+  height:40px!important;
+  min-width:40px!important;
+  max-width:40px!important;
+  min-height:40px!important;
+  padding:0!important;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) {
+  position:relative;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) > :is(svg,img) {
+  position:absolute;
+  inset:0;
+  display:block;
+  margin:auto;
+  pointer-events:none;
+}
+body button.hc310Avatar > img {
+  width:100%;
+  height:100%;
+  max-width:none;
+  max-height:none;
+  object-fit:cover;
+  object-position:center;
+}
+body :is(button.hc310Avatar,button.hc311Close,button.hc312IconOnly) > svg {
+  width:21px;
+  height:21px;
+}
+body #hc289Portal .hc310SideToggle > svg {
+  width:15px;
+  height:15px;
+}
+body #hc297Workspace > header [data-settings] {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  text-align:center;
+}
+body #hc297Workspace > header [data-settings] > svg {
+  display:block;
+  width:17px;
+  height:17px;
+  flex:none;
+  pointer-events:none;
+}
+button[data-hc289-icon] > :is(svg,.hc308ActionLabel) {
+  vertical-align:middle;
+}
+</style>
 </body>
 </html>
