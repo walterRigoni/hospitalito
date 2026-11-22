@@ -53,6 +53,9 @@ async function run() {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
       const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[];
       let failDirectory=true,changedQuote=true,resolveNote;
+      let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test'};
+      let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
+      const profileRequest=()=>({client:{...patient,profile:personal},verifications:[{institution_id:'inst',status:'verified'}]});
       const prior={id:'consulta-anterior',mode:'office',status:'finished',starts_at:new Date(date.getTime()-86400000).toISOString(),minutes:30,is_trial:true,peer_name:'Persona anterior'};
       const upcoming={...prior,id:'consulta-proxima',status:'confirmed',starts_at:new Date(today+'T23:59:00-03:00').toISOString(),peer_name:'Persona próxima'};
       const next = new Date(today+'T23:59:00-03:00');
@@ -67,7 +70,7 @@ async function run() {
         const responses={
           publicBranding:{settings:{programName:'Hospitalito'}},
           directory:{providers:[provider],institutions:[{id:'inst',name:'Centro de prueba'}]},
-          me:{client:{username:'test',profile:{}},verifications:[{institution_id:'inst',status:'verified'}]},
+          me:profileRequest(),
           calendar:{days:[{date:today,free:1,total:1,slots:[{local:today+'T22:00',available:true}]}]},
           calendarVisits:{visits:[upcoming]},
           myReports:{reports:[{id:'r1',visit_id:'visita-de-prueba',name:'Informe de prueba'}]},
@@ -77,6 +80,14 @@ async function run() {
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
           myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings}
         };
+        if(b.action==='updateClientProfile'){
+          personal={...personal,...b.profile};
+          return route.fulfill({json:{ok:true,...profileRequest()}});
+        }
+        if(b.action==='updateProfile'){
+          const user=b.token==='fixture'?{username:'test',name:'Paciente de prueba',role:'cliente'}:{username:'qa308',name:'Profesional de prueba',role:'medico'};
+          return route.fulfill({json:{ok:true,user:{...user,...b.user}}});
+        }
         if (route.request().url().includes('hospitalito-telemed')) {
           const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
           if(b.action==='directory' && failDirectory) {failDirectory=false;return route.fulfill({status:503,json:{ok:false,error:'Conexión de prueba interrumpida'}});}
@@ -217,6 +228,14 @@ async function run() {
         await professionalAvatar.click();
       }
       await page.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      const professionalName=page.locator('#hc289Dialog [data-hc314-row=name]');
+      await professionalName.getByText('Profesional de prueba').waitFor();
+      await professionalName.getByRole('button',{name:'Editar Nombre visible'}).click();
+      const nameEditor=professionalName.getByRole('textbox',{name:'Nombre visible'});
+      await nameEditor.fill('Borrador de prueba');
+      await professionalName.getByRole('button',{name:'Cancelar'}).click();
+      assert.equal(await nameEditor.count(),0);
+      await professionalName.getByText('Profesional de prueba').waitFor();
       await page.locator('#hc289Dialog').getByRole('button',{name:'Apariencia',exact:true}).click();
       await page.locator('#hc289Dialog [data-vmode=dark]').waitFor();
       const professionalFormat=page.locator('#hc289Dialog .hc313Format');
@@ -332,15 +351,44 @@ async function run() {
       await centeredIcon(portal.getByRole('button',{name:'Mes anterior'}));
       await centeredIcon(portal.getByRole('button',{name:'Mes siguiente'}));
       await centeredIcon(portal.locator('.hc310SideToggle'));
+      assert.equal(await portal.locator('[data-portal-section][aria-current=page]').count(),0);
       if(width<800){
-        await profile.tap();assert(await page.locator('#hc289AccountMenu').isVisible());
+        await portal.getByRole('button',{name:'Opciones de cuenta'}).tap();
+        await accountMenu.getByRole('menuitem',{name:'Perfil',exact:true}).click();
+        await portal.locator('#hc289Dialog [data-client-settings=account]').waitFor();
+        await portal.locator('#hc289Dialog [data-289-close]').click();
         await profile.tap();
       }else{
         await profile.hover();assert(await page.locator('#hc289AccountMenu').isVisible());
         await profile.click();
       }
-      await portal.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
       const accountPanel=portal.locator('#hc289Dialog');
+      await accountPanel.getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      assert.equal(await accountPanel.locator('[data-client-settings]').count(),4);
+      assert.equal(await accountPanel.locator('[data-client-settings=account]').getAttribute('aria-current'),'page');
+      const telephone=accountPanel.locator('[data-hc314-row=phone]');
+      const pencil=telephone.getByRole('button',{name:'Editar Teléfono'});
+      assert.equal(await accountPanel.locator('input').count(),0);
+      await telephone.getByText('1112345678').waitFor();
+      assert.equal(await accountPanel.locator('[data-hc314-row=dni] button').count(),0);
+      assert.equal(await pencil.evaluate(e=>getComputedStyle(e).opacity),width<800?'1':'0');
+      if(width>800)await telephone.hover();
+      assert.equal(await pencil.evaluate(e=>getComputedStyle(e).opacity),'1');
+      await pencil.click();
+      const phoneInput=telephone.getByRole('textbox',{name:'Teléfono'});
+      assert.equal(await phoneInput.inputValue(),'1112345678');
+      await phoneInput.fill('1100001122');
+      await telephone.getByRole('button',{name:'Guardar',exact:true}).click();
+      await telephone.getByText('1100001122').waitFor();
+      assert.equal(personal.address,'Dirección de prueba 42');
+      assert.equal(personal.email,'paciente@example.test');
+      if(width>800){
+        const layout=await accountPanel.evaluate(el=>{
+          const outer=el.getBoundingClientRect(),nav=el.querySelector('.hcSettingsNav').getBoundingClientRect(),stage=el.querySelector('.hcSettingsStage').getBoundingClientRect();
+          return {left:nav.left-outer.left,right:outer.right-stage.right,height:outer.height,stageWidth:stage.width};
+        });
+        assert(Math.abs(layout.left-layout.right)<2&&layout.left<36&&layout.stageWidth>900,JSON.stringify(layout));
+      }
       await centeredIcon(accountPanel.getByRole('button',{name:'Cerrar',exact:true}));
       await accountPanel.getByRole('button',{name:'Cerrar',exact:true}).click();
       await profile.press('ArrowDown');
@@ -356,6 +404,17 @@ async function run() {
         await contrast(accountPanel.getByRole('button',{name:'Cerrar',exact:true}));
       }
       const patientFormat=patientSettings.locator('.hc313Format');
+      const actualExamples=await page.evaluate(()=>{
+        const now=new Date();
+        return {
+          date:HC313.date(now,{timeZone:HC313.argentina}),
+          iso:new Intl.DateTimeFormat('fr-CA',{timeZone:HC313.argentina,year:'numeric',month:'2-digit',day:'2-digit'}).format(now),
+          time:HC313.time(now,{timeZone:HC313.argentina})
+        };
+      });
+      assert.deepEqual(await patientFormat.getByLabel('Formato de fecha').locator('option').allTextContents(),[actualExamples.date,actualExamples.iso]);
+      assert.match((await patientFormat.getByLabel('Formato de hora').locator('option').allTextContents())[0],/^\d{2}:\d{2} \(24 horas\)$/);
+
       assert.equal(await patientFormat.getByLabel('Formato de fecha').inputValue(),'dmy');
       assert.equal(await patientFormat.getByLabel('Formato de hora').inputValue(),'24h');
       await patientFormat.getByLabel('Formato de fecha').selectOption('iso');
@@ -379,6 +438,31 @@ async function run() {
       await patientSettings.locator('[data-vmode=dark]').waitFor();
       await accountPanel.getByRole('button',{name:'Cerrar',exact:true}).click();
       await home.click();
+      const noSelection=async()=>{
+        await portal.locator('#hc289PortalMain .hc310CalendarTall').waitFor();
+        assert.equal(await portal.locator('[data-portal-section][aria-current=page]').count(),0);
+      };
+      await noSelection();
+      for(const section of ['turns','studies','alerts','prescriptions']){
+        const item=portal.locator('[data-portal-section='+section+']');
+        const chooseSection=async()=>{await openSidebar();await item.click();};
+        await chooseSection();
+        assert.equal(await item.getAttribute('aria-current'),'page');
+        await chooseSection();
+        await noSelection();
+        await chooseSection();
+        const close=portal.locator('#hc289PortalMain').getByRole('button',
+          {name:section==='alerts'?'Cerrar':'Volver al calendario',exact:true});
+        await centeredIcon(close);
+        if(section==='turns'){
+          const refresh=portal.getByRole('button',{name:'Actualizar',exact:true}).first();
+          const [left,right]=await Promise.all([refresh.boundingBox(),close.boundingBox()]);
+          assert(right.x-left.x-left.width>=6,'Actualizar queda a la izquierda de la cruz');
+        }
+        if(section==='studies')assert.equal(await portal.locator('#hc289PortalMain [data-289-back]').count(),0);
+        await close.click();
+        await noSelection();
+      }
       await openSidebar();
       await portal.getByRole('button',{name:'Mis Recetas'}).click();
       await portal.getByRole('heading',{name:'Mis Recetas'}).waitFor();

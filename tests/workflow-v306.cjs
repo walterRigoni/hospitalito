@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 let scripts=0;for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++;}}
 const expectedVersion = 'v' + html.match(/const CURRENT_VERSION = (\d+);/)[1];
-const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62,v311:63,v312:63,v313:64}[expectedVersion];
+const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62,v311:63,v312:63,v313:64,v314:65}[expectedVersion];
 assert(html.includes('id="hc-v306-ui"'));assert.equal(scripts,expectedScripts);
 function fn(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=html.indexOf('{',start);for(let i=open;i<html.length;i++){if(html[i]==='{')depth++;if(html[i]==='}'&&!--depth)return html.slice(start,i+1);}throw Error(name);}
 const now=Date.parse('2026-11-21T02:00:00-03:00');class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}

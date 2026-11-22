@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v313 · Historia Clínica Digital</title>
+<title>Hospitalito v314 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v313</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v314</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -6468,6 +6468,162 @@ html::-webkit-scrollbar-corner{
     <div id="labModalContent"></div>
   </div>
 </div>
+<script id="hc-v314-profile">
+(() => {
+  'use strict';
+  const esc = value => window.hc289Esc(value);
+  const icon = name => window.hc289Icon(name);
+  const photoPattern = /^data:image\/(?:jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/i;
+  const photoTypes = 'image/jpeg,image/png,image/webp,image/gif';
+
+  function sectionHeader(title, action='') {
+    return '<div class="hc314SectionHead"><h2 tabindex="-1">'+esc(title)+'</h2><div class="hc314SectionActions">'+action+
+      '<button type="button" class="hc311Close" data-hc314-close-section aria-label="Volver al calendario" title="Volver al calendario">'+icon('close')+'</button></div></div>';
+  }
+
+  function profileValue(field) {
+    if (field.type==='photo') {
+      const photo = photoPattern.test(field.value || '') ? field.value : '';
+      return '<span class="hc289Avatar hc314ProfilePhoto">'+(photo?'<img alt="Foto de perfil" src="'+photo+'">':icon('user'))+'</span>'+
+        '<span>'+ (photo?'Foto guardada':'Sin foto')+'</span>';
+    }
+    return esc(field.value || 'Sin cargar');
+  }
+
+  function profileRows(fields) {
+    return '<dl class="hc314Profile" data-hc314-profile>'+fields.map(field=>
+      '<div class="hc314ProfileRow" data-hc314-row="'+esc(field.key)+'"><dt>'+esc(field.label)+'</dt>'+
+      '<dd><div class="hc314Value">'+profileValue(field)+'</div>'+
+      (field.editable?'<button type="button" class="hc314Ghost hc314Pencil hc312IconOnly" data-hc314-edit aria-label="Editar '+esc(field.label)+'" title="Editar '+esc(field.label)+'">'+icon('edit')+'</button>':'')+
+      '</dd></div>').join('')+'</dl><p class="hc314ProfileStatus" data-hc314-message role="status"></p>';
+  }
+
+  function bindProfile(panel, fields, save) {
+    const list = panel.querySelector('[data-hc314-profile]');
+    if (!list) return;
+    const message = panel.querySelector('[data-hc314-message]');
+    let active = null;
+    list.querySelectorAll('[data-hc314-edit]').forEach(button=>{
+      button.onclick = () => {
+        if (active?.busy) return;
+        active?.close(false);
+        const row=button.closest('[data-hc314-row]'), field=fields.find(item=>item.key===row.dataset.hc314Row);
+        const value=row.querySelector('.hc314Value'), editor=document.createElement('form');
+        editor.className='hc314Editor';
+        editor.dataset.hc314Editor='';
+        const content = field.type==='location' ? '<p>Usá la ubicación de este dispositivo.</p>'
+          : '<input name="value" type="'+(field.type==='photo'?'file':field.type||'text')+'" aria-label="'+esc(field.label)+'"'+
+          (field.type==='photo'?' accept="'+photoTypes+'" required': ' value="'+esc(field.value)+'" maxlength="'+(field.max||200)+'"'+(field.required?' required':''))+
+          (field.autocomplete?' autocomplete="'+esc(field.autocomplete)+'"':'')+'>';
+        editor.innerHTML=content+'<div class="hc314EditActions"><button type="submit" class="hc314Ghost">'+
+          (field.type==='location'?'Guardar ubicación actual':'Guardar')+'</button><button type="button" data-cancel class="hc314Ghost">Cancelar</button></div>';
+        button.hidden=true;
+        value.hidden=true;
+        value.after(editor);
+        message.textContent='';
+        const current={busy:false,close(restore=true){
+          editor.remove();value.hidden=false;button.hidden=false;active=null;
+          if(restore)button.focus({preventScroll:true});
+        }};
+        active=current;
+        const submit=editor.querySelector('[type=submit]'), cancel=editor.querySelector('[data-cancel]');
+        cancel.onclick=()=>current.close();
+        editor.onkeydown=event=>{
+          if(event.key==='Escape'){
+            event.preventDefault();event.stopPropagation();
+            if(!current.busy)current.close();
+          }
+        };
+        editor.onsubmit=async event=>{
+          event.preventDefault();
+          if(current.busy)return;
+          current.busy=true;submit.disabled=true;cancel.disabled=true;message.textContent='Guardando…';
+          try {
+            const input=editor.elements.value;
+            const inputValue=field.type==='photo'?await readPhoto(input.files[0]):input?.value.trim();
+            if(field.required&&!inputValue)throw Error('Completá este dato.');
+            if(!editor.isConnected)return;
+            field.value=await save(field,inputValue);
+            if(!editor.isConnected)return;
+            value.innerHTML=profileValue(field);
+            current.close();
+            message.textContent='Dato guardado.';
+          } catch(error) {
+            if(editor.isConnected)message.textContent=error.message||'No se pudo guardar el dato.';
+          } finally {
+            current.busy=false;submit.disabled=false;cancel.disabled=false;
+          }
+        };
+        (editor.elements.value||submit).focus();
+      };
+    });
+  }
+
+  async function readPhoto(file) {
+    if(!file||!photoTypes.split(',').includes(file.type)||file.size>5000000)throw Error('Elegí una imagen JPG, PNG, WEBP o GIF de hasta 5 MB.');
+    const data=await readFileAsDataURL(file);
+    if(!photoPattern.test(data))throw Error('La foto no es válida.');
+    return data;
+  }
+
+  function accountFields(user, role, institution='') {
+    return [
+      {key:'name',label:'Nombre visible',value:user.name,editable:true,required:true,max:150,autocomplete:'name'},
+      {key:'username',label:'Usuario',value:user.username},
+      {key:'role',label:'Rol',value:role},
+      ...(institution?[{key:'institution',label:'Institución activa',value:institution}]:[]),
+      {key:'email',label:'Correo electrónico',value:user.email,editable:true,type:'email',autocomplete:'email'},
+      {key:'phone',label:'Teléfono',value:user.phone,editable:true,type:'tel',max:80,autocomplete:'tel'},
+      {key:'professionalTitle',label:'Título profesional',value:user.professionalTitle,editable:true,max:150},
+      {key:'licenseNumber',label:'Matrícula / identificador',value:user.licenseNumber,editable:true,max:160},
+      {key:'specialty',label:'Especialidad / función',value:user.specialty,editable:true,max:200},
+      {key:'photo',label:'Foto de perfil',value:user.photo,type:'photo',editable:true}
+    ];
+  }
+
+  async function saveAccountField(user, field, value) {
+    const username=user.username, patch={[field.key]:value};
+    const activeUser=()=>session?.username||(document.querySelector('#hc297Workspace')?loadJSON(LS.globalAuthUser,{})?.username:'');
+    if(activeUser()!==username)throw Error('Cambió la sesión. Volvé a abrir tu perfil.');
+    const authToken=session?.localSeed?'':hcGlobalAuthToken();
+    let updated={...user,...patch};
+    if(authToken){
+      const response=await window.hc230AuthRequest('updateProfile',{token:authToken,user:patch});
+      if(activeUser()!==username||hcGlobalAuthToken()!==authToken)throw Error('Cambió la sesión.');
+      if(response.user?.username!==username)throw Error('No se confirmó el cambio de perfil.');
+      const current=loadJSON(LS.globalAuthUser,{});
+      updated={...(current?.username===username?current:user),...patch,...response.user};
+      saveJSON(LS.globalAuthUser,updated);
+    }
+    if(session?.username===username){
+      if(authToken)hcGlobalCacheUser({...updated,role:session.role},{id:hcGlobalCurrentInstitutionId(),name:session.institutionName||''});
+      else {
+        const users=getUsers(),index=users.findIndex(item=>item.username===username);
+        if(index<0)throw Error('No se encontró el perfil local.');
+        users[index]=hcUserUpdateStamp(users[index],patch);
+        setUsers(users);
+      }
+      if(field.key==='name'){
+        session.name=updated.name;
+        saveJSON(LS.session,session);
+      }
+      syncSessionUI?.();
+      if(field.key==='name'){
+        const brand=document.querySelector('#hcSettingsBrandUser');
+        if(brand)brand.textContent=updated.name+' · '+session.role;
+      }
+    }
+    Object.assign(user,updated);
+    window.HC310.avatar(document.querySelector('#btnAccount'),updated);
+    window.HC310.avatar(document.querySelector('#hc297Workspace [data-pro-profile]'),updated);
+    const workspaceName=document.querySelector('#hc297Workspace > header > div > small');
+    if(workspaceName&&field.key==='name')workspaceName.textContent=updated.name;
+    return updated[field.key];
+  }
+
+  window.HC314 = {profileRows,bindProfile,accountFields,saveAccountField,sectionHeader};
+})();
+</script>
 <script id="hc-v313-formats">
 (() => {
   'use strict';
@@ -6559,15 +6715,44 @@ html::-webkit-scrollbar-corner{
     return weekday+' '+formatDate(fields,preferences());
   }
 
-  function settingsMarkup() {
-    const current=preferences();
-    const select=(name,options)=>'<select data-hc313-format="'+name+'">'+options.map(([value,label])=>
+  function examples(now) {
+    const dateParts=parts(now,{timeZone:argentina});
+    return {
+      dateFormat:[['dmy',formatDate(dateParts,{dateFormat:'dmy'})],['iso',formatDate(dateParts,{dateFormat:'iso'})]],
+      timeFormat:[['24h',formatTime(dateParts,{timeFormat:'24h'})+' (24 horas)'],['12h',formatTime(dateParts,{timeFormat:'12h'})+' (12 horas)']]
+    };
+  }
+
+  let exampleTimer;
+  function refreshExamples() {
+    clearTimeout(exampleTimer);
+    const options=document.querySelectorAll('#hcSettingsModal.show .hc313Format select,#hc289Dialog .hc313Format select');
+    if(!options.length)return;
+    const current=examples(new Date());
+    options.forEach(select=>{
+      current[select.dataset.hc313Format]?.forEach(([value,label])=>{
+        const option=select.querySelector('option[value="'+value+'"]');
+        if(option&&option.textContent!==label)option.textContent=label;
+      });
+    });
+    exampleTimer=setTimeout(refreshExamples,60030-Date.now()%60000);
+  }
+
+  function settingsMarkup(now=new Date()) {
+    const current=preferences(), choices=examples(now);
+    const select=name=>'<select data-hc313-format="'+name+'">'+choices[name].map(([value,label])=>
       '<option value="'+value+'"'+(value===current[name]?' selected':'')+'>'+label+'</option>').join('')+'</select>';
+    if(typeof document!=='undefined'){
+      clearTimeout(exampleTimer);
+      exampleTimer=setTimeout(refreshExamples,60030-Date.now()%60000);
+    }
     return '<fieldset class="hc313Format"><legend>Fecha y hora</legend><div>'+
-      '<label>Formato de fecha'+select('dateFormat',[['dmy','12/11/2026'],['iso','2026-11-12']])+'</label>'+
-      '<label>Formato de hora'+select('timeFormat',[['24h','13:00 (24 horas)'],['12h','1:00 p. m. (12 horas)']])+'</label>'+
+      '<label>Formato de fecha'+select('dateFormat')+'</label>'+
+      '<label>Formato de hora'+select('timeFormat')+'</label>'+
       '</div></fieldset>';
   }
+
+  if(typeof document!=='undefined')document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshExamples();});
 
   window.HC313 = {argentina,date,time,dateTime,dayLabel,settingsMarkup,setPreferences};
 })();
@@ -45263,7 +45448,6 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
   let currentSection="account";
   let selectedMember="";
   let memberChat="";
-  let pendingProfilePhoto=null;
   let pendingSignature=null;
 
   const esc=(s)=>typeof escHTML==="function"?escHTML(String(s??"")):String(s??"").replace(/[&<>\"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -45376,28 +45560,17 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
     return String(session?.institutionName||localStorage.getItem(LS.backendRegistryName)||getInst?.()?.line1||"Institución");
   }
   function renderAccount(){
-    const u=currentUser();
-    return `<div class="hcSettingsPage">${hero("Cuenta y perfil","Tus datos de identificación dentro de Hospitalito.")}
-      <div class="hcSettingsGrid">
-        <div class="hcSettingsCard">
-          <div class="hcSettingsRow">${avatarHtml(u)}<div class="hcSettingsMeta"><div class="hcSettingsName">${esc(u.name||session?.name||meName())}</div><div class="hcSettingsMuted">@${esc(meName())} · ${esc(roleLabel(session?.role||u.role))}</div><div class="hcSettingsMuted" style="margin-top:4px;">${esc(currentInstitutionName())}</div></div></div>
-          <div class="hcSettingsFields">
-            <div class="hcSettingsField full"><label>Nombre visible</label><input id="hcsProfileName" value="${esc(u.name||session?.name||"")}"></div>
-            <div class="hcSettingsField"><label>Título profesional</label><input id="hcsProfessionalTitle" value="${esc(u.professionalTitle||"")}" placeholder="Ej.: Dr., Dra., Lic."></div>
-            <div class="hcSettingsField"><label>Matrícula / identificador</label><input id="hcsLicenseNumber" value="${esc(u.licenseNumber||"")}" placeholder="Ej.: MP 12345"></div>
-            <div class="hcSettingsField full"><label>Especialidad / función</label><input id="hcsSpecialty" value="${esc(u.specialty||"")}" placeholder="Ej.: Terapia Intensiva"></div>
-            <div class="hcSettingsField full"><label>Foto de perfil</label><input id="hcsProfilePhoto" type="file" accept="image/*"></div>
-          </div>
-          <div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hcsSaveProfile" type="button">Guardar perfil</button><button class="hcSettingsBtn" id="hcsOpenClassicAccount" type="button">Abrir Cuenta clásica</button></div>
-          <div id="hcsProfileMsg" class="hcSettingsNotice">Los cambios de perfil usan el mismo sistema de cuenta ya existente.</div>
-        </div>
-        <div class="hcSettingsCard"><div class="hcSettingsCardTitle">Resumen de cuenta</div><div class="hcSettingsCardSub">Información de solo lectura para evitar cambios accidentales de permisos.</div>
-          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Usuario</div><div class="hcToggleSub">${esc(meName())}</div></div></div>
-          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Rol</div><div class="hcToggleSub">${esc(roleLabel(session?.role||u.role))}</div></div></div>
-          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Institución activa</div><div class="hcToggleSub">${esc(currentInstitutionName())}</div></div></div>
-          <div class="hcToggleRow"><div class="hcToggleText"><div class="hcToggleTitle">Tema</div><div class="hcToggleSub">${esc(THEME_DEFS[userTheme(u)]?.label||"Azul oscuro")}</div></div><button class="hcSettingsBtn" data-hcs-section="personalization">Cambiar</button></div>
-        </div>
-      </div></div>`;
+    const u=currentUser(),user={...u,username:meName(),name:u.name||session?.name||meName()};
+    const fields=window.HC314.accountFields(user,roleLabel(session?.role||u.role),currentInstitutionName());
+    fields.push({key:"theme",label:"Tema",value:THEME_DEFS[userTheme(u)]?.label});
+    const page=document.getElementById("hcSettingsContent");
+    queueMicrotask(()=>{
+      if(page.querySelector('[data-hc314-profile-page]'))window.HC314.bindProfile(page,fields,(field,value)=>window.HC314.saveAccountField(user,field,value));
+    });
+    return `<div class="hcSettingsPage" data-hc314-profile-page><h2>Perfil</h2>
+      <div class="hcSettingsGrid"><div class="hcSettingsCard">${window.HC314.profileRows(fields)}
+        <div class="hcSettingsActions"><button type="button" class="hcSettingsBtn hc314Ghost" id="hcsOpenClassicAccount">Abrir Cuenta clásica</button></div>
+      </div></div></div>`;
   }
   function renderPrivacy(){
     return `<div class="hcSettingsPage">${hero("Seguridad y privacidad","Cambio de contraseña y estado de la sesión. Hospitalito no expone aquí credenciales ni secretos del backend.")}
@@ -45461,20 +45634,6 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
     if(id==="members"&&memberChat){setTimeout(()=>{const m=document.getElementById("hcsChatMsgs");if(m)m.scrollTop=m.scrollHeight;},0);}
   }
   function msg(id,text,kind=""){const el=document.getElementById(id);if(!el)return;el.textContent=text;el.className="hcSettingsNotice"+(kind?` ${kind}`:"");}
-  async function saveProfile(){
-    if(!session)return;const u=currentUser();let photo=u.photo||"";
-    try{const f=document.getElementById("hcsProfilePhoto")?.files?.[0];if(f){if(f.size>8*1024*1024)throw new Error("La foto supera 8 MB.");photo=await readFileAsDataURL(f);}}
-    catch(e){return msg("hcsProfileMsg",e.message||String(e),"warn");}
-    const patch={name:String(document.getElementById("hcsProfileName")?.value||u.name||"").trim(),photo,professionalTitle:String(document.getElementById("hcsProfessionalTitle")?.value||"").trim(),licenseNumber:String(document.getElementById("hcsLicenseNumber")?.value||"").trim(),specialty:String(document.getElementById("hcsSpecialty")?.value||"").trim(),uiTheme:userTheme(u),preferences:{...(u.preferences||{}),theme:userTheme(u)}};
-    try{
-      let updated={...u,...patch};
-      const users=getUsers?.()||[];const idx=users.findIndex(x=>String(x.username||"")===meName());if(idx>=0){updated=typeof hcUserUpdateStamp==="function"?hcUserUpdateStamp(users[idx],patch):updated;users[idx]=updated;setUsers?.(users);}
-      if(!session.localSeed&&typeof hcGlobalAuthToken==="function"&&hcGlobalAuthToken()){
-        const r=await hcGlobalAccountRequest("updateProfile",{token:hcGlobalAuthToken(),user:patch});updated={...updated,...(r.user||{})};try{hcGlobalCacheUser?.(updated,{id:hcGlobalCurrentInstitutionId?.(),name:session?.institutionName||""});saveJSON?.(LS.globalAuthUser,updated);}catch(_){ }
-      }
-      session.name=updated.name||session.name;saveJSON?.(LS.session,session);syncSessionUI?.();msg("hcsProfileMsg","Perfil guardado correctamente.","good");
-    }catch(e){msg("hcsProfileMsg",e.message||String(e),"warn");}
-  }
   async function changePasswordNew(){
     const cur=String(document.getElementById("hcsPassCurrent")?.value||""),next=String(document.getElementById("hcsPassNew")?.value||""),next2=String(document.getElementById("hcsPassNew2")?.value||"");
     if(!cur||!next||!next2)return msg("hcsPassMsg","Completá los tres campos.","warn");if(next!==next2)return msg("hcsPassMsg","Las nuevas contraseñas no coinciden.","warn");
@@ -45508,7 +45667,6 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
     if(ev.target.closest?.("#hcSettingsBackToAccount")){closeSettings();openAccount?.();return;}
     if(ev.target.closest?.("#hcsOpenClassicAccount")){closeSettings();openAccount?.();return;}
     const themeBtn=ev.target.closest?.("[data-hcs-theme]");if(themeBtn){await persistTheme(themeBtn.getAttribute("data-hcs-theme"));return;}
-    if(ev.target.closest?.("#hcsSaveProfile")){await saveProfile();return;}
     if(ev.target.closest?.("#hcsChangePassword")){await changePasswordNew();return;}
     const mem=ev.target.closest?.("[data-hcs-member]");if(mem){selectedMember=mem.getAttribute("data-hcs-member")||"";memberChat="";renderSection("members");return;}
     if(ev.target.closest?.("#hcsMembersBack")){selectedMember="";memberChat="";renderSection("members");return;}
@@ -45523,7 +45681,6 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
     if(ev.target.closest?.("#hcsLogout")){closeSettings();logout?.();return;}
   },true);
   document.addEventListener("change",async function(ev){
-    if(ev.target.id==="hcsProfilePhoto"){const f=ev.target.files?.[0]||null;pendingProfilePhoto=f||null;return;}
     if(ev.target.id==="hcsSignatureFile"){
       const f=ev.target.files?.[0]||null;if(!f){pendingSignature=null;return;}
       try{pendingSignature=typeof hcPrepareSignatureDataURL==="function"?await hcPrepareSignatureDataURL(f):await readFileAsDataURL(f);msg("hcsSignatureMsg","Firma preparada. Presioná Guardar firma y datos.","good");}catch(e){pendingSignature=null;msg("hcsSignatureMsg",e.message||String(e),"warn");}
@@ -45535,7 +45692,7 @@ body.hcUiReduceMotion #hcSettingsModal *,body.hcUiReduceMotion #hcSettingsModal 
     if(ev.target.id==="hcsReduceMotion"){setPref("reduceMotion",!!ev.target.checked);return;}
   },true);
   document.addEventListener("input",function(ev){if(ev.target.id==="hcsMemberSearch"){const q=String(ev.target.value||"").trim().toLowerCase();document.querySelectorAll("#hcsMemberList [data-search]").forEach(el=>{el.style.display=!q||String(el.dataset.search||"").includes(q)?"":"none";});}},true);
-  document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&document.getElementById("hcSettingsModal")?.classList.contains("show")){const modal=document.getElementById("hcSettingsModal");if(modal.classList.contains("nav-open"))modal.classList.remove("nav-open");else closeSettings();}},true);
+  document.addEventListener("keydown",function(ev){if(ev.key==="Escape"&&!ev.target.closest?.("[data-hc314-editor]")&&document.getElementById("hcSettingsModal")?.classList.contains("show")){const modal=document.getElementById("hcSettingsModal");if(modal.classList.contains("nav-open"))modal.classList.remove("nav-open");else closeSettings();}},true);
   window.addEventListener("resize",()=>{if(currentSection==="sessions"&&document.getElementById("hcSettingsModal")?.classList.contains("show"))renderSection("sessions");},{passive:true});
 
   window.hcSettingsOpen=openSettings;window.hcSettingsClose=closeSettings;window.hcSettingsApplyTheme=applyTheme;
@@ -45804,7 +45961,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`hospitalito_jornadas_${date||localDate()}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   function refreshAccountShiftCard(){
-    const page=$("#hcSettingsContent .hcSettingsPage"),anchor=$("#hcsProfileName");if(!page||!anchor)return;let card=$("#hc229WorkAccountCard");if(card)card.remove();const x=todayShift();card=document.createElement("div");card.id="hc229WorkAccountCard";card.className="hcSettingsCard hc229WorkAccountCard";card.innerHTML=`<div class="hcSettingsCardTitle">Jornada de hoy</div><div class="hcSettingsCardSub">Registro laboral sincronizado para tu cuenta e institución.</div>${x?`<div><b>${esc((x.services||[]).join(", "))}</b></div><div class="hcSettingsMuted" style="margin-top:5px;">${esc(shiftLabel(x.dutyType))} · ${esc(window.HC313.date(x.startDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.startTime)||"—")} → ${esc(window.HC313.date(x.endDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.endTime)||"—")}</div>`:`<div class="hcSettingsMuted">Todavía no registraste tu jornada de hoy.</div>`}<div class="hcSettingsActions"><button class="hcSettingsBtn primary" type="button" id="hc229AccountEditShift">${x?"Modificar jornada":"Registrar jornada"}</button></div>`;
+    const page=$("#hcSettingsContent .hcSettingsPage"),anchor=$("[data-hc314-profile-page]");if(!page||!anchor)return;let card=$("#hc229WorkAccountCard");if(card)card.remove();const x=todayShift();card=document.createElement("div");card.id="hc229WorkAccountCard";card.className="hcSettingsCard hc229WorkAccountCard";card.innerHTML=`<div class="hcSettingsCardTitle">Jornada de hoy</div><div class="hcSettingsCardSub">Registro laboral sincronizado para tu cuenta e institución.</div>${x?`<div><b>${esc((x.services||[]).join(", "))}</b></div><div class="hcSettingsMuted" style="margin-top:5px;">${esc(shiftLabel(x.dutyType))} · ${esc(window.HC313.date(x.startDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.startTime)||"—")} → ${esc(window.HC313.date(x.endDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.endTime)||"—")}</div>`:`<div class="hcSettingsMuted">Todavía no registraste tu jornada de hoy.</div>`}<div class="hcSettingsActions"><button class="hcSettingsBtn primary" type="button" id="hc229AccountEditShift">${x?"Modificar jornada":"Registrar jornada"}</button></div>`;
     const grid=page.querySelector(".hcSettingsGrid");(grid||page).appendChild(card);
   }
 
@@ -46358,7 +46515,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   window.hc231NotificationsSettingsHtml=(p,hero,switchRow)=>`<div class="hcSettingsPage">${hero('Notificaciones','Mensajes, avisos de cuenta y estado de sincronización en un solo lugar.')}<div class="hcSettingsGrid"><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Centro de notificaciones</div><div class="hcSettingsCardSub">Tenés <b>${notifications.filter(x=>!x.read_at).length}</b> notificaciones sin leer.</div><div class="hcSettingsActions"><button class="hcSettingsBtn primary" id="hc231OpenNotificationsSettings" type="button">Abrir notificaciones</button></div></div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Interfaz</div>${switchRow('hcsShowSync','Mostrar estado de sincronización','Muestra el estado Supabase en la barra superior.',p.showSyncStatus!==false)}</div><div class="hcSettingsCard"><div class="hcSettingsCardTitle">Qué vas a recibir</div><div class="hcSettingsNotice">Mensajes nuevos, contactos, avisos administrativos y problemas importantes de sincronización. Las alarmas clínicas continúan usando sus avisos específicos.</div></div></div></div>`;
   function injectTopButtons(){const right=$('.topbar>div:last-child');if(!right)return;if(!$('#hc231NotifyBtn')){const b=document.createElement('button');b.className='btn small';b.id='hc231NotifyBtn';b.type='button';b.innerHTML='🔔 <span class="hc231NotifyBadge" id="hc231NotifyBadge"></span>';right.insertBefore(b,$('#btnAccount')||null);}if(session?.role==='observador'&&!$('#hc231ObserverView')){const b=document.createElement('button');b.className='btn small';b.id='hc231ObserverView';b.type='button';b.textContent='Vista gestión';right.insertBefore(b,$('#hc231NotifyBtn'));}if(session?.role==='superadmin'&&!$('#hc231PlatformTop')){const b=document.createElement('button');b.className='btn small primary';b.id='hc231PlatformTop';b.type='button';b.textContent='Plataforma';right.insertBefore(b,$('#hc231NotifyBtn'));}}
   function observerMode(){const on=session?.role==='observador';document.body.classList.toggle('hcObserver',on);injectTopButtons();}
-  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.closest('#medHistoria,#medScales,#hc270PatientSearch,#hc280Security,#hc280Lock'))return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
+  function mutatingControl(el){const b=el?.closest?.('button,input[type="button"],input[type="submit"],a');if(!b)return null;if(b.closest('#medHistoria,#medScales,#hc270PatientSearch,#hc280Security,#hc280Lock,[data-hc314-profile]'))return null;if(b.matches('#btnAccount,#btnLogout,#btnMobileCensusToggle,#btnMobileCensusClose,#hc231NotifyBtn,#hc231ObserverView,#hcSettingsCloseBtn,#hcSettingsMenuBtn,[data-medtab],[data-admin-tab],[data-hcs-section],[data-hcs-member],[data-hcs-chat],#hcsMembersBack,#hcsChatBack,#hc231NotificationsClose'))return null;const text=(b.textContent+' '+b.id+' '+b.className).toLowerCase();return /(guardar|agregar|eliminar|quitar|suspender|pausar|activar|administrar|marcar|recibir|editar|modificar|nuevo|crear|enviar|cargar|registrar|confirmar|aplicar|vincular|desvincular|reabrir|atendid|finalizar|firmar)/.test(text)?b:null;}
   document.addEventListener('click',ev=>{if(session?.role==='observador'){const b=mutatingControl(ev.target);if(b){ev.preventDefault();ev.stopImmediatePropagation();toast?.('Modo Observador: solo lectura');return;}}const add=ev.target.closest?.('#hc231AddContact');if(add){const q=String($('#hc231ContactUsername')?.value||'').trim();if(!q)return;req('addContact',{token:token(),institutionId:inst(),username:q}).then(()=>refreshContacts(true)).catch(e=>alert(e.message||e));return;}if(ev.target.closest?.('#hc231NotifyBtn,#hc231OpenNotificationsSettings')){const m=$('#hc231NotificationsModal');m.classList.add('show');m.setAttribute('aria-hidden','false');refreshNotifications(true);return;}if(ev.target.closest?.('#hc231NotificationsClose')){$('#hc231NotificationsModal')?.classList.remove('show');return;}if(ev.target.closest?.('#hc231MarkAllRead')){req('markNotificationsRead',{token:token(),institutionId:inst()}).then(()=>{localNotifs.forEach(x=>x.read_at=new Date().toISOString());return refreshNotifications(true)});return;}if(ev.target.closest?.('#hc231ObserverView')){const med=$('#appMed'),adm=$('#appAdmin'),toAdmin=med?.style.display!=='none';if(toAdmin){med.style.display='none';adm.style.display='grid';try{renderAdmin?.();}catch(_){}}else{adm.style.display='none';med.style.display='grid';try{renderMed?.();}catch(_){}}ev.target.closest('#hc231ObserverView').textContent=toAdmin?'Vista clínica':'Vista gestión';return;}if(ev.target.closest?.('#hc231InstallApp')){const pr=window.hc231InstallPrompt;if(pr){pr.prompt();pr.userChoice.finally(()=>{window.hc231InstallPrompt=null;$('#hc231InstallApp')?.remove();});}return;}if(ev.target.closest?.('#hc231PlatformTop')){showPlatform();return;}if(ev.target.closest?.('#hc231PlatformRefresh')){loadPlatform();return;}if(ev.target.closest?.('#hc231PlatformAccount')){window.hcSettingsOpen?.('account');return;}if(ev.target.closest?.('#hc231CreateInst')){createInstitution();return;}const pc=ev.target.closest?.('[data-hc231-contact]');if(pc){const u=pc.getAttribute('data-hc231-contact');req('addContact',{token:token(),institutionId:inst(),username:u}).then(()=>{toast?.('Contacto agregado');refreshContacts(false)}).catch(e=>alert(e.message||e));return;}},true);
   document.addEventListener('click',ev=>{if(ev.target.closest?.('[data-hcs-chat]')){const u=ev.target.closest('[data-hcs-chat]').getAttribute('data-hcs-chat');window.hc231ActiveChat=u;refreshConversation(u,false);}if(ev.target.closest?.('#hcsChatBack,#hcsMembersBack'))window.hc231ActiveChat='';if(ev.target.closest?.('[data-hcs-section="members"]'))setTimeout(()=>{augmentMembers();refreshContacts(true)},50);},true);
   function augmentMembers(){const list=$('#hcsMemberList');if(!list||$('#hc231ContactAdder'))return;const card=document.createElement('div');card.id='hc231ContactAdder';card.className='hcSettingsCard';card.style.marginBottom='12px';card.innerHTML='<div class="hcSettingsCardTitle">Agregar contacto por usuario</div><div class="hcSettingsCardSub">Permite conversar con un profesional de otra institución sin darle acceso a historias clínicas.</div><div class="hc231AddContact"><input id="hc231ContactUsername" placeholder="Nombre de usuario exacto"><button class="hcSettingsBtn primary" id="hc231AddContact" type="button">Agregar</button></div>';list.parentElement?.insertBefore(card,list);directory.forEach(u=>{const el=list.querySelector(`[data-hcs-member="${CSS.escape(u.username)}"]`);if(el&&!el.querySelector('.hc231ContactScope')){const sp=document.createElement('span');sp.className='hc231ContactScope';sp.textContent=u.contactScope==='institución'?'Misma institución':'Contacto';el.lastElementChild?.appendChild(sp);}})}
@@ -47317,7 +47474,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 313;
+  const CURRENT_VERSION = 314;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -49766,7 +49923,7 @@ body.hc289Visual{background:var(--hc-theme-bg);color:var(--hc-theme-text)}body.h
 #btnWorkShift,#btnProfessionals,#hc280SecurityButton,#hc284LicenseTop,#hc231NotifyBtn,#hc232CallTop,#btnLogout{display:none!important}#whoami{font-weight:800;text-align:right;max-width:320px;line-height:1.3}
 #hc289AccountMenu{position:fixed;z-index:1000009;min-width:225px;padding:7px;background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:12px;box-shadow:0 12px 36px #0006}#hc289AccountMenu[hidden]{display:none}#hc289AccountMenu button{display:block;width:100%;text-align:left;background:transparent;color:inherit;border:0;border-radius:6px;padding:11px 15px;font:inherit;cursor:pointer}#hc289AccountMenu button:hover,#hc289AccountMenu button:focus-visible{background:var(--hc-theme-accent-soft)}.hc289Danger{color:#f04452!important;font-weight:900!important;letter-spacing:.05em}
 #hcSettingsModal.hc289Members .hcSettingsSidebar{display:none!important}#hcSettingsModal.hc289Members .hcSettingsMain{width:100%}#hcSettingsModal.hc289Members #hcSettingsBackToAccount{display:none}.hc289Members .hcMemberListNew{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}.hc289Members .hcMemberToolbar{width:100%}
-.hcSettingsPage:has(#hcsProfileName) .hcSettingsGrid{grid-template-columns:minmax(0,760px);justify-content:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsRow{flex-direction:column;text-align:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsAvatar{width:140px;height:140px;border-radius:50%;margin:auto}.hcSettingsPage:has(#hcsProfileName) .hcSettingsMeta{text-align:center;margin-top:15px}#hcsOpenClassicAccount{display:none}
+[data-hc314-profile-page] .hcSettingsGrid{grid-template-columns:minmax(0,760px);justify-content:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsRow{flex-direction:column;text-align:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsAvatar{width:140px;height:140px;border-radius:50%;margin:auto}.hcSettingsPage:has(#hcsProfileName) .hcSettingsMeta{text-align:center;margin-top:15px}#hcsOpenClassicAccount{display:none}
 .hc289Swatches{display:flex;flex-wrap:wrap;gap:10px}.hc289Swatches button{display:flex;align-items:center;gap:8px;padding:12px 15px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);color:var(--hc-theme-text);border-radius:10px;font:inherit}.hc289Swatches button[aria-pressed=true]{outline:3px solid var(--hc-theme-accent)}.hc289Swatches i{width:22px;height:22px;border-radius:50%}
 #hc289Toast{position:fixed;z-index:2147483647;bottom:22px;left:50%;transform:translateX(-50%);background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);padding:14px 24px;border-radius:12px;box-shadow:0 6px 30px #0005;max-width:90vw}
 .hc289Dialog{position:fixed;inset:0;z-index:1000005;overflow:auto;padding:30px max(20px,calc((100vw - 1000px)/2));background:var(--hc-theme-bg);color:var(--hc-theme-text)}.hc289Dialog h2{margin:0 40px 22px 0}.hc289Close{float:right;min-width:38px;min-height:38px;font-size:24px}.hc289Form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.hc289Form label{display:flex;flex-direction:column;gap:7px}.hc289Form input,.hc289Form select,.hc289Form textarea,.hc289Dialog input,.hc289Dialog select,.hc289Dialog textarea{width:100%;box-sizing:border-box;background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:8px;padding:11px;font:inherit}.hc289Form input[type=checkbox],.hc289Form input[type=radio]{width:22px;height:22px;flex:none}.hc289Check{display:flex!important;flex-direction:row!important;align-items:center;gap:9px}.hc289Full{grid-column:1/-1}.hc289Dialog button,.hc289Panel button,#hc289Portal button{cursor:pointer;font:inherit;border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 14px;background:var(--hc-theme-surface-2);color:var(--hc-theme-text)}.hc289Primary{background:var(--hc-theme-accent)!important;color:#081421!important;font-weight:800!important}body[data-hc289-mode=light] .hc289Primary{color:#fff!important}.hc289Notice{padding:14px 0;color:var(--hc-theme-muted);line-height:1.5}.hc289Row{padding:16px 0;border-bottom:1px solid var(--hc-theme-line);display:flex;gap:15px;align-items:center}.hc289Row>div{flex:1}.hc289Avatar{width:52px;height:52px;border-radius:50%;object-fit:contain;flex:none;background:var(--hc-theme-surface-2);display:grid;place-items:center}.hc289Avatar img{width:100%;height:100%;object-fit:contain;border-radius:50%}.hc289Panel{background:var(--hc-theme-surface);color:var(--hc-theme-text);padding:18px;min-width:0;border-bottom:1px solid var(--hc-theme-line);margin:14px 0}.hc289Panel input,.hc289Panel textarea,.hc289Panel select{background:var(--hc-theme-bg);color:var(--hc-theme-text)}
@@ -49784,7 +49941,7 @@ body.hc289Client>header,body.hc289Client>#login,body.hc289Client>#loginView,body
 (()=>{'use strict';
 window.HC_DEMO_VERSION='v305';document.title='Hospitalito · Historia Clínica Digital · HC Demo v305 · Supabase';
 const q=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const icon=(name)=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>',left:'<path d="m15 6-6 6 6 6"/>',right:'<path d="m9 6 6 6-6 6"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',print:'<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z"/>',edit:'<path d="M4 20l1-6L17 2l5 5L10 19zM14 5l5 5"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="M5 5l14 14M19 5L5 19"/>',search:'<circle cx="10" cy="10" r="7"/><path d="M15 15l7 7"/>',video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-4v12l-6-4"/>',send:'<path d="M2 3l20 9-20 9 4-9zM6 12h16"/>',refresh:'<path d="M20 7A9 9 0 104 19M20 2v6h-6"/>'}[name]||'<path d="M5 12h14"/>')+'</svg>';
+const icon=(name)=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>',left:'<path d="m15 6-6 6 6 6"/>',right:'<path d="m9 6 6 6-6 6"/>',down:'<path d="m6 9 6 6 6-6"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',print:'<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z"/>',edit:'<path d="M4 20l1-6L17 2l5 5L10 19zM14 5l5 5"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="M5 5l14 14M19 5L5 19"/>',search:'<circle cx="10" cy="10" r="7"/><path d="M15 15l7 7"/>',video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-4v12l-6-4"/>',send:'<path d="M2 3l20 9-20 9 4-9zM6 12h16"/>',refresh:'<path d="M20 7A9 9 0 104 19M20 2v6h-6"/>'}[name]||'<path d="M5 12h14"/>')+'</svg>';
 const U=()=>{
  const client=window.hc289ClientSession?.user;if(client)return client;
  const current=getCurrentUser?.(),saved=loadJSON(LS.globalAuthUser,{})||{};
@@ -49899,8 +50056,13 @@ menu.addEventListener('click',e=>{const id=e.target.closest('[data-hc289-menu]')
  if(id==='booking-alerts'){window.hc296Notifications({fullscreen:!!window.hc289ClientSession});return;}
  if(window.hc289ClientSession){window.hc289ClientAccount(id);return;}if(id==='security'){window.hc280OpenSecurity();return;}if(id==='chat'){proxy('hc232ChatTop');return;}if(id==='outpatient'){proxy('hc289OutpatientTop');return;}if(id==='institution-tele'){proxy('hc292ProTop');return;}if(id==='logout')proxy('btnLogout');else if(id==='shift')proxy('btnWorkShift');else if(id==='license')proxy('hc284LicenseTop');else{window.hcSettingsOpen(id==='settings'?'personalization':id);if(id==='members')setTimeout(()=>{const body=q('#hcSettingsContent');if(body&&!q('#hc289Professionals')){const b=document.createElement('button');b.id='hc289Professionals';b.className='hcSettingsBtn';b.textContent='Profesionales';b.onclick=()=>proxy('btnProfessionals');body.prepend(b);}},10);}});
 
-document.addEventListener('pointerdown',e=>{if(!e.target.closest('#hc289AccountMenu,#btnAccount,#hc289PortalAccount,[data-pro-profile]'))closeMenu();});
-document.addEventListener('click',e=>{const account=e.target.closest('#btnAccount,#hc289PortalAccount,[data-pro-profile]');if(account){e.preventDefault();e.stopImmediatePropagation();if(!window.HC310.touch(e)||!menu.hidden&&menuTrigger===account){
+document.addEventListener('pointerdown',e=>{if(!e.target.closest('#hc289AccountMenu,#btnAccount,#hc289PortalAccount,#hc314AccountMenuTrigger,[data-pro-profile]'))closeMenu();});
+document.addEventListener('click',e=>{const account=e.target.closest('#btnAccount,#hc289PortalAccount,#hc314AccountMenuTrigger,[data-pro-profile]');if(account){e.preventDefault();e.stopImmediatePropagation();
+ if(account.id==='hc289PortalAccount'){closeMenu();window.hc289ClientAccount('account');return;}
+ if(account.id==='hc314AccountMenuTrigger'){
+  if(!menu.hidden&&menuTrigger===account)closeMenu();else openMenu(account);
+  return;
+ }if(!window.HC310.touch(e)||!menu.hidden&&menuTrigger===account){
   closeMenu();const workspace=account.closest('#hc297Workspace');
   if(workspace)workspace.hc310Account('account');
   else if(window.hc289ClientSession)window.hc289ClientAccount('account');
@@ -49923,7 +50085,7 @@ document.addEventListener('change',e=>{
 }});
 document.addEventListener('keydown',e=>{
  if(e.key==='Escape'&&!menu.hidden){closeMenu(true);e.preventDefault();return;}
- const trigger=e.target.closest('#btnAccount,#hc289PortalAccount,[data-pro-profile]');
+ const trigger=e.target.closest('#btnAccount,#hc289PortalAccount,#hc314AccountMenuTrigger,[data-pro-profile]');
  if(trigger&&['ArrowDown','ArrowUp'].includes(e.key)){openMenu(trigger);const items=menu.querySelectorAll('button');items[e.key==='ArrowUp'?items.length-1:0]?.focus();e.preventDefault();return;}
  if(!menu.hidden&&menu.contains(e.target)){
   const items=[...menu.querySelectorAll('button')],index=items.indexOf(document.activeElement);
@@ -50304,7 +50466,7 @@ function appointmentsView(loading=false){
  const root=main();if(!root)return;root.dataset.view='appointments';bookingUI=null;
  let rows=allBookings().filter(b=>appointmentsTab==='history'?['past','cancelled'].includes(bookingColor(b)):['future','pending'].includes(bookingColor(b)));
  if(appointmentsTab==='history')rows=rows.slice().reverse();
- root.innerHTML='<div class="hc305AppointmentsHead"><h2>Mis turnos</h2><button type="button" data-hc305-refresh '+(loading?'disabled':'')+'>Actualizar</button></div><p class="hc289Notice">Turnos de instituciones, Telemedicina y Consultorio Privado en una sola lista.</p><div class="hc305AppointmentTabs" role="group" aria-label="Filtrar mis turnos"><button type="button" data-hc305-filter="upcoming" aria-pressed="'+(appointmentsTab==='upcoming')+'">Próximos</button><button type="button" data-hc305-filter="history" aria-pressed="'+(appointmentsTab==='history')+'">Historial</button></div><p id="hc305AppointmentStatus" role="status"></p><div id="hc305AppointmentList">'+(rows.length?rows.map(bookingRow).join(''):appointmentEmpty(loading))+'</div>';
+ root.innerHTML=window.HC314.sectionHeader('Mis Turnos','<button type="button" class="hc314Ghost" data-hc305-refresh '+(loading?'disabled':'')+'>Actualizar</button>')+'<p class="hc289Notice">Turnos de instituciones, Telemedicina y Consultorio Privado en una sola lista.</p><div class="hc305AppointmentTabs" role="group" aria-label="Filtrar mis turnos"><button type="button" data-hc305-filter="upcoming" aria-pressed="'+(appointmentsTab==='upcoming')+'">Próximos</button><button type="button" data-hc305-filter="history" aria-pressed="'+(appointmentsTab==='history')+'">Historial</button></div><p id="hc305AppointmentStatus" role="status"></p><div id="hc305AppointmentList">'+(rows.length?rows.map(bookingRow).join(''):appointmentEmpty(loading))+'</div>';
  updatePortalNavigation();
 }
 async function openMyAppointments(){
@@ -50387,7 +50549,7 @@ async function performPortalRefresh(render=false){
 
 function calendarView(day=''){
  const root=main();if(!root)return;
- root.dataset.view='calendar';window.HC311.markPortal('turns');bookingUI=null;selectedDay=typeof day==='string'?day:'';
+ root.dataset.view='calendar';window.HC311.markPortal(null);bookingUI=null;selectedDay=typeof day==='string'?day:'';
  const bookings=allBookings();
  window.HC310.calendar(root,{
   month, selected:selectedDay, tall:true,
@@ -50402,7 +50564,7 @@ function bookingRow(b){
  const p=directory.providers.find(p=>p.id===b.provider_id),color=bookingColor(b),privateVisit=!!b.privateVisit,name=b.peer_name||p?.name||b.provider_name||'Profesional';
  return '<article class="hc289Row hc304Appointment '+color+'"><div><b>'+E(name)+'</b><p>'+E(format(b.starts_at))+' · '+E(privateVisit?(window.HC310.modeLabel(b.mode)):b.telemedicine?'Telemedicina institucional':'Institución')+'</p><span class="hc305Status '+color+'">'+E(statusLabel(b.status))+'</span>'+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class="hc305AppointmentActions">'+(privateVisit?'<button type="button" data-304-visit="'+E(b.id)+'">Ver consulta y pagos</button>':'')+'<button type="button" data-hc305-date="'+E(localDate(b.starts_at))+'">Ver en calendario</button>'+(!privateVisit&&['pending','confirmed'].includes(b.status)?'<button type="button" data-289-cancel="'+E(b.id)+'">Cancelar turno</button>':'')+'</div></div></article>';
 }
-function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Mis estudios</h2>'+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(window.HC313.dateTime(r.date))+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
+function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML=window.HC314.sectionHeader('Mis Estudios')+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(window.HC313.dateTime(r.date))+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
 window.hc310ReleaseBooking=()=>{bookingUI=null;};
 document.addEventListener('hc313FormatChanged',()=>{
  if(!window.hc289ClientSession||locked)return;
@@ -50452,23 +50614,76 @@ function setupSidebar(){
  });
 }
 let accountRequest=0;
-async function clientAccount(section,inSettings=false){
+async function clientAccount(section){
  const opening=++accountRequest,owner=window.hc289ClientSession?.token;
  const panel=(title,content)=>{
-   if(!inSettings&&section!=='settings')return dialog(title,content,{fullscreen:true});
    const el=dialog(title,window.HC310.settingsMarkup(content,section),{fullscreen:true});
-   window.HC310.bindSettings(el,key=>window.hc289ClientAccount(key,true));
+   el.classList.add('hc314Settings');
+   window.HC310.bindSettings(el,window.hc289ClientAccount);
    return el;
- };if(section==='logout'){await logoutClient();return;}if(section==='settings'){panel('Configuración',window.hc289Personalization());return;}if(section==='privacy'){const el=panel('Seguridad de la cuenta','<p>La sesión se mantiene en este dispositivo al cambiar de aplicación. Podés salir desde Cuenta → SALIR.</p><form class="hc289Form"><label class="hc289Full">Contraseña actual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="hc289Full">Nueva contraseña<input name="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><button type="submit">Cambiar contraseña</button><p role="status"></p></form>');el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await window.hc230AuthRequest('changePassword',{token:token(),...Object.fromEntries(new FormData(e.target))});e.target.reset();el.querySelector('[role=status]').textContent='Contraseña actualizada.';},el.querySelector('[role=status]'));};return;}if(section==='notifications'){return window.hc296Notifications({fullscreen:true});}
+ };if(section==='logout'){await logoutClient();return;}if(section==='settings'){panel('Apariencia',window.hc289Personalization());return;}if(section==='privacy'){const el=panel('Seguridad de la cuenta','<p>La sesión se mantiene en este dispositivo al cambiar de aplicación. Podés salir desde Cuenta → SALIR.</p><form class="hc289Form"><label class="hc289Full">Contraseña actual<input name="currentPassword" type="password" autocomplete="current-password" required></label><label class="hc289Full">Nueva contraseña<input name="newPassword" type="password" autocomplete="new-password" minlength="10" required></label><button type="submit">Cambiar contraseña</button><p role="status"></p></form>');el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await window.hc230AuthRequest('changePassword',{token:token(),...Object.fromEntries(new FormData(e.target))});e.target.reset();el.querySelector('[role=status]').textContent='Contraseña actualizada.';},el.querySelector('[role=status]'));};return;}if(section==='notifications'){return window.hc296Notifications({fullscreen:true});}
  if(section==='reminders'){
    const el=panel('Avisos de turnos','<h3>Recordatorios de mis turnos</h3><label class="hc289Check"><input type="checkbox"> Mostrar avisos emergentes en este dispositivo</label><p role="status"></p>');
    window.HC311.editPatientReminders(el);return;
  }
  if(!me)await refresh();
- if(opening!==accountRequest||owner!==window.hc289ClientSession?.token)return;const user=window.hc289ClientSession?.user;if(!user)return;const p=me?.client||{},profile=p.profile||{};const el=panel('Perfil','<div style="text-align:center"><span class="hc289Avatar" style="width:140px;height:140px;margin:auto">'+(image(user.photo)?'<img src="'+image(user.photo)+'" alt="Foto de perfil">':icon('user'))+'</span><h2 style="margin:16px">'+E(p.legal_name)+'</h2><p>@'+E(p.username)+' · Cliente</p></div><p>DNI '+E(p.dni)+' · Nacimiento '+E(window.HC313.date(p.dob))+'</p><p class="hc289Notice">Los cambios de identidad requieren una nueva revisión institucional.</p><section><h3>Fotos de mi DNI</h3><p id="hc290MyDocumentStatus" role="status"></p><div id="hc290MyDocuments" class="hc290DocumentGallery"></div></section><form class="hc289Form"><label class="hc289Full">Foto de perfil<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><label class="hc289Full">Dirección<input name="address" value="'+E(profile.address)+'" autocomplete="street-address"></label><label>Teléfono<input name="phone" value="'+E(profile.phone)+'" autocomplete="tel"></label><label>Correo<input name="email" type="email" value="'+E(profile.email)+'" autocomplete="email"></label><div class="hc289Full"><button type="button" id="hc289ProfileGeo">Guardar mi ubicación</button><span id="hc289ProfileGeoStatus"> '+(profile.latitude!=null?'Ubicación guardada':'Sin ubicación guardada')+'</span></div><button type="submit" class="hc289Primary">Guardar perfil</button><p role="status"></p></form><h3>Verificaciones por institución</h3>'+(me?.verifications||[]).map(v=>'<p>'+E(directory.institutions.find(i=>i.id===v.institution_id)?.name||v.institution_id)+' · '+E(({pending:'Pendiente',verified:'Verificada',rejected:'Rechazada',revoked:'Revocada'})[v.status])+'</p>').join(''));let pos={latitude:profile.latitude,longitude:profile.longitude};q('#hc289ProfileGeo').onclick=e=>run(e.currentTarget,async()=>{pos=await geo();q('#hc289ProfileGeoStatus').textContent='Ubicación obtenida; guardá el perfil para conservarla.';},q('#hc289ProfileGeoStatus'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const values=Object.fromEntries(new FormData(e.target));await api('updateClientProfile',{profile:{...values,...pos}});if(e.target.elements.photo.files[0]){const read=await fileRead(e.target.elements.photo.files[0]);const j=await window.hc230AuthRequest('updateProfile',{token:token(),user:{photo:read.data}});window.hc289ClientSession.user={...user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));}window.HC310?.avatar(q('#hc289PortalAccount'),window.hc289ClientSession.user);await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';},el.querySelector('[role=status]'));};loadPersonalDocuments(el);}
+ if(opening!==accountRequest||owner!==window.hc289ClientSession?.token)return;
+ const account=window.hc289ClientSession;
+ if(!account)return;
+ const client=me?.client;
+ const profile=client?.profile||{};
+ const fields=[
+   {key:'name',label:'Nombre completo',value:client?.legal_name||account.user.name},
+   {key:'username',label:'Usuario',value:account.user.username},
+   {key:'dni',label:'DNI',value:client?.dni},
+   {key:'dob',label:'Fecha de nacimiento',value:window.HC313.date(client?.dob)},
+   {key:'address',label:'Dirección',value:profile.address,editable:!!client,max:500,autocomplete:'street-address'},
+   {key:'phone',label:'Teléfono',value:profile.phone,editable:!!client,type:'tel',max:80,autocomplete:'tel'},
+   {key:'email',label:'Correo electrónico',value:profile.email,editable:!!client,type:'email',autocomplete:'email'},
+   {key:'location',label:'Ubicación',value:profile.latitude!=null?'Ubicación guardada':'Sin ubicación guardada',editable:!!client,type:'location'},
+   {key:'photo',label:'Foto de perfil',value:account.user.photo,type:'photo',editable:true}
+ ];
+ const documents='<section class="hc314ProfileExtra"><h3>Fotos de mi DNI</h3><p id="hc290MyDocumentStatus" role="status"></p><div id="hc290MyDocuments" class="hc290DocumentGallery"></div></section>';
+ const verifications=(me?.verifications||[]).map(v=>'<p>'+E(directory.institutions.find(i=>i.id===v.institution_id)?.name||v.institution_id)+' · '+E(({pending:'Pendiente',verified:'Verificada',rejected:'Rechazada',revoked:'Revocada'})[v.status])+'</p>').join('');
+ const el=panel('Perfil',window.HC314.profileRows(fields)+'<p class="hc289Notice">Los cambios de identidad requieren una nueva revisión institucional.</p>'+
+   (!client?'<p role="status">No se pudieron cargar tus datos personales. <button type="button" class="hc314Ghost" data-reload-profile>Reintentar</button></p>':'')+
+   documents+'<section class="hc314ProfileExtra"><h3>Verificaciones por institución</h3>'+(verifications||'<p>Sin verificaciones registradas.</p>')+'</section>');
+ const retry=el.querySelector('[data-reload-profile]');
+ if(retry)retry.onclick=()=>window.hc289ClientAccount('account');
+ loadPersonalDocuments(el);
+ window.HC314.bindProfile(el,fields,async(field,value)=>{
+   const sameSession=()=>window.hc289ClientSession?.token===owner;
+   const requireSession=()=>{if(!sameSession())throw Error('Cambió la sesión. Volvé a abrir el perfil.');};
+   requireSession();
+   if(field.key==='photo'){
+     const saved=await window.hc230AuthRequest('updateProfile',{token:owner,user:{photo:value}});
+     requireSession();
+     if(saved.user?.username!==account.user.username||saved.user.photo!==value)throw Error('No se confirmó la foto de perfil.');
+     const current=window.hc289ClientSession;
+     current.user={...current.user,...saved.user};
+     localStorage.setItem('hc289.client',JSON.stringify(current));
+     window.HC310.avatar(q('#hc289PortalAccount'),current.user);
+     return current.user.photo;
+   }
+   const coordinates=field.key==='location'?await geo():null;
+   requireSession();
+   const latest=await api('me');
+   requireSession();
+   if(!latest.client)throw Error('No se pudieron comprobar los datos personales.');
+   const {address='',phone='',email='',latitude=null,longitude=null}=latest.client.profile||{};
+   const patch={address,phone,email,latitude,longitude,...(coordinates||{[field.key]:value})};
+   const saved=await api('updateClientProfile',{profile:patch});
+   requireSession();
+   if(!saved.client)throw Error('No se confirmó el cambio de perfil.');
+   requestSerial++;me=saved;
+   const result=saved.client.profile;
+   position=result.latitude!=null?{latitude:result.latitude,longitude:result.longitude}:null;
+   return field.key==='location'?(position?'Ubicación guardada':'Sin ubicación guardada'):result[field.key];
+ });
+}
 window.hc289ClientAccount=clientAccount;
 async function logoutClient(){const saved=window.hc289ClientSession;localStorage.removeItem('hc289.client');window.hc289ClientSession=null;requestSerial++;locked=false;q('#hc289Portal')?.remove();q('#hc289Dialog')?.remove();q('#hc289ClientLock')?.remove();document.body.classList.remove('hc289Client');location.reload();}
-document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(window.HC313.dateTime(a.date))+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
+document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-hc314-close-section')){calendarView();main().querySelector('.hc310CalendarViewport')?.focus({preventScroll:true});return;}if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(window.HC313.dateTime(a.date))+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
 for(const event of ['pointerdown','keydown','touchstart'])document.addEventListener(event,()=>{if(!locked)lastActivity=Date.now();},{passive:true});
 setInterval(()=>{if(!window.hc289ClientSession||document.hidden)return;if(!locked&&Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username)||0)>0&&Date.now()-lastActivity>Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username))*60000){locked=true;q('#hc289Portal').inert=true;q('#hc289AccountMenu').hidden=true;const preserved=q('#hc289Dialog');if(preserved){preserved.id='hc289PreservedDialog';preserved.inert=true;}const el=dialog('Sesión bloqueada','<p>Confirmá tu contraseña para continuar. Tu formulario se conserva.</p><form><input type="password" name="password" autocomplete="current-password" aria-label="Contraseña" required><p><button type="submit">Continuar</button><button type="button" id="hc289LockedDevice">Huella, rostro o PIN</button><button type="button" id="hc289LockedExit">SALIR</button></p><p role="status"></p></form>');el.id='hc289ClientLock';el.style.zIndex=2147483646;el.querySelector('[data-289-close]').remove();el.querySelector('#hc289LockedExit').onclick=logoutClient;const device=el.querySelector('#hc289LockedDevice');device.disabled=location.origin!=='https://walterrigoni.github.io'||!window.PublicKeyCredential;device.onclick=e=>run(e.currentTarget,async()=>{const a=await window.hc280Access.authenticate(window.hc289ClientSession.user.username);if(a.user.role!=='cliente')throw Error('Cuenta no habilitada para el portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:e.target.elements.password.value});if(a.user.role!=='cliente')throw Error('Esta cuenta ya no tiene acceso al portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));};}else if(!locked)refresh();},8000);
 let saved;try{saved=JSON.parse(localStorage.getItem('hc289.client')||'null');}catch{}if(saved?.token&&saved.user?.role==='cliente')setTimeout(()=>window.hc289EnterClient(saved),50);
@@ -50484,7 +50699,7 @@ async function enroll(){const box=q('#hc289ClientPasskeys'),status=box.querySele
  const cs=window.hc289ClientSession,a=await window.hc230AuthRequest('authenticateUser',{username:cs.user.username,password:password.value});if(a.user.username!==cs.user.username||a.user.role!=='cliente')throw Error('La cuenta no coincide.');password.value='';window.hc289ClientSession=a;localStorage.setItem('hc289.client',JSON.stringify(a));const access=window.hc280Access,o=await access.request('hospitalito-passkeys','registerOptions',{token:a.token}),pk={...o.options,challenge:decode(o.options.challenge),user:{...o.options.user,id:decode(o.options.user.id)},excludeCredentials:o.options.excludeCredentials?.map(c=>({...c,id:decode(c.id)})),authenticatorSelection:{...o.options.authenticatorSelection,userVerification:'required'}};const credential=await window.hc306CreateCredential(pk,box);if(!credential)throw Error('Activación cancelada.');await access.request('hospitalito-passkeys','registerVerify',{token:a.token,challengeId:o.challengeId,response:access.jsonCredential(credential),label:'Portal · este dispositivo'});status.textContent='Dispositivo vinculado. Tu huella, rostro o PIN permanecen en el dispositivo.';await list();
  }catch(e){status.textContent=e.name==='NotAllowedError'?'Activación cancelada. Podés seguir usando tu contraseña.':e.message;}finally{button.disabled=!secure();}}
 async function list(){const box=q('#hc289ClientPasskeys');if(!box)return;try{const a=await window.hc280Access.request('hospitalito-passkeys','list',{token:window.hc289ClientSession.token});box.querySelector('[data-keys]').innerHTML=a.credentials.map(c=>'<p>'+E(c.label)+' <button type="button" data-revoke-key="'+E(c.id)+'">Desactivar</button></p>').join('')||'<p>No hay dispositivos vinculados.</p>';box.querySelectorAll('[data-revoke-key]').forEach(b=>b.onclick=async()=>{try{const password=box.querySelector('[type=password]'),a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:password.value});password.value='';await window.hc280Access.request('hospitalito-passkeys','revoke',{token:a.token,credentialId:b.dataset.revokeKey});await list();}catch(e){box.querySelector('[role=status]').textContent=e.message;}});}catch(e){box.querySelector('[role=status]').textContent='Para consultar o modificar las llaves, confirmá tu contraseña.';}}
-const base=window.hc289ClientAccount;window.hc289ClientAccount=async function(section,inSettings){await base(section,inSettings);if(section!=='privacy'||!window.hc289ClientSession)return;const el=q('#hc289Dialog');if(!el)return;const box=document.createElement('section');box.id='hc289ClientPasskeys';box.innerHTML='<hr><h3>Huella, rostro o PIN del dispositivo</h3><p>Se usa la biometría ya registrada en el teléfono o en Windows Hello. Hospitalito guarda una llave pública; no registra fotos de tu rostro ni huellas.</p><p>'+(!secure()?'Para vincular el dispositivo, abrí la web segura de Hospitalito.':'Cada dispositivo debe vincularse por separado.')+'</p><label>Confirmar contraseña para vincular o desactivar<input type="password" autocomplete="current-password"></label><p><button type="button" data-enroll '+(!secure()?'disabled':'')+'>Vincular este dispositivo</button></p><div data-keys></div><p role="status"></p>';(el.querySelector('.hcSettingsStage')||el).append(box);box.querySelector('[data-enroll]').onclick=enroll;await list();};
+const base=window.hc289ClientAccount;window.hc289ClientAccount=async function(section){await base(section);if(section!=='privacy'||!window.hc289ClientSession)return;const el=q('#hc289Dialog');if(!el)return;const box=document.createElement('section');box.id='hc289ClientPasskeys';box.innerHTML='<hr><h3>Huella, rostro o PIN del dispositivo</h3><p>Se usa la biometría ya registrada en el teléfono o en Windows Hello. Hospitalito guarda una llave pública; no registra fotos de tu rostro ni huellas.</p><p>'+(!secure()?'Para vincular el dispositivo, abrí la web segura de Hospitalito.':'Cada dispositivo debe vincularse por separado.')+'</p><label>Confirmar contraseña para vincular o desactivar<input type="password" autocomplete="current-password"></label><p><button type="button" data-enroll '+(!secure()?'disabled':'')+'>Vincular este dispositivo</button></p><div data-keys></div><p role="status"></p>';(el.querySelector('.hcSettingsStage')||el).append(box);box.querySelector('[data-enroll]').onclick=enroll;await list();};
 })();
 
 </script>
@@ -50534,7 +50749,7 @@ window.hc289StaffDecorate=()=>{
  if(right&&allowed.includes(role())&&!q('#hc289OutpatientTop')){const b=document.createElement('button');b.id='hc289OutpatientTop';b.textContent='Ambulatorios';b.className='btn small';b.onclick=outpatient;right.insertBefore(b,q('#btnAccount'));}
  if(q('#hc289OutpatientTop'))q('#hc289OutpatientTop').hidden=!allowed.includes(role());
  if(['admin','superadmin'].includes(role())&&!q('#hc289ManagePortal')){const root=q('#adminApp .topbar .right')||right||q('#adminPanel');if(root){const b=document.createElement('button');b.id='hc289ManagePortal';b.className='btn';b.textContent='Portal · clientes';b.onclick=()=>adminPortal();root.append(b);}}
- const profile=q('#hcSettingsContent:has(#hcsProfileName)');if(profile&&['medico','enfermero','bioquimico','microbiologo','imagenologo','kinesiologo','nutricionista','hemoterapia'].includes(role())&&!q('#hc289ProfileAgenda')){const button=document.createElement('button');button.id='hc289ProfileAgenda';button.className='hcSettingsBtn';button.textContent='Mi agenda y reservas';button.onclick=()=>{window.hcSettingsClose?.();providerAgenda();};profile.querySelector('.hcSettingsActions')?.append(button);}
+ const profile=q('#hcSettingsContent:has([data-hc314-profile-page])');if(profile&&['medico','enfermero','bioquimico','microbiologo','imagenologo','kinesiologo','nutricionista','hemoterapia'].includes(role())&&!q('#hc289ProfileAgenda')){const button=document.createElement('button');button.id='hc289ProfileAgenda';button.className='hcSettingsBtn';button.textContent='Mi agenda y reservas';button.onclick=()=>{window.hcSettingsClose?.();providerAgenda();};profile.querySelector('.hcSettingsActions')?.append(button);}
  const consult=q('#medConsult');if(consult&&['medico','enfermero','bioquimico','microbiologo','imagenologo','kinesiologo','nutricionista','hemoterapia'].includes(role())&&!consult.querySelector('[data-hc289-agenda]')){const section=document.createElement('section');section.className='hc289Panel';section.innerHTML='<h3>Agenda para clientes del Portal</h3><p>Publicá tus horarios y bloqueá días u horas no disponibles. Revisá las reservas de clientes.</p><button data-hc289-agenda>Mi agenda y reservas</button>';section.querySelector('button').onclick=()=>providerAgenda();consult.prepend(section);}
 };window.hc289AdminPortal=adminPortal;window.hc289Outpatient=outpatient;window.hc289ProviderAgenda=providerAgenda;
 })();
@@ -51342,7 +51557,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v313";document.title="Hospitalito · Historia Clínica Digital · v313";
+window.HC_DEMO_VERSION="v314";document.title="Hospitalito · Historia Clínica Digital · v314";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -52001,7 +52216,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   function avatar(button, user) {
     if (!button) return;
     const photo = user?.photo || user?.profile?.photo || '';
-    const src = /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(photo) ? photo : '';
+    const src = /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=]+$/i.test(photo) ? photo : '';
     const key = src || 'default';
     if (button.hc310Avatar === key) return;
     button.hc310Avatar = key;
@@ -52011,8 +52226,8 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v313</small></button>'+
-      '<span class="hc289PortalWho">'+E(user.name)+'</span><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button></header>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v314</small></button>'+
+      '<span class="hc289PortalWho">'+E(user.name)+'</span><div class="hc314AccountActions"><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button><button id="hc314AccountMenuTrigger" type="button" class="hc314Ghost hc312IconOnly" aria-haspopup="menu" aria-expanded="false" aria-label="Opciones de cuenta" title="Opciones de cuenta">'+window.hc289Icon('down')+'</button></div></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
       '<button type="button" data-portal-section="turns">Mis Turnos</button><button type="button" data-hc310-studies data-portal-section="studies">Mis Estudios</button><button type="button" data-hc310-reminders data-portal-section="alerts">Avisos</button><button type="button" data-portal-section="prescriptions">Mis Recetas</button></nav>'+
@@ -52065,6 +52280,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     $('[data-hc310-book]',portal).onclick = () => choose(actions.book);
     const sections={turns:actions.turns,studies:actions.studies,alerts:actions.reminders,prescriptions:actions.prescriptions};
     portal.querySelectorAll('[data-portal-section]').forEach(button=>button.onclick=()=>choose(()=>{
+      if(button.getAttribute('aria-current')==='page')return actions.home();
       window.HC311.markPortal(button.dataset.portalSection);
       sections[button.dataset.portalSection]();
     }));
@@ -52426,17 +52642,15 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   }
 
   function professionalProfile(mode,user,section='account') {
-    const profile='<div class="hc310Profile"></div><button type="button" data-profile-edit>Editar perfil profesional</button>';
     const titles={account:'Perfil',settings:'Apariencia',agenda:'Agenda y tarifas'};
     if(section==='agenda')return window.hc292Professional(mode);
-    const el=window.hc289Dialog(titles[section],settingsMarkup(
-      section==='account'?profile:window.hc289Personalization(),section,titles));
+    const fresh=loadJSON(LS.globalAuthUser,{});
+    if(fresh?.username===user.username)user={...user,...fresh};
+    const fields=window.HC314.accountFields(user,window.hc292Tele.roles[user.role]||user.role);
+    const content=section==='account'?window.HC314.profileRows(fields):window.hc289Personalization();
+    const el=window.hc289Dialog(titles[section],settingsMarkup(content,section,titles));
     bindSettings(el,key=>professionalProfile(mode,user,key));
-    if(section==='settings')return;
-    const box=$('.hc310Profile',el);
-    const image=document.createElement('span');avatar(image,user);box.append(image);
-    const name=document.createElement('h3');name.textContent=user.name||user.username||'Profesional';box.append(name);
-    $('[data-profile-edit]',el).onclick=()=>window.hc292Professional(mode);
+    if(section==='account')window.HC314.bindProfile(el,fields,(field,value)=>window.HC314.saveAccountField(user,field,value));
   }
 
   function openProfessionalVisit(id,mode) {
@@ -52744,7 +52958,7 @@ body #hc289Portal #hc310UrgentHelp a:hover {background:#98182e;}
 
   async function prescriptions(root) {
     const request = window.hc292Tele.api;
-    root.innerHTML = '<h2>Mis Recetas</h2><p role="status">Cargando recetas…</p><div data-rx-list></div>';
+    root.innerHTML = window.HC314.sectionHeader('Mis Recetas')+'<p role="status">Cargando recetas…</p><div data-rx-list></div>';
     const list = root.querySelector('[data-rx-list]'), status = root.querySelector('[role=status]');
     try {
       const {prescriptions:items} = await request('myPrescriptions');
@@ -52997,6 +53211,119 @@ body[data-hc289-mode=light] #medPanel label.imgStudyChoice {
 }
 body[data-hc289-mode=light] #medPanel label.imgStudyChoice:has(input:checked) {
   background:var(--hc310-green);color:var(--hc310-green-text)!important;
+}
+</style>
+<style id="hc-v314-styles">
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+) {
+  background:transparent!important;
+  color:var(--hc310-text)!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+):is(:hover,:focus-visible):not(:disabled) {
+  background:var(--hc310-raised)!important;
+}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+):focus-visible {outline:2px solid var(--hc310-focus);outline-offset:1px;}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) .hcSettingsNavBtn:is(.active,[aria-current=page]) {
+  font-weight:800;
+  text-decoration:underline;
+  text-underline-offset:.23em;
+}
+body #hc289Portal .hc310SideNav :is([aria-current=page],.hc310NewAlerts) {
+  font-weight:800;
+}
+body #hc289Portal .hc310SideNav .hc310NewAlerts {
+  color:var(--hc310-yellow-text)!important;
+}
+body #hc289Portal .hc310SideNav button {border-radius:7px;}
+
+body #hc289Portal .hc311FullAccount.hc314Settings {
+  padding-inline:clamp(14px,2.1vw,34px);
+}
+body #hc289Portal .hc314Settings .hc310Settings {
+  grid-template-columns:clamp(155px,16vw,220px) minmax(0,1fr);
+  gap:clamp(12px,2vw,28px);
+}
+body #hc289Portal .hc314Settings .hcSettingsNav {
+  padding:0;
+  background:transparent;
+  border:0;
+}
+body #hc289Portal .hc314Settings .hcSettingsPage {max-width:none;margin:0;}
+body #hc289Portal .hc314Settings .hcSettingsStage {width:100%;box-sizing:border-box;}
+body #hc289Portal .hc314Settings > h2 {margin:5px 48px 16px 0;}
+@media (max-width:650px) {
+  body #hc289Portal .hc314Settings .hc310Settings {grid-template-columns:minmax(0,1fr);gap:9px;}
+  body #hc289Portal .hc314Settings .hcSettingsNav {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+
+.hc314SectionHead,.hc314SectionActions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.hc314SectionHead {justify-content:space-between;margin:0 0 12px;}
+body #hc289Portal main .hc314SectionHead h2 {margin:0;min-width:0;}
+.hc314SectionActions {flex:none;}
+body #hc289Portal main > #hc289Dialog:has([data-reminders]) {max-width:none;}
+.hc314SectionActions [data-hc305-refresh] {min-height:40px;}
+
+.hc314Profile {margin:0;}
+.hc314ProfileRow {
+  display:grid;
+  grid-template-columns:minmax(122px, .42fr) minmax(0,1fr);
+  align-items:center;
+  gap:4px 16px;
+  padding:9px 0;
+  min-height:38px;
+  border-bottom:1px solid var(--hc310-line);
+  color:var(--hc310-text);
+}
+.hc314ProfileRow dt {font-weight:750;color:var(--hc310-muted);}
+.hc314ProfileRow dd {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  min-width:0;
+}
+.hc314Value {
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:34px;
+  overflow-wrap:anywhere;
+}
+.hc314Value[hidden],body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) button.hc314Pencil[hidden] {display:none!important;}
+.hc314ProfilePhoto {width:42px;height:42px;}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) button.hc314Pencil {
+  width:36px;height:36px;min-width:36px;min-height:36px;
+  padding:0;border-radius:8px;
+}
+@media (hover:hover) and (pointer:fine) {
+  .hc314ProfileRow:not(:hover):not(:focus-within) .hc314Pencil {opacity:0;}
+}
+.hc314Editor {display:flex;flex-wrap:wrap;align-items:center;gap:8px;grid-column:1/-1;}
+.hc314Editor input {flex:1 1 165px;min-width:0;max-width:100%;box-sizing:border-box;}
+.hc314EditActions {display:flex;flex-wrap:wrap;gap:4px;}
+.hc314EditActions button {min-height:36px;border-radius:7px;}
+.hc314ProfileStatus {color:var(--hc310-muted);margin:8px 0;}
+.hc314ProfileStatus:empty {margin:0;}
+@media (max-width:480px) {
+  .hc314ProfileRow {grid-template-columns:minmax(0,1fr);gap:2px;}
+  .hc314Value {min-height:28px;}
+}
+
+.hc314ProfileExtra {padding:8px 0;border-bottom:1px solid var(--hc310-line);}
+.hc314ProfileExtra h3 {margin:5px 0;}
+#hc289Portal .hc314AccountActions {display:flex;align-items:center;gap:3px;}
+body #hc289Portal #hc314AccountMenuTrigger {display:none;min-width:27px;width:27px;height:40px;padding:0;}
+@media (hover:none), (pointer:coarse) {
+  body #hc289Portal #hc314AccountMenuTrigger {display:inline-flex;}
 }
 </style>
 </body>

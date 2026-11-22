@@ -6,7 +6,8 @@ const vm = require('node:vm');
 let viewer = 'paciente';
 const accounts = {paciente:{},profesional:{dateFormat:'iso',timeFormat:'12h'}};
 const window = {hc313Viewer:()=>viewer,hc289Visual:()=>accounts[viewer]};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../ui/v313.js'),'utf8'),{window,Intl,Date});
+const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
+vm.runInNewContext(html.match(/<script id="hc-v313-formats">([\s\S]*?)<\/script>/)[1],{window,Intl,Date});
 
 const {date,time,dateTime,dayLabel,settingsMarkup,setPreferences,argentina} = window.HC313;
 assert.equal(date('2026-11-12'),'12/11/2026');
@@ -27,7 +28,14 @@ assert.equal(date('2026-11-12',{short:true}),'12/11');
 assert.equal(dateTime(null),'');
 assert.equal(dateTime('sin horario'),'');
 assert.match(dayLabel('2026-11-12'),/jueves 12\/11\/2026/);
-assert.match(settingsMarkup(),/value="dmy" selected/);
+const now=new Date('2026-03-06T12:24:00Z');
+assert.match(settingsMarkup(now),/value="dmy" selected>06\/03\/2026/);
+assert.match(settingsMarkup(now),/value="iso">2026-03-06/);
+assert.match(settingsMarkup(now),/value="24h" selected>09:24 \(24 horas\)/);
+assert.match(settingsMarkup(now),/value="12h">9:24 a\. m\. \(12 horas\)/);
+const nextDay=new Date('2026-03-07T03:00:00Z');
+assert.match(settingsMarkup(nextDay),/value="dmy" selected>07\/03\/2026/);
+assert.match(settingsMarkup(nextDay),/value="24h" selected>00:00/);
 
 viewer='profesional';
 assert.equal(dateTime('2026-11-12T13:00'),'2026-11-12 1:00 p. m.');

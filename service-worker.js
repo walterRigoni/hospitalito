@@ -1,7 +1,7 @@
-const CACHE = 'hospitalito-v313-shell';
+const CACHE = 'hospitalito-v314-shell';
 const HOME = new URL('./', self.registration.scope).href;
 const ASSETS = ['./manifest.webmanifest', './hospitalito-icon.svg'];
-const appPages = new Set([new URL(HOME).pathname, new URL('./index.html', HOME).pathname, new URL('./Hospitalito_v313.html', HOME).pathname]);
+const appPages = new Set([new URL(HOME).pathname, new URL('./index.html', HOME).pathname, new URL('./Hospitalito_v314.html', HOME).pathname]);
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);

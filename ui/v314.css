@@ -1,0 +1,111 @@
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+) {
+  background:transparent!important;
+  color:var(--hc310-text)!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+):is(:hover,:focus-visible):not(:disabled) {
+  background:var(--hc310-raised)!important;
+}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) :is(
+  button.hc314Ghost,.hc310SideNav button,.hc310Settings .hcSettingsNavBtn,#hcSettingsNav .hcSettingsNavBtn
+):focus-visible {outline:2px solid var(--hc310-focus);outline-offset:1px;}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) .hcSettingsNavBtn:is(.active,[aria-current=page]) {
+  font-weight:800;
+  text-decoration:underline;
+  text-underline-offset:.23em;
+}
+body #hc289Portal .hc310SideNav :is([aria-current=page],.hc310NewAlerts) {
+  font-weight:800;
+}
+body #hc289Portal .hc310SideNav .hc310NewAlerts {
+  color:var(--hc310-yellow-text)!important;
+}
+body #hc289Portal .hc310SideNav button {border-radius:7px;}
+
+body #hc289Portal .hc311FullAccount.hc314Settings {
+  padding-inline:clamp(14px,2.1vw,34px);
+}
+body #hc289Portal .hc314Settings .hc310Settings {
+  grid-template-columns:clamp(155px,16vw,220px) minmax(0,1fr);
+  gap:clamp(12px,2vw,28px);
+}
+body #hc289Portal .hc314Settings .hcSettingsNav {
+  padding:0;
+  background:transparent;
+  border:0;
+}
+body #hc289Portal .hc314Settings .hcSettingsPage {max-width:none;margin:0;}
+body #hc289Portal .hc314Settings .hcSettingsStage {width:100%;box-sizing:border-box;}
+body #hc289Portal .hc314Settings > h2 {margin:5px 48px 16px 0;}
+@media (max-width:650px) {
+  body #hc289Portal .hc314Settings .hc310Settings {grid-template-columns:minmax(0,1fr);gap:9px;}
+  body #hc289Portal .hc314Settings .hcSettingsNav {grid-template-columns:repeat(2,minmax(0,1fr));}
+}
+
+.hc314SectionHead,.hc314SectionActions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.hc314SectionHead {justify-content:space-between;margin:0 0 12px;}
+body #hc289Portal main .hc314SectionHead h2 {margin:0;min-width:0;}
+.hc314SectionActions {flex:none;}
+body #hc289Portal main > #hc289Dialog:has([data-reminders]) {max-width:none;}
+.hc314SectionActions [data-hc305-refresh] {min-height:40px;}
+
+.hc314Profile {margin:0;}
+.hc314ProfileRow {
+  display:grid;
+  grid-template-columns:minmax(122px, .42fr) minmax(0,1fr);
+  align-items:center;
+  gap:4px 16px;
+  padding:9px 0;
+  min-height:38px;
+  border-bottom:1px solid var(--hc310-line);
+  color:var(--hc310-text);
+}
+.hc314ProfileRow dt {font-weight:750;color:var(--hc310-muted);}
+.hc314ProfileRow dd {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  gap:6px;
+  margin:0;
+  min-width:0;
+}
+.hc314Value {
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:34px;
+  overflow-wrap:anywhere;
+}
+.hc314Value[hidden],body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) button.hc314Pencil[hidden] {display:none!important;}
+.hc314ProfilePhoto {width:42px;height:42px;}
+body :is(#hc289Portal,#hc289Dialog,#hcSettingsModal) button.hc314Pencil {
+  width:36px;height:36px;min-width:36px;min-height:36px;
+  padding:0;border-radius:8px;
+}
+@media (hover:hover) and (pointer:fine) {
+  .hc314ProfileRow:not(:hover):not(:focus-within) .hc314Pencil {opacity:0;}
+}
+.hc314Editor {display:flex;flex-wrap:wrap;align-items:center;gap:8px;grid-column:1/-1;}
+.hc314Editor input {flex:1 1 165px;min-width:0;max-width:100%;box-sizing:border-box;}
+.hc314EditActions {display:flex;flex-wrap:wrap;gap:4px;}
+.hc314EditActions button {min-height:36px;border-radius:7px;}
+.hc314ProfileStatus {color:var(--hc310-muted);margin:8px 0;}
+.hc314ProfileStatus:empty {margin:0;}
+@media (max-width:480px) {
+  .hc314ProfileRow {grid-template-columns:minmax(0,1fr);gap:2px;}
+  .hc314Value {min-height:28px;}
+}
+
+.hc314ProfileExtra {padding:8px 0;border-bottom:1px solid var(--hc310-line);}
+.hc314ProfileExtra h3 {margin:5px 0;}
+#hc289Portal .hc314AccountActions {display:flex;align-items:center;gap:3px;}
+body #hc289Portal #hc314AccountMenuTrigger {display:none;min-width:27px;width:27px;height:40px;padding:0;}
+@media (hover:none), (pointer:coarse) {
+  body #hc289Portal #hc314AccountMenuTrigger {display:inline-flex;}
+}
