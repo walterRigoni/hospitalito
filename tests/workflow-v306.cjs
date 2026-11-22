@@ -118,6 +118,14 @@ const {chromium}=require('playwright'),http=require('node:http');
  const sticky=await page.evaluate(()=>({top:document.querySelector('#hc306ClinicalHeader').getBoundingClientRect().top,bar:document.querySelector('.topbar').getBoundingClientRect().bottom,scroll:scrollY}));
  assert(sticky.scroll>100&&(expectedVersion==='v320'?sticky.top<sticky.bar-10:Math.abs(sticky.top-sticky.bar)<4),JSON.stringify(sticky));console.log('PASS clinical header scroll behavior',sticky);
  await page.evaluate(()=>window.scrollTo(0,0));
+ if(expectedVersion==='v320'){
+  await page.setViewportSize({width:844,height:390});
+  const landscape=await page.evaluate(()=>{
+   document.body.classList.add('hcMobile','hcMobileLandscape');
+   return getComputedStyle(document.querySelector('#hc306ClinicalHeader')).position;
+  });
+  assert.equal(landscape,'static');
+ }
  if(['v307','v308','v309','v310'].includes(expectedVersion)){
   for(const width of [320,390,844,1280]){
    await page.setViewportSize({width,height:844});

@@ -382,6 +382,10 @@
     [
       "   if(window.HC310.touch(e)&&!menu.hidden&&menuTrigger===account)closeMenu();else openMenu(account);",
       "   if(menuPinned&&!menu.hidden&&menuTrigger===account)closeMenu();\n   else{clearTimeout(hoverTimer);openMenu(account);menuPinned=true;}"
+    ],
+    [
+      "@media(max-width:760px) {\n  body .hc304Mainbar > div:last-child {justify-content:flex-start}",
+      "body.hcMobile #hc306ClinicalHeader {position:static!important;top:auto!important;z-index:auto}\nbody.hcMobile .hc304Mainbar #whoami {margin-inline-start:auto}\n@media(max-width:760px) {\n  body .hc304Mainbar > div:last-child {justify-content:flex-start}"
     ]
   ]
 }
