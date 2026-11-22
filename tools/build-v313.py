@@ -195,6 +195,9 @@ change('>Mañana 06:00–14:00</option>', '>Mañana ${window.HC313.time("06:00")
 change('>Tarde 14:00–22:00</option>', '>Tarde ${window.HC313.time("14:00")}–${window.HC313.time("22:00")}</option>')
 change('>Noche 22:00–06:00</option>', '>Noche ${window.HC313.time("22:00")}–${window.HC313.time("06:00")}</option>')
 
+change("'+slot.local.slice(-5)+", "'+E(window.HC313.time(slot.local))+")
+change("Horarios · '+E(date)", "Horarios · '+E(window.HC313.date(date))")
+
 script=(root / "ui/v313.js").read_text(encoding="utf-8")
 style=(root / "ui/v313.css").read_text(encoding="utf-8")
 change('<script id="hc-v286-diet-helpers">',

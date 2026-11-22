@@ -29,12 +29,13 @@
       }
       const legacyDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
       if (legacyDate) return {day:pad(legacyDate[1]),month:pad(legacyDate[2]),year:legacyDate[3]};
-      const clock = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?(?:\s*([ap])\.?\s*m\.?)?$/i.exec(text);
-      if (clock) {
+      const clock = /^(\d{1,2})(?::([0-5]\d)(?::([0-5]\d))?)?(?:\s*([ap])\.?\s*m\.?)?$/i.exec(text);
+      if (clock && (clock[2] || clock[4])) {
         const n = Number(clock[1]);
-        if (n > 24 || (n===24 && (clock[2]!=='00'||Number(clock[3]||0)))) return {};
+        const minute=clock[2]||'00';
+        if (n > 24 || (n===24 && (minute!=='00'||Number(clock[3]||0)))) return {};
         const hour = clock[4] && n<=12 ? n%12+(clock[4].toLowerCase()==='p'?12:0) : n%24;
-        return {hour:pad(hour),minute:clock[2],second:clock[3]};
+        return {hour:pad(hour),minute,second:clock[3]};
       }
       if (!iso) return {};
     }

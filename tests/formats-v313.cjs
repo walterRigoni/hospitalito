@@ -13,6 +13,7 @@ assert.equal(date('2026-11-12'),'12/11/2026');
 assert.equal(date('12/11/2026'),'12/11/2026');
 assert.equal(time('13:00'),'13:00');
 assert.equal(time('13:00 p. m.'),'13:00');
+assert.equal(time('13 p. m.'),'13:00');
 assert.equal(time('12:00 a. m.'),'00:00');
 assert.equal(time('24:00'),'00:00');
 assert.equal(time('25:00'),'');
