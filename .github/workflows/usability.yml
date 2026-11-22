@@ -2,7 +2,7 @@ name: Hospitalito - revisión de interfaz
 on:
   push:
     branches: [main, codex/hospitalito-v316]
-    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'ui/v313.*', 'ui/v314.*', 'ui/v315.*', 'ui/v316.css', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tools/build-v313.py', 'tools/build-v314.py', 'tools/build-v315.py', 'tools/build-v316.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', 'tests/formats-v313.cjs', '.github/workflows/usability.yml']
+    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'ui/v313.*', 'ui/v314.*', 'ui/v315.*', 'ui/v316*', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tools/build-v313.py', 'tools/build-v314.py', 'tools/build-v315.py', 'tools/build-v316.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', 'tests/formats-v313.cjs', '.github/workflows/usability.yml']
   workflow_dispatch:
 permissions:
   contents: read

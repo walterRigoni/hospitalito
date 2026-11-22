@@ -50247,6 +50247,18 @@ async function loadOCR(){
   });
   return ocrReady;
 }
+const deadline=(promise,ms,message)=>new Promise((resolve,reject)=>{const id=setTimeout(()=>reject(Error(message)),ms);Promise.resolve(promise).then(v=>{clearTimeout(id);resolve(v);},e=>{clearTimeout(id);reject(e);});});
+function createDniWorker(T,logger){
+  return T.createWorker('spa',1,{
+    workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js',
+    corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@7.0.0',logger
+  });
+}
+function readDniOrientation(worker,canvas,isCurrent){
+  return window.HC316Dni.readDirection(canvas,
+    candidate=>deadline(worker.recognize(candidate,{rotateAuto:false}),25000,'No pude detectar la orientación del DNI.'),
+    isCurrent);
+}
 function identityImage(file){
   return new Promise((resolve,reject)=>{
     const url=URL.createObjectURL(file),img=new Image();
@@ -50266,17 +50278,51 @@ async function identityCanvas(file,ocr=false,turns=0){
 function initialDniTurns(img){
   return img.naturalHeight>img.naturalWidth?1:0;
 }
-function orientSavedDocuments(gallery){
-  for(const card of gallery.querySelectorAll('.hc290SavedDocument')){
+function flipDni(turns){return (Number(turns)+2)%4;}
+async function orientSavedDocuments(gallery){
+  const cards=await Promise.all([...gallery.querySelectorAll('.hc290SavedDocument')].map(async card=>{
     const frame=card.querySelector('.hc316DniFrame'),img=frame.querySelector('img'),button=card.querySelector('[data-dni-rotate]');
-    const initialize=()=>{
-      if(!img.naturalWidth)return;
-      frame.dataset.dniTurns=initialDniTurns(img);
-      button.disabled=false;
-    };
-    if(img.complete)initialize();
-    else img.addEventListener('load',initialize,{once:true});
-    button.onclick=()=>{frame.dataset.dniTurns=(Number(frame.dataset.dniTurns)+1)%4;};
+    let manual=false;
+    const isCurrent=()=>frame.isConnected&&!manual;
+    try{await img.decode();}catch{return null;}
+    if(!frame.isConnected)return null;
+    const turns=initialDniTurns(img);
+    frame.dataset.dniTurns=turns;
+    button.disabled=false;
+    button.onclick=()=>{manual=true;frame.dataset.dniTurns=(Number(frame.dataset.dniTurns)+1)%4;};
+    return {frame,img,turns,isCurrent};
+  }));
+  const readable=cards.filter(Boolean);
+  const hasImage=()=>readable.some(card=>card.isCurrent());
+  if(!hasImage())return;
+  let worker,expired=false;
+  try{
+    const T=await loadOCR();
+    if(!hasImage())return;
+    const creating=createDniWorker(T,()=>{});
+    creating.then(w=>{if(expired)w.terminate().catch(()=>{});}).catch(()=>{});
+    worker=await deadline(creating,25000,'No pude iniciar la lectura del DNI.');
+    await worker.setParameters({tessedit_pageseg_mode:'3'});
+    for(const {frame,img,turns,isCurrent} of readable){
+      if(!isCurrent())continue;
+      let canvas=document.createElement('canvas');
+      const scale=Math.min(1,1600/Math.max(img.naturalWidth,img.naturalHeight));
+      canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      try{
+        const ctx=canvas.getContext('2d');
+        ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        canvas=window.HC292OCR.rotate(canvas,turns);
+        const direction=await readDniOrientation(worker,canvas,isCurrent);
+        if(direction?.flip&&isCurrent())frame.dataset.dniTurns=flipDni(turns);
+      }finally{canvas.width=canvas.height=1;}
+    }
+  }catch{
+    // The gallery already shows each photo and offers manual rotation.
+  }finally{
+    expired=true;
+    if(worker)worker.terminate().catch(()=>{});
   }
 }
 function identityGallery(result){
@@ -50393,7 +50439,6 @@ async function signup(){
     panel.querySelector('[data-take-photo]').onclick=()=>takePhoto(side);
     panel.querySelector('[data-remove-document]').onclick=()=>{if(saving)return;closeCamera();selections[side]++;photoBusy[side]=0;resetRead();if(photos[side])URL.revokeObjectURL(photos[side].url);photos[side]=null;panel.querySelectorAll('input[type="file"]').forEach(input=>input.value='');updatePanel(side);scanButton.disabled=!photos.front&&!photos.back;ocrStatus.textContent='Foto eliminada. Agregá otra para continuar.';if(photos.front||photos.back)scheduleRead();};
   }
-  const deadline=(promise,ms,message)=>new Promise((resolve,reject)=>{const id=setTimeout(()=>reject(Error(message)),ms);Promise.resolve(promise).then(v=>{clearTimeout(id);resolve(v);},e=>{clearTimeout(id);reject(e);});});
   async function readDocuments(){
     if(saving||!el.isConnected||!photos.front&&!photos.back)return;
     stop();const job=serial,snapshot={...photos};let localWorker=null,acceptingWorker=true;
@@ -50402,7 +50447,7 @@ async function signup(){
     const applyRead=()=>{const parsed=parseIdentity([readings.front,readings.back].filter(Boolean).join('\n'));for(const key of ['name','dni','dob'])if(parsed[key]&&(!form.elements[key].value||!edited.has(key)&&form.elements[key].value===auto[key])){form.elements[key].value=parsed[key];auto[key]=parsed[key];edited.delete(key);form.elements.confirmedData.checked=false;}return parsed;};
     try{
       const T=await loadOCR();if(!live(job))return;
-      const creating=T.createWorker('spa',1,{workerPath:'https://cdn.jsdelivr.net/npm/tesseract.js@7.0.0/dist/worker.min.js',corePath:'https://cdn.jsdelivr.net/npm/tesseract.js-core@7.0.0',logger:m=>{if(live(job)&&m.status==='recognizing text'){progress.value=Math.round(m.progress*100);}}});
+      const creating=createDniWorker(T,m=>{if(live(job)&&m.status==='recognizing text')progress.value=Math.round(m.progress*100);});
       creating.then(w=>{if(!live(job)||!acceptingWorker)Promise.resolve(w.terminate()).catch(()=>{});}).catch(()=>{});
       localWorker=await deadline(creating,60000,'El lector tardó demasiado. Podés reintentar o escribir los datos a mano.');
       if(!live(job))return;worker=localWorker;
@@ -50410,8 +50455,25 @@ async function signup(){
       for(const side of ['front','back']){
         if(!snapshot[side])continue;if(!live(job))return;
         ocrStatus.textContent='Leyendo el '+(side==='front'?'frente':'dorso')+' del DNI…';
-        const canvas=await identityCanvas(snapshot[side].file,true,snapshot[side].ocrRotation);if(!live(job)){canvas.width=canvas.height=1;return;}
-        let result=await deadline(localWorker.recognize(canvas,{rotateAuto:true}),45000,'La lectura está tardando demasiado. Reintentá con una foto más clara o escribí los datos a mano.');
+        const photo=snapshot[side],isCurrent=()=>live(job);
+        let canvas=await identityCanvas(photo.file,true,photo.ocrRotation);
+        if(!isCurrent()){canvas.width=canvas.height=1;return;}
+        let result;
+        if(!photo.orientationChecked&&!photo.ocrCrop){
+          const direction=await readDniOrientation(localWorker,canvas,isCurrent);
+          if(!direction){canvas.width=canvas.height=1;return;}
+          photo.orientationChecked=true;
+          if(direction.flip){
+            photo.ocrRotation=flipDni(photo.ocrRotation);
+            const panel=el.querySelector('[data-document-side="'+side+'"]');
+            updatePanel(side);
+            panel.querySelector('[data-crop-canvas]').hidden=true;
+            canvas=window.HC292OCR.rotate(canvas,2);
+          }
+          result=direction.result;
+        }else{
+          result=await deadline(localWorker.recognize(canvas,{rotateAuto:true}),45000,'La lectura está tardando demasiado. Reintentá con una foto más clara o escribí los datos a mano.');
+        }
         if(!live(job))return;readings[side]=result.data?.text||'';let parsed=applyRead();
         const weak=side==='front'&&(!parsed.name||!parsed.dni||!parsed.dob||Number(result.data?.confidence??100)<72);
         if(window.HC292OCR&&(weak||snapshot[side].ocrCrop)){
@@ -50798,6 +50860,7 @@ async function imageCanvas(file){const url=URL.createObjectURL(file);try{const i
 function attach(panel,photo,read){let details=panel.querySelector('[data-292-ocr]');if(!details){details=document.createElement('details');details.dataset['292Ocr']='';details.className='hc292OCRAdjust';details.innerHTML='<summary>Mejorar lectura de letras pequeñas</summary><p>Si sobra fondo, marcá con el dedo o el mouse el rectángulo que ocupa el DNI. Acercá la cámara y evitá reflejos: ampliar una imagen borrosa no recupera el detalle.</p><button type="button" data-crop-open>Ajustar encuadre</button><button type="button" data-crop-reset>Usar foto completa</button><p data-crop-status role="status"></p><canvas data-crop-canvas hidden aria-label="Marcá el área del DNI arrastrando un rectángulo"></canvas>';panel.append(details);}if(details._photo!==photo)details.querySelector('canvas').hidden=true;details._photo=photo;details.querySelectorAll('button').forEach(b=>b.disabled=!photo);if(!photo){details.querySelector('canvas').hidden=true;details.querySelector('[data-crop-status]').textContent='Primero agregá una foto.';return;}let source=null,start=null,selection=null;const canvas=details.querySelector('canvas'),status=details.querySelector('[data-crop-status]');const point=e=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))};};const paint=()=>{if(!source)return;const ctx=canvas.getContext('2d');ctx.drawImage(source,0,0);const r=selection||photo.ocrCrop;if(r){ctx.fillStyle='rgba(30,140,240,.15)';ctx.fillRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);ctx.strokeStyle='#1685e8';ctx.lineWidth=3;ctx.strokeRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);}};
 details.querySelector('[data-crop-open]').onclick=async()=>{const selected=details._photo,rotation=selected.ocrRotation;try{const prepared=rotate(await imageCanvas(selected.file),rotation);if(selected!==details._photo||rotation!==selected.ocrRotation||!details.isConnected){prepared.width=prepared.height=1;return;}source=prepared;canvas.width=source.width;canvas.height=source.height;canvas.hidden=false;paint();status.textContent='Arrastrá desde una esquina del DNI hasta la esquina opuesta. Luego usá Leer DNI.';}catch{status.textContent='No se pudo abrir el encuadre. Probá otra foto.';}};canvas.onpointerdown=e=>{if(!source)return;e.preventDefault();start=point(e);canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!start)return;const end=point(e);selection={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(end.x-start.x),h:Math.abs(end.y-start.y)};paint();};canvas.onpointerup=e=>{if(!start)return;canvas.releasePointerCapture(e.pointerId);start=null;if(selection?.w>.1&&selection?.h>.1){photo.ocrCrop=selection;status.textContent='Encuadre listo. Se usa para leer; la foto original se conserva.';read();}else{selection=null;status.textContent='Marcá un rectángulo más grande, que incluya todo el DNI.';}paint();};canvas.onpointercancel=()=>{start=null;selection=null;paint();};details.querySelector('[data-crop-reset]').onclick=()=>{photo.ocrCrop=null;selection=null;paint();status.textContent='Se leerá la foto completa.';read();};panel.querySelector('[data-dni-rotate]').onclick=()=>{
   photo.ocrRotation=(photo.ocrRotation+1)%4;
+  photo.orientationChecked=true;
   panel.querySelector('.hc290PhotoPreview').dataset.dniTurns=photo.ocrRotation;
   photo.ocrCrop=null;source=null;start=null;selection=null;canvas.hidden=true;
   panel.querySelector('.hc290PhotoStatus').textContent='Foto lista. Vista girada '+photo.ocrRotation*90+'°.';
@@ -53473,5 +53536,45 @@ body #hc289Portal .hc315Location [data-location-status]:empty {display:none;}
 }
 .hc290SavedDocument [data-dni-rotate] { margin-top: 10px; }
 </style>
+<script id="hc-v316-orientation">
+(() => {
+  'use strict';
+
+  function orientationScore(result) {
+    const data = result.data || {};
+    const text = String(data.text || '').normalize('NFD').replace(/\p{M}/gu, '').toUpperCase();
+    const headings = text.match(/\b(?:ARGENTINA|REPUBLICA|DOCUMENTO|APELLIDOS?|NOMBRES?|NACIMIENTO|NACIONALIDAD|DOMICILIO|EJEMPLAR|VENCIMIENTO|EMISION|TRAMITE|RENAPER|SURNAME|BIRTH)\b/g);
+    const machineReadable = text.split('\n').some(line => /^I[D<]ARG[0-9<]{5,}/.test(line.replace(/\s/g, '')));
+    const landmarks = new Set(headings).size + (machineReadable ? 3 : 0);
+    const confidence = Math.min(100, Math.max(0, Number(data.confidence) || 0));
+    return {landmarks, value: landmarks * 2 + confidence / 100};
+  }
+
+  async function readDirection(canvas, read, isCurrent) {
+    const first = await read(canvas);
+    if (!isCurrent()) return null;
+
+    const opposite = document.createElement('canvas');
+    opposite.width = canvas.width;
+    opposite.height = canvas.height;
+    const context = opposite.getContext('2d');
+    context.translate(opposite.width, opposite.height);
+    context.rotate(Math.PI);
+    context.drawImage(canvas, 0, 0);
+    try {
+      const second = await read(opposite);
+      if (!isCurrent()) return null;
+      const initial = orientationScore(first);
+      const reversed = orientationScore(second);
+      const flip = reversed.landmarks >= 2 && reversed.value - initial.value >= 1.5;
+      return {flip, result: flip ? second : first};
+    } finally {
+      opposite.width = opposite.height = 1;
+    }
+  }
+
+  window.HC316Dni = {readDirection};
+})();
+</script>
 </body>
 </html>

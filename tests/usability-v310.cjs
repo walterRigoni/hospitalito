@@ -59,8 +59,22 @@ async function run() {
       const identityPhotos=await page.evaluate(()=>['front','back'].map(side=>{
         const canvas=document.createElement('canvas');
         canvas.width=side==='front'?32:20;canvas.height=side==='front'?20:32;
+        if(side==='front'){
+          const ctx=canvas.getContext('2d');
+          ctx.fillStyle='#ffff00';ctx.fillRect(16,10,16,10);
+        }
         return {side,data:canvas.toDataURL('image/png')};
       }));
+      await page.addInitScript(()=>{
+        window.Tesseract={createWorker:async()=>({
+          setParameters:async()=>{},
+          recognize:async canvas=>{
+            const [,green,blue]=canvas.getContext('2d').getImageData(2,2,1,1).data;
+            return {data:{text:green>200&&blue<100?'ARGENTINA\nDOCUMENTO\nAPELLIDO':'',confidence:90}};
+          },
+          terminate:async()=>{}
+        })};
+      });
       let failDirectory=true,changedQuote=true,resolveNote;
       let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test',latitude:-31.4,longitude:-64.2};
       let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
@@ -422,13 +436,13 @@ async function run() {
       const rotateReverse=savedPhoto.nth(1).getByRole('button',{name:'Girar dorso del DNI 90°'});
       await accountPanel.locator('#hc290MyDocuments [data-dni-rotate]:enabled').first().waitFor();
       await savedPhoto.nth(1).locator('[data-dni-rotate]:enabled').waitFor();
-      assert.equal(await frontFrame.getAttribute('data-dni-turns'),'0');
+      await savedPhoto.nth(0).locator('.hc316DniFrame[data-dni-turns="2"]').waitFor();
       assert.equal(await backFrame.getAttribute('data-dni-turns'),'1');
       const reverseBounds=await backFrame.boundingBox();
       assert(reverseBounds.width/reverseBounds.height>1.5);
       await rotateReverse.click();
       assert.equal(await backFrame.getAttribute('data-dni-turns'),'2');
-      assert.equal(await frontFrame.getAttribute('data-dni-turns'),'0');
+      assert.equal(await frontFrame.getAttribute('data-dni-turns'),'2');
       assert.equal(await backFrame.getAttribute('href'),identityPhotos[1].data);
       if(width>800){
         const layout=await accountPanel.evaluate(el=>{

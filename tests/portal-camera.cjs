@@ -16,7 +16,17 @@ module.exports=async function run(options={}){
     if(__cameraMode==='delayed')await new Promise(resolve=>window.__releaseCamera=resolve);return stream;
    };
    const revoke=URL.revokeObjectURL.bind(URL);URL.revokeObjectURL=url=>{__revoked.push(url);revoke(url);};
-   window.Tesseract={createWorker:async()=>({setParameters:async()=>{},recognize:async()=>({data:{text:window.__ocrText||'',confidence:96}}),terminate:async()=>{}})};
+   window.Tesseract={createWorker:async()=>({
+    setParameters:async()=>{},
+    recognize:async(canvas,options)=>{
+     if(window.__checkDniDirection&&options.rotateAuto===false){
+      const [,green,blue]=canvas.getContext('2d').getImageData(8,8,1,1).data;
+      return {data:{text:green>200&&blue<100?'REPÚBLICA ARGENTINA\nDOCUMENTO\nAPELLIDO':'vn01 vw',confidence:90}};
+     }
+     return {data:{text:window.__ocrText||'',confidence:96}};
+    },
+    terminate:async()=>{}
+   })};
   });
   await page.route('**/*',async route=>{
    if(route.request().url()===site)return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(root,'index.html'),'utf8')});
@@ -56,6 +66,17 @@ module.exports=async function run(options={}){
    await picker.setFiles(buffer?{name,mimeType,buffer}:[]);
    if(buffer)await panel.locator('.hc290PhotoStatus').filter({hasText:'Foto lista.'}).waitFor();
   };
+  const invertedDni=Buffer.from(await page.evaluate(()=>{
+   const canvas=document.createElement('canvas');canvas.width=480;canvas.height=300;
+   const context=canvas.getContext('2d');context.fillStyle='#182038';context.fillRect(0,0,480,300);
+   context.fillStyle='#ffff00';context.fillRect(360,220,120,80);
+   return canvas.toDataURL('image/png').split(',')[1];
+  }),'base64');
+  await page.evaluate(()=>{window.__checkDniDirection=true;});
+  await choose(front,'album',invertedDni);
+  await front.locator('.hc290PhotoPreview[data-dni-turns="2"]').waitFor();
+  check(true,'An upside-down landscape DNI is turned automatically after reading both directions');
+  await page.evaluate(()=>{window.__checkDniDirection=false;});
   await choose(front,'album',red);const first=await front.locator('.hc290PhotoPreview img').getAttribute('src');
   check(await front.locator('.hc290PhotoPreview').isVisible(),'Album selection displays a preview');
   await page.evaluate(()=>window.__previousPicker=document.querySelector('[data-document-side="front"] [data-photo-source="album"]'));
