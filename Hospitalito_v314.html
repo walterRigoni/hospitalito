@@ -6485,7 +6485,7 @@ html::-webkit-scrollbar-corner{
     if (field.type==='photo') {
       const photo = photoPattern.test(field.value || '') ? field.value : '';
       return '<span class="hc289Avatar hc314ProfilePhoto">'+(photo?'<img alt="Foto de perfil" src="'+photo+'">':icon('user'))+'</span>'+
-        '<span>'+ (photo?'Foto guardada':'Sin foto')+'</span>';
+        '<span>'+ (photo?'Foto guardada':'Sin foto guardada')+'</span>';
     }
     return esc(field.value || 'Sin cargar');
   }
@@ -49923,7 +49923,7 @@ body.hc289Visual{background:var(--hc-theme-bg);color:var(--hc-theme-text)}body.h
 #btnWorkShift,#btnProfessionals,#hc280SecurityButton,#hc284LicenseTop,#hc231NotifyBtn,#hc232CallTop,#btnLogout{display:none!important}#whoami{font-weight:800;text-align:right;max-width:320px;line-height:1.3}
 #hc289AccountMenu{position:fixed;z-index:1000009;min-width:225px;padding:7px;background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:12px;box-shadow:0 12px 36px #0006}#hc289AccountMenu[hidden]{display:none}#hc289AccountMenu button{display:block;width:100%;text-align:left;background:transparent;color:inherit;border:0;border-radius:6px;padding:11px 15px;font:inherit;cursor:pointer}#hc289AccountMenu button:hover,#hc289AccountMenu button:focus-visible{background:var(--hc-theme-accent-soft)}.hc289Danger{color:#f04452!important;font-weight:900!important;letter-spacing:.05em}
 #hcSettingsModal.hc289Members .hcSettingsSidebar{display:none!important}#hcSettingsModal.hc289Members .hcSettingsMain{width:100%}#hcSettingsModal.hc289Members #hcSettingsBackToAccount{display:none}.hc289Members .hcMemberListNew{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}.hc289Members .hcMemberToolbar{width:100%}
-[data-hc314-profile-page] .hcSettingsGrid{grid-template-columns:minmax(0,760px);justify-content:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsRow{flex-direction:column;text-align:center}.hcSettingsPage:has(#hcsProfileName) .hcSettingsAvatar{width:140px;height:140px;border-radius:50%;margin:auto}.hcSettingsPage:has(#hcsProfileName) .hcSettingsMeta{text-align:center;margin-top:15px}#hcsOpenClassicAccount{display:none}
+[data-hc314-profile-page] .hcSettingsGrid{grid-template-columns:minmax(0,840px);justify-content:center}
 .hc289Swatches{display:flex;flex-wrap:wrap;gap:10px}.hc289Swatches button{display:flex;align-items:center;gap:8px;padding:12px 15px;border:1px solid var(--hc-theme-line);background:var(--hc-theme-surface);color:var(--hc-theme-text);border-radius:10px;font:inherit}.hc289Swatches button[aria-pressed=true]{outline:3px solid var(--hc-theme-accent)}.hc289Swatches i{width:22px;height:22px;border-radius:50%}
 #hc289Toast{position:fixed;z-index:2147483647;bottom:22px;left:50%;transform:translateX(-50%);background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);padding:14px 24px;border-radius:12px;box-shadow:0 6px 30px #0005;max-width:90vw}
 .hc289Dialog{position:fixed;inset:0;z-index:1000005;overflow:auto;padding:30px max(20px,calc((100vw - 1000px)/2));background:var(--hc-theme-bg);color:var(--hc-theme-text)}.hc289Dialog h2{margin:0 40px 22px 0}.hc289Close{float:right;min-width:38px;min-height:38px;font-size:24px}.hc289Form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.hc289Form label{display:flex;flex-direction:column;gap:7px}.hc289Form input,.hc289Form select,.hc289Form textarea,.hc289Dialog input,.hc289Dialog select,.hc289Dialog textarea{width:100%;box-sizing:border-box;background:var(--hc-theme-surface);color:var(--hc-theme-text);border:1px solid var(--hc-theme-line);border-radius:8px;padding:11px;font:inherit}.hc289Form input[type=checkbox],.hc289Form input[type=radio]{width:22px;height:22px;flex:none}.hc289Check{display:flex!important;flex-direction:row!important;align-items:center;gap:9px}.hc289Full{grid-column:1/-1}.hc289Dialog button,.hc289Panel button,#hc289Portal button{cursor:pointer;font:inherit;border:1px solid var(--hc-theme-line);border-radius:9px;padding:9px 14px;background:var(--hc-theme-surface-2);color:var(--hc-theme-text)}.hc289Primary{background:var(--hc-theme-accent)!important;color:#081421!important;font-weight:800!important}body[data-hc289-mode=light] .hc289Primary{color:#fff!important}.hc289Notice{padding:14px 0;color:var(--hc-theme-muted);line-height:1.5}.hc289Row{padding:16px 0;border-bottom:1px solid var(--hc-theme-line);display:flex;gap:15px;align-items:center}.hc289Row>div{flex:1}.hc289Avatar{width:52px;height:52px;border-radius:50%;object-fit:contain;flex:none;background:var(--hc-theme-surface-2);display:grid;place-items:center}.hc289Avatar img{width:100%;height:100%;object-fit:contain;border-radius:50%}.hc289Panel{background:var(--hc-theme-surface);color:var(--hc-theme-text);padding:18px;min-width:0;border-bottom:1px solid var(--hc-theme-line);margin:14px 0}.hc289Panel input,.hc289Panel textarea,.hc289Panel select{background:var(--hc-theme-bg);color:var(--hc-theme-text)}
@@ -50271,7 +50271,7 @@ window.hc290IdentityGallery=identityGallery;
 async function loadPersonalDocuments(el){
   const status=el.querySelector('#hc290MyDocumentStatus'),gallery=el.querySelector('#hc290MyDocuments');if(!status||!gallery)return;
   status.textContent='Cargando las fotos de tu DNI…';
-  try{const j=await api('myIdentityDocuments');if(!el.isConnected)return;gallery.innerHTML=identityGallery(j);status.textContent=j.documents?.some(d=>d.side==='back')?'Fotos guardadas en tu cuenta.':'Tu cuenta tiene el frente guardado. El dorso se solicita en los nuevos registros.';}
+  try{const j=await api('myIdentityDocuments');if(!el.isConnected)return;gallery.innerHTML=identityGallery(j);status.textContent=!j.documents?.length?'Todavía no hay fotos de DNI guardadas.':j.documents.some(d=>d.side==='back')?'Fotos guardadas en tu cuenta.':'Tu cuenta tiene el frente guardado. El dorso se solicita en los nuevos registros.';}
   catch(error){if(!el.isConnected)return;status.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.textContent='Volver a cargar el DNI';retry.onclick=()=>loadPersonalDocuments(el);status.append(document.createElement('br'),retry);}
 }
 function registrationUsername(value){
@@ -50635,6 +50635,7 @@ async function clientAccount(section){
  const fields=[
    {key:'name',label:'Nombre completo',value:client?.legal_name||account.user.name},
    {key:'username',label:'Usuario',value:account.user.username},
+   {key:'role',label:'Rol',value:'Paciente'},
    {key:'dni',label:'DNI',value:client?.dni},
    {key:'dob',label:'Fecha de nacimiento',value:window.HC313.date(client?.dob)},
    {key:'address',label:'Dirección',value:profile.address,editable:!!client,max:500,autocomplete:'street-address'},
@@ -50676,7 +50677,7 @@ async function clientAccount(section){
    requireSession();
    if(!saved.client)throw Error('No se confirmó el cambio de perfil.');
    requestSerial++;me=saved;
-   const result=saved.client.profile;
+   const result=saved.client.profile||{};
    position=result.latitude!=null?{latitude:result.latitude,longitude:result.longitude}:null;
    return field.key==='location'?(position?'Ubicación guardada':'Sin ubicación guardada'):result[field.key];
  });

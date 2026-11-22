@@ -58,7 +58,7 @@ change("if(b.closest('#medHistoria,#medScales,#hc270PatientSearch,#hc280Security
        "if(b.closest('#medHistoria,#medScales,#hc270PatientSearch,#hc280Security,#hc280Lock,[data-hc314-profile]'))")
 change('anchor=$("#hcsProfileName")', 'anchor=$("[data-hc314-profile-page]")')
 change('#hcSettingsContent:has(#hcsProfileName)', '#hcSettingsContent:has([data-hc314-profile-page])')
-change('.hcSettingsPage:has(#hcsProfileName) .hcSettingsGrid', '[data-hc314-profile-page] .hcSettingsGrid')
+region('.hcSettingsPage:has(#hcsProfileName) .hcSettingsGrid', '\n', """[data-hc314-profile-page] .hcSettingsGrid{grid-template-columns:minmax(0,840px);justify-content:center}""")
 
 change("async function clientAccount(section,inSettings=false){","async function clientAccount(section){")
 change("   if(!inSettings&&section!=='settings')return dialog(title,content,{fullscreen:true});\n","")
@@ -76,6 +76,7 @@ region(" if(!me)await refresh();\n if(opening!==accountRequest", "window.hc289Cl
  const fields=[
    {key:'name',label:'Nombre completo',value:client?.legal_name||account.user.name},
    {key:'username',label:'Usuario',value:account.user.username},
+   {key:'role',label:'Rol',value:'Paciente'},
    {key:'dni',label:'DNI',value:client?.dni},
    {key:'dob',label:'Fecha de nacimiento',value:window.HC313.date(client?.dob)},
    {key:'address',label:'Dirección',value:profile.address,editable:!!client,max:500,autocomplete:'street-address'},
@@ -117,7 +118,7 @@ region(" if(!me)await refresh();\n if(opening!==accountRequest", "window.hc289Cl
    requireSession();
    if(!saved.client)throw Error('No se confirmó el cambio de perfil.');
    requestSerial++;me=saved;
-   const result=saved.client.profile;
+   const result=saved.client.profile||{};
    position=result.latitude!=null?{latitude:result.latitude,longitude:result.longitude}:null;
    return field.key==='location'?(position?'Ubicación guardada':'Sin ubicación guardada'):result[field.key];
  });
@@ -138,6 +139,9 @@ region("  function professionalProfile(mode,user,section='account') {","  functi
   }
 
 """)
+
+change("status.textContent=j.documents?.some(d=>d.side==='back')?",
+       "status.textContent=!j.documents?.length?'Todavía no hay fotos de DNI guardadas.':j.documents.some(d=>d.side==='back')?")
 
 # The calendar is the neutral state of the portal shortcuts.
 change("root.dataset.view='calendar';window.HC311.markPortal('turns');","root.dataset.view='calendar';window.HC311.markPortal(null);")

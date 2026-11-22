@@ -14,7 +14,7 @@
     if (field.type==='photo') {
       const photo = photoPattern.test(field.value || '') ? field.value : '';
       return '<span class="hc289Avatar hc314ProfilePhoto">'+(photo?'<img alt="Foto de perfil" src="'+photo+'">':icon('user'))+'</span>'+
-        '<span>'+ (photo?'Foto guardada':'Sin foto')+'</span>';
+        '<span>'+ (photo?'Foto guardada':'Sin foto guardada')+'</span>';
     }
     return esc(field.value || 'Sin cargar');
   }

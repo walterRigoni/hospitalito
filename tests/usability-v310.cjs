@@ -186,6 +186,14 @@ async function run() {
           for(const cell of await page.locator('#qa-contrast [data-contrast]').all())await contrast(cell);
         }
         await page.evaluate(()=>document.querySelector('#qa-contrast').remove());
+        await page.evaluate(()=>hcSettingsOpen('account'));
+        const title=page.locator('#hcSettingsContent [data-hc314-row=professionalTitle]');
+        assert.equal(await title.locator('input').count(),0);
+        await title.getByRole('button',{name:'Editar Título profesional'}).click();
+        await title.getByRole('textbox',{name:'Título profesional'}).fill('Título de prueba');
+        await title.getByRole('button',{name:'Guardar',exact:true}).click();
+        await title.getByText('Título de prueba').waitFor();
+        assert.equal(await page.evaluate(()=>getUsers().find(user=>user.username==='qa308').professionalTitle),'Título de prueba');
         await page.evaluate(()=>hcSettingsOpen('personalization'));
         const institutional=page.locator('#hcSettingsContent .hc313Format');
         assert.equal(await institutional.getByLabel('Formato de fecha').inputValue(),'dmy');
@@ -455,9 +463,12 @@ async function run() {
           {name:section==='alerts'?'Cerrar':'Volver al calendario',exact:true});
         await centeredIcon(close);
         if(section==='turns'){
-          const refresh=portal.getByRole('button',{name:'Actualizar',exact:true}).first();
-          const [left,right]=await Promise.all([refresh.boundingBox(),close.boundingBox()]);
-          assert(right.x-left.x-left.width>=6,'Actualizar queda a la izquierda de la cruz');
+          await page.locator('#hc289PortalMain [data-hc305-refresh]:enabled').waitFor();
+          const spacing=await portal.locator('#hc289PortalMain .hc314SectionActions').evaluate(row=>{
+            const refresh=row.querySelector('[data-hc305-refresh]').getBoundingClientRect();
+            return row.querySelector('[data-hc314-close-section]').getBoundingClientRect().left-refresh.right;
+          });
+          assert(spacing>=6,'Actualizar queda a la izquierda de la cruz');
         }
         if(section==='studies')assert.equal(await portal.locator('#hc289PortalMain [data-289-back]').count(),0);
         await close.click();
