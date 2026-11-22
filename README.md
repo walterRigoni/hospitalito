@@ -1,12 +1,14 @@
 # Hospitalito
 
-Sistema Digital de Historia Clínica. Versión actual **v312**, basada en v311.
+Sistema Digital de Historia Clínica. Versión actual **v313**, basada en v312.
 
 - [Abrir Hospitalito](https://walterrigoni.github.io/hospitalito/)
-- [Archivo HTML v312](Hospitalito_v312.html)
+- [Archivo HTML v313](Hospitalito_v313.html)
 - [Guía v307](Hospitalito_v307_guia.md)
 - [Arquitectura del Portal y comprobaciones](PORTAL.md)
 - [Escalas clínicas conservadas](ESCALAS.md)
+
+v313 usa DD/MM/AAAA y 24 horas de forma predeterminada. Cada cuenta puede cambiar los formatos en Configuración → Apariencia o Personalización.
 
 v311 corrige los mensajes y reintentos de acceso, abre Cuenta a pantalla completa y agrega Mis Recetas al Portal. El médico publica el PDF firmado desde Documentos de la consulta. La lista requiere la versión actualizada de la función `hospitalito-telemed`.
 

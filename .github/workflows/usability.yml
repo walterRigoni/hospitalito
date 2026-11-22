@@ -1,8 +1,8 @@
 name: Hospitalito - revisión de interfaz
 on:
   push:
-    branches: [main, codex/hospitalito-v312]
-    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', '.github/workflows/usability.yml']
+    branches: [main, codex/hospitalito-v313]
+    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'ui/v313.*', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tools/build-v313.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', 'tests/formats-v313.cjs', '.github/workflows/usability.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -21,9 +21,12 @@ jobs:
         run: |
           python3 tools/build-v311.py
           python3 tools/build-v312.py
-          git diff --exit-code -- index.html Hospitalito_v311.html Hospitalito_v312.html
+          python3 tools/build-v313.py
+          git diff --exit-code -- index.html Hospitalito_v311.html Hospitalito_v312.html Hospitalito_v313.html
       - name: Probar respuestas del inicio de sesión
         run: node tests/access-v311.cjs
+      - name: Probar formatos de cada cuenta
+        run: node tests/formats-v313.cjs
       - name: Instalar Chromium
         run: |
           npm install --prefix "$RUNNER_TEMP/browser" --no-save --ignore-scripts playwright@1.56.1

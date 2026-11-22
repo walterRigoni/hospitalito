@@ -16,6 +16,7 @@ const ctx=vm.createContext({console,Map,Set,Date,AbortController,setTimeout,clea
   hcV189PrettyKey:k=>k,HC221_PATIENT_SYNC_URL:'https://example.test/patient',HC207_PUBLISHABLE:'public',
   hc207RowsToSnapshot:rows=>{const s={clinical:{},patients:[],registry:[],appointments:[],archive:[],inst:{}};for(const r of rows){if(r.deleted)continue;if(r.bucket==='clinical'){const [pid,field]=r.record_id.split('::').map(decodeURIComponent);s.clinical[pid]||={};s.clinical[pid][field]=r.payload.value;}else s[r.bucket]=r.payload.value;}return s;}
 });
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../ui/v313.js'),'utf8'),ctx);
 vm.runInContext(script,ctx);
 const run=code=>vm.runInContext(code,ctx),json=code=>JSON.parse(JSON.stringify(run(code)));
 const srcA={id:'A',local:true,institution:{id:'A',name:'Hospital A',logoData:'data:image/png;base64,QQ=='},patients:[

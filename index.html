@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-AR">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v312 · Historia Clínica Digital</title>
+<title>Hospitalito v313 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v312</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v313</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -6468,6 +6468,109 @@ html::-webkit-scrollbar-corner{
     <div id="labModalContent"></div>
   </div>
 </div>
+<script id="hc-v313-formats">
+(() => {
+  'use strict';
+
+  const argentina = 'America/Argentina/Buenos_Aires';
+  const defaults = {dateFormat:'dmy',timeFormat:'24h'};
+  const pad = value => String(value).padStart(2,'0');
+  const zones = new Map();
+  let viewer, settings=defaults;
+  function setPreferences(visual={}) {
+    viewer=window.hc313Viewer?.();
+    settings={
+      dateFormat:visual.dateFormat==='iso'?'iso':defaults.dateFormat,
+      timeFormat:visual.timeFormat==='12h'?'12h':defaults.timeFormat
+    };
+    return settings;
+  }
+  function preferences() {
+    if (viewer!==window.hc313Viewer?.()) return setPreferences(window.hc289Visual?.());
+    return settings;
+  }
+
+  function parts(value, options) {
+    if (typeof value === 'string') {
+      const text = value.trim();
+      const iso = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/i.exec(text);
+      if (iso && !(options.timeZone && iso[4] && /(?:Z|[+-]\d{2}:?\d{2})$/i.test(text))) {
+        const [,year,month,day,hour,minute,second] = iso;
+        return {year,month,day,hour,minute,second};
+      }
+      const legacyDate = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text);
+      if (legacyDate) return {day:pad(legacyDate[1]),month:pad(legacyDate[2]),year:legacyDate[3]};
+      const clock = /^(\d{1,2}):([0-5]\d)(?::([0-5]\d))?(?:\s*([ap])\.?\s*m\.?)?$/i.exec(text);
+      if (clock) {
+        const n = Number(clock[1]);
+        if (n > 24 || (n===24 && (clock[2]!=='00'||Number(clock[3]||0)))) return {};
+        const hour = clock[4] && n<=12 ? n%12+(clock[4].toLowerCase()==='p'?12:0) : n%24;
+        return {hour:pad(hour),minute:clock[2],second:clock[3]};
+      }
+      if (!iso) return {};
+    }
+    if (value==null || value==='') return {};
+    const timestamp = new Date(value);
+    if (!Number.isFinite(+timestamp)) return {};
+    if (options.timeZone) {
+      if (!zones.has(options.timeZone)) zones.set(options.timeZone,new Intl.DateTimeFormat('en-GB',{
+        timeZone:options.timeZone,year:'numeric',month:'2-digit',day:'2-digit',
+        hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'
+      }));
+      return Object.fromEntries(zones.get(options.timeZone).formatToParts(timestamp).map(({type,value})=>[type,value]));
+    }
+    return {
+      year:timestamp.getFullYear(),month:pad(timestamp.getMonth()+1),day:pad(timestamp.getDate()),
+      hour:pad(timestamp.getHours()),minute:pad(timestamp.getMinutes()),second:pad(timestamp.getSeconds())
+    };
+  }
+
+  function formatDate(fields, settings, short) {
+    if (!fields.year) return '';
+    if (settings.dateFormat==='iso') return short?fields.month+'-'+fields.day:[fields.year,fields.month,fields.day].join('-');
+    return short?fields.day+'/'+fields.month:[fields.day,fields.month,fields.year].join('/');
+  }
+
+  function formatTime(fields, settings, seconds) {
+    if (fields.hour===undefined) return '';
+    const hour = Number(fields.hour)%24;
+    const minutes = ':'+fields.minute+(seconds&&fields.second!==undefined?':'+fields.second:'');
+    if (settings.timeFormat==='12h') return (hour%12||12)+minutes+(hour<12?' a. m.':' p. m.');
+    return pad(hour)+minutes;
+  }
+
+  function date(value, options={}) {
+    return formatDate(parts(value,options),preferences(),options.short);
+  }
+  function time(value, options={}) {
+    return formatTime(parts(value,options),preferences(),options.seconds);
+  }
+  function dateTime(value, options={}) {
+    const fields=parts(value,options), settings=preferences();
+    return [formatDate(fields,settings,options.short),formatTime(fields,settings,options.seconds)].filter(Boolean).join(' ');
+  }
+
+  function dayLabel(value) {
+    const fields=parts(value,{});
+    if (!fields.year) return '';
+    const day=new Date(fields.year+'-'+fields.month+'-'+fields.day+'T12:00:00');
+    const weekday=day.toLocaleDateString('es-AR',{weekday:'long'});
+    return weekday+' '+formatDate(fields,preferences());
+  }
+
+  function settingsMarkup() {
+    const current=preferences();
+    const select=(name,options)=>'<select data-hc313-format="'+name+'">'+options.map(([value,label])=>
+      '<option value="'+value+'"'+(value===current[name]?' selected':'')+'>'+label+'</option>').join('')+'</select>';
+    return '<fieldset class="hc313Format"><legend>Fecha y hora</legend><div>'+
+      '<label>Formato de fecha'+select('dateFormat',[['dmy','12/11/2026'],['iso','2026-11-12']])+'</label>'+
+      '<label>Formato de hora'+select('timeFormat',[['24h','13:00 (24 horas)'],['12h','1:00 p. m. (12 horas)']])+'</label>'+
+      '</div></fieldset>';
+  }
+
+  window.HC313 = {argentina,date,time,dateTime,dayLabel,settingsMarkup,setPreferences};
+})();
+</script>
 <script id="hc-v286-diet-helpers">
 function hc286IsDiet(item){return !!item&&(item.modulePrescription||item.freeTextPrescription)&&/^(nutricion|dieta)$/.test(String(item.drugName||item.nombre||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim());}
 function hc286DietText(item,pid=selectedPatientId){
@@ -6616,7 +6719,7 @@ function openPrintHTML(title, bodyHTML){
 
   const html = `
     <!doctype html>
-    <html lang="es">
+    <html lang="es-AR">
     <head>
       <meta charset="utf-8">
       <title>${escHTML(title)}</title>
@@ -6950,32 +7053,10 @@ function printLabResult(pid, resultId){
 }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function nowDateObj(){ return new Date(); }
-function nowStr(){
-  const d = nowDateObj();
-  return `${pad2(d.getDate())}/${pad2(d.getMonth()+1)}/${d.getFullYear()} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-}
-function dmyFromDateISO(iso){
-  if(!iso) return "";
-  const [y,m,d] = String(iso).split("-");
-  if(!y||!m||!d) return "";
-  return `${d}/${m}/${y}`;
-}
-function dmyhmFromISODateTime(iso){
-  if(!iso) return "";
-  const s = String(iso).replace(" ", "T");
-  const [date, time] = s.split("T");
-  const dmy = dmyFromDateISO(date);
-  if(!time) return dmy;
-  const hhmm = time.slice(0,5);
-  return `${dmy} ${hhmm}`;
-}
-function hm24FromISO(iso){
-  if(!iso) return "";
-  const s = String(iso).replace(" ", "T");
-  const parts = s.split("T");
-  if(parts.length < 2) return "";
-  return parts[1].slice(0,5);
-}
+function nowStr(){ return window.HC313.dateTime(nowDateObj()); }
+function dmyFromDateISO(iso){ return window.HC313.date(iso); }
+function dmyhmFromISODateTime(iso){ return window.HC313.dateTime(iso); }
+function hm24FromISO(iso){ return window.HC313.time(iso); }
 function isoFromNow(){
   const d = nowDateObj();
   const y = d.getFullYear();
@@ -10071,10 +10152,8 @@ function showEl(el, on){
 }
 
 function fmtDateTimeShort(iso){
-  if(!iso) return "—";
-  const d = new Date(iso);
-  if(isNaN(d.getTime())) return "—";
-  return `${d.toLocaleDateString()} ${d.toLocaleTimeString().slice(0,5)}`;
+  const value=iso?new Date(iso):null;
+  return window.HC313.dateTime(value)||"—";
 }
 
 function getSVPreviewData(pid){
@@ -11237,8 +11316,8 @@ if((me?.role === "bioquimico" || me?.role === "imagenologo") && !selectedPatient
     const line2 = `DNI: ${p?.dni||"—"} • Edad: ${age!==""?String(age):"—"} • Sexo: ${p?.sex||"—"} • OS: ${p?.os||"—"} • Afiliado: ${p?.aff||"—"}`;
     const areaTxt = bed?.area || (consultAppt ? "Consultorios" : "—");
     const consultRoomTxt = consultAppt ? appointmentConsultorio(consultAppt) : "";
-    const camaTxt = bed?.label || (consultAppt ? `${consultRoomTxt ? consultorioDisplay(consultRoomTxt) + " • " : ""}Turno ${consultAppt.time || "—"}` : "—");
-    const ingresoTxt = adm ? dmyhmFromISODateTime(adm.admDateTime||"") : (consultAppt ? `${dmyFromDateISO(consultAppt.date || "")} ${consultAppt.time || ""} • ${apptStatusText(consultAppt.status || "turno")}` : "—");
+    const camaTxt = bed?.label || (consultAppt ? `${consultRoomTxt ? consultorioDisplay(consultRoomTxt) + " • " : ""}Turno ${window.HC313.time(consultAppt.time) || "—"}` : "—");
+    const ingresoTxt = adm ? dmyhmFromISODateTime(adm.admDateTime||"") : (consultAppt ? `${dmyFromDateISO(consultAppt.date || "")} ${window.HC313.time(consultAppt.time)} • ${apptStatusText(consultAppt.status || "turno")}` : "—");
     const dxTxt = adm?.dx || consultAppt?.reason || "—";
     const line3 = `Domicilio: ${dom||"—"} • Área: ${areaTxt} • Cama: ${camaTxt} • Ingreso/turno: ${ingresoTxt} • Motivo/Dx: ${dxTxt}`;
     hdr.innerHTML = `
@@ -11458,7 +11537,7 @@ function hcMedicationClockTimesValid(raw, regularidad){
   const minutes=times.map(time=>Number(time.slice(0,2))*60+Number(time.slice(3,5)));
   return minutes.every((minute,index)=>((minutes[(index+1)%minutes.length]-minute+1440)%1440 || 1440)===interval*60);
 }
-function hcMedicationClockLabel(value){ return value==="00:00" ? "24:00" : value; }
+function hcMedicationClockLabel(value){ return window.HC313.time(value); }
 function hcMedicationClockTimesForPlan(raw){
   return hcMedicationClockTimes(raw).sort((a,b)=>{
     const minute=time=>{const hour=Number(time.slice(0,2));return (hour<6?hour+24:hour)*60+Number(time.slice(3,5));};
@@ -11684,11 +11763,11 @@ function hcNursePrescriptionTasks(items, now = new Date()){
     if(hcIsIntermittentInfusionItem(item)){
       const state = hcIntermittentInfusionScheduleState(item,now);
       if(state.dueSlot && !hcIntermittentInfusionIsRunning(item) && !needsAck){
-        tasks.push({itemId:item.id,kind:"infusion",name,label:`Administrar ${state.dueSlot.at.slice(11,16)}`});
+        tasks.push({itemId:item.id,kind:"infusion",name,label:`Administrar ${window.HC313.time(state.dueSlot.at)}`});
       }
     }else if(hcIsScheduledMedicationItem(item)){
       const slot = hcMedicationSlotsForDate(item,planDate).find(s=>hcMedicationSlotNeedsAlert(item,s,now));
-      if(slot) tasks.push({itemId:item.id,kind:"medicacion",name,label:`Administrar ${slot.at.slice(11,16)}`});
+      if(slot) tasks.push({itemId:item.id,kind:"medicacion",name,label:`Administrar ${window.HC313.time(slot.at)}`});
     }
     const preparedHours=hcGlobalCalcBagDurationHours(item);
     const preparedAt=item.currentPreparedStartedAt || item.currentBagStartedAt || "";
@@ -11885,7 +11964,7 @@ function renderMedCenso(){
 
       const left = document.createElement("div");
       const room = appointmentConsultorio(a);
-      left.textContent = `${a.time || "—"} • ${room ? consultorioDisplay(room) : "Consultorios"}`;
+      left.textContent = `${window.HC313.time(a.time) || "—"} • ${room ? consultorioDisplay(room) : "Consultorios"}`;
 
       const right = document.createElement("div");
       right.className = "consultorioPacienteNombre";
@@ -15025,7 +15104,7 @@ function renderBalTrend(arr){
   const dots = data.map((p,i)=>{
   const x = xAt(i);
   const y = yAt(p.bal);
-  const label = dmyFromDateISO(p.day).slice(0,5);
+  const label = window.HC313.date(p.day,{short:true});
   const valColor = p.bal > 0 ? "#68d391" : (p.bal < 0 ? "#fc8181" : "#fff");
   
 
@@ -16387,7 +16466,7 @@ function hcLabTrendChartHTML(points){
   const every=Math.max(1,Math.ceil(p.length/6));
   const labels=p.map((x,i)=>{
     if(i!==0&&i!==p.length-1&&i%every!==0)return "";
-    const parts=dmyhmFromISODateTime(x.at||"").split(" ");
+    const parts=[window.HC313.date(x.at),window.HC313.time(x.at)];
     return `<text class="labTrendAxisLabel" x="${xx(i)}" y="${h-b+18}" text-anchor="middle"><tspan x="${xx(i)}">${escHTML(parts[0]||"")}</tspan><tspan x="${xx(i)}" dy="11">${escHTML(parts[1]||"")}</tspan></text>`;
   }).join("");
   const dots=p.map((x,i)=>`<g><circle class="labTrendDot" cx="${xx(i)}" cy="${yy(x.numeric)}" r="${i===p.length-1?5:4}"></circle><title>${escHTML(dmyhmFromISODateTime(x.at||""))}: ${escHTML(x.value)} ${escHTML(x.unit)}</title><text class="labTrendPointValue" x="${xx(i)}" y="${Math.max(13,yy(x.numeric)-9)}" text-anchor="middle">${escHTML(x.value)}</text></g>`).join("");
@@ -18479,7 +18558,7 @@ function buildPatientHeaderHTML(){
 }
 function buildPrintShell(bodyTitle, bodyHTML){
   return `
-<!doctype html><html lang="es"><head><meta charset="utf-8" />
+<!doctype html><html lang="es-AR"><head><meta charset="utf-8" />
 <title>${escHTML(bodyTitle)}</title>
 <style>
   :root{ --blue:#0b4ea2; --black:#0a0a0a; }
@@ -18511,7 +18590,7 @@ function buildPrintShell(bodyTitle, bodyHTML){
 function buildPrintShellNoPatient(bodyTitle, bodyHTML){
   const inst = getInst();
   return `
-<!doctype html><html lang="es"><head><meta charset="utf-8" />
+<!doctype html><html lang="es-AR"><head><meta charset="utf-8" />
 <title>${escHTML(bodyTitle)}</title>
 <style>
   :root{ --blue:#0b4ea2; --black:#0a0a0a; }
@@ -23280,7 +23359,7 @@ function patientHasPendingNurseAlert(patientId){
       const normalizedDose = doseText.toLowerCase().replace(/\s+/g, "");
       const title = `${name}${doseText && !normalizedName.includes(normalizedDose) ? ` ${doseText}` : ""} / ${frequencyShort}`;
       const viaText = String(item.via || "—")==="Oral" ? "VO" : String(item.via || "—");
-      const timeText = slots.map(slot=>String(slot.at || "").slice(11,16)).filter(Boolean).join(" · ");
+      const timeText = slots.map(slot=>window.HC313.time(slot.at)).filter(Boolean).join(" · ");
       const pendingAck = nurse && !!item.pendingNurseAlert && !nurseAckSuppressesPendingAlert(item);
       const dueSlot = nurse && !pendingAck ? slots.find(slot=>hcMedicationSlotNeedsAlert(item,slot,now)) : null;
       const nextSlot = slots.find(slot=>!hcAdministrationRecordForSlot(item,slot.key) && new Date(slot.at).getTime() > now.getTime());
@@ -23288,8 +23367,8 @@ function patientHasPendingNurseAlert(patientId){
       const lastRecord = lastRecordedSlot ? hcAdministrationRecordForSlot(item,lastRecordedSlot.key) : null;
       const needsAttention = pendingAck || !!dueSlot;
       const plannedDay = displayPlanDate !== selectedDate ? ` • ${dmyFromDateISO(displayPlanDate)}` : "";
-      const statusText = dueSlot ? ` • Pendiente ${String(dueSlot.at || "").slice(11,16)}` : (nextSlot ? ` • próxima ${String(nextSlot.at || "").slice(11,16)}` : "");
-      const recordText = lastRecord ? ` • ${lastRecord.notAdministered || lastRecord.status === "observacion" ? "Obs" : "✓ OK"} ${String(lastRecordedSlot.at || "").slice(11,16)}` : "";
+      const statusText = dueSlot ? ` • Pendiente ${window.HC313.time(dueSlot.at)}` : (nextSlot ? ` • próxima ${window.HC313.time(nextSlot.at)}` : "");
+      const recordText = lastRecord ? ` • ${lastRecord.notAdministered || lastRecord.status === "observacion" ? "Obs" : "✓ OK"} ${window.HC313.time(lastRecordedSlot.at)}` : "";
       const subtitle = `Fecha ${dmyFromDateISO(displayPlanDate)}: horarios ${timeText}${statusText}${recordText}`;
       const id = escHTML(item.id);
       return `<div class="card prListItem hcRxCompactItem hcRxMedicationItem" data-pr-item-id="${id}">
@@ -23475,7 +23554,7 @@ function patientHasPendingNurseAlert(patientId){
     })();
 
     const infusionPlanSlots = isIntermittent ? hcMedicationSlotsForDate(it, selectedPrescriptionDate) : [];
-    const infusionHours = infusionPlanSlots.map(slot=>String(slot.at || "").slice(11,16)).filter(Boolean).join(" · ");
+    const infusionHours = infusionPlanSlots.map(slot=>window.HC313.time(slot.at)).filter(Boolean).join(" · ");
     const compactScheduleText = (()=>{
       if(!isIntermittent) return "";
       const firstAt = infusionPlanSlots[0]?.at || intermittentSchedule?.dueSlot?.at || intermittentSchedule?.nextSlot?.at || hcMedicationAnchorSlot(it)?.at || hcMedicationFirstDoseAt(it) || "";
@@ -23684,7 +23763,7 @@ function patientHasPendingNurseAlert(patientId){
                 const record=hcAdministrationRecordForSlot(item,slot.key);
                 const result=record ? (record.notAdministered || record.status === "observacion" ? `Observación: ${record.observation || record.obs || "No administrado"}` : (record.infusionFinishedAt ? "Infusión finalizada" : (record.infusionStartedAt ? "Infusión iniciada" : "Administrado"))) : (new Date(slot.at).getTime() <= Date.now() ? "Pendiente" : "Programado");
                 const by=record?.byName ? ` • ${record.byName}` : "";
-                return `<div><span>${escHTML(String(slot.at || "").slice(11,16))}</span><b>${escHTML(result + by)}</b></div>`;
+                return `<div><span>${escHTML(window.HC313.time(slot.at))}</span><b>${escHTML(result + by)}</b></div>`;
               }).join("") || `<div><span>Horario</span><b>Sin dosis en este plan</b></div>`}
             </div>
           </div>
@@ -28523,7 +28602,7 @@ function renderNursingReports(){
       </div>
       <div class="nrCard">
         <div class="nrTitle">Turno informado</div>
-        <div class="row"><div class="field"><label>Fecha de inicio del turno</label><input id="nrShiftDate" type="date" value="${escHTML(def.date)}"></div><div class="field"><label>Turno</label><select id="nrShift"><option value="manana" ${def.code==="manana"?"selected":""}>Mañana 06:00–14:00</option><option value="tarde" ${def.code==="tarde"?"selected":""}>Tarde 14:00–22:00</option><option value="noche" ${def.code==="noche"?"selected":""}>Noche 22:00–06:00</option><option value="personalizado">Personalizado</option></select></div></div>
+        <div class="row"><div class="field"><label>Fecha de inicio del turno</label><input id="nrShiftDate" type="date" value="${escHTML(def.date)}"></div><div class="field"><label>Turno</label><select id="nrShift"><option value="manana" ${def.code==="manana"?"selected":""}>Mañana ${window.HC313.time("06:00")}–${window.HC313.time("14:00")}</option><option value="tarde" ${def.code==="tarde"?"selected":""}>Tarde ${window.HC313.time("14:00")}–${window.HC313.time("22:00")}</option><option value="noche" ${def.code==="noche"?"selected":""}>Noche ${window.HC313.time("22:00")}–${window.HC313.time("06:00")}</option><option value="personalizado">Personalizado</option></select></div></div>
         <div id="nrCustomWrap" class="nrShiftCustom"><div class="field"><label>Desde</label><input id="nrCustomStart" type="datetime-local" value="${escHTML(nrDateTimeInputValue(new Date(Date.now()-8*3600000)))}"></div><div class="field"><label>Hasta</label><input id="nrCustomEnd" type="datetime-local" value="${escHTML(nrDateTimeInputValue(new Date()))}"></div></div>
       </div>
     </div>
@@ -28684,7 +28763,7 @@ function fqBuildText(pid,user,form){
     `Medicación habitual: ${a.habitualMedication}`,
     "",
     "DATOS DEL ACTO QUIRÚRGICO",
-    `Fecha: ${surgeryDate} • Inicio: ${form.startTime||"—"} • Fin: ${form.endTime||"—"}${duration?` • Duración: ${duration}`:""}`,
+    `Fecha: ${surgeryDate} • Inicio: ${window.HC313.time(form.startTime)||"—"} • Fin: ${window.HC313.time(form.endTime)||"—"}${duration?` • Duración: ${duration}`:""}`,
     `Carácter: ${form.urgency||"—"} • Especialidad: ${form.specialty||"—"} • Quirófano: ${form.operatingRoom||"—"}`,
     `Diagnóstico preoperatorio: ${form.preDx||"—"}`,
     `Diagnóstico postoperatorio: ${form.postDx||form.preDx||"—"}`,
@@ -28822,7 +28901,7 @@ function fqHistoryHTML(arr,isDoctor){
     const edited=Number(r.version||1)>1?` • Corregida v${Number(r.version||1)}: ${nrFormatDateTime(r.updatedAt)} por ${r.updatedByName||"—"}`:"";
     return `<div class="fqHistoryItem">
       <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap;">
-        <div><b>${escHTML(proc)}</b><div class="fqHistoryMeta">Cirugía: ${escHTML(r.form?.surgeryDate?dmyFromDateISO(r.form.surgeryDate):"—")} ${escHTML(r.form?.startTime||"")} • Guardada: ${escHTML(nrFormatDateTime(r.createdAt))} • ${escHTML(r.authorName||r.authorId||"—")}${escHTML(edited)}</div></div>
+        <div><b>${escHTML(proc)}</b><div class="fqHistoryMeta">Cirugía: ${escHTML(r.form?.surgeryDate?dmyFromDateISO(r.form.surgeryDate):"—")} ${escHTML(window.HC313.time(r.form?.startTime))} • Guardada: ${escHTML(nrFormatDateTime(r.createdAt))} • ${escHTML(r.authorName||r.authorId||"—")}${escHTML(edited)}</div></div>
         <div class="fqToolbar">
           ${isDoctor?`<button class="btn small" type="button" data-fq-edit="${escHTML(r.id||"")}">Editar</button>`:""}
           <button class="btn small" type="button" data-fq-print="${escHTML(r.id||"")}">Imprimir</button>
@@ -29038,7 +29117,7 @@ function monitorApplyData(card,data){
   if(!card||!data)return;const set=(q,v)=>{const e=card.querySelector(q);if(e&&v!==undefined&&v!==null&&v!=="")e.textContent=v;};
   set("[data-mon-hr]",Math.round(Number(data.hr)||0)||"—");set("[data-mon-spo2]",Math.round(Number(data.spo2)||0)||"—");set("[data-mon-rr]",Math.round(Number(data.rr)||0)||"—");
   const bp=data.nibp||data.bp||{};if(bp&&bp.sys)set("[data-mon-bp]",`${Math.round(bp.sys)}/${Math.round(bp.dia||0)}`);
-  const clock=card.querySelector("[data-mon-clock]");if(clock)clock.textContent=new Date().toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+  const clock=card.querySelector("[data-mon-clock]");if(clock)clock.textContent=window.HC313.time(new Date(),{seconds:true});
   if(Array.isArray(data.ecg)&&data.ecg.length){const key=card.dataset.monCard;let s=monitorRuntime.series.get(key)||[];s=s.concat(data.ecg.map(Number).filter(Number.isFinite)).slice(-420);monitorRuntime.series.set(key,s);monitorDrawSeries(card,s);}
 }
 function monitorStopBed(bedId){
@@ -29201,7 +29280,7 @@ function archSearch(){
   }
   box.innerHTML = out.map(x=>`
     <div style="border:1px solid rgba(255,255,255,.10); border-radius:12px; padding:10px; margin-top:8px;">
-      <div style="font-weight:900;">${escHTML(x.type||"")} • ${escHTML(x.date||"—")}</div>
+      <div style="font-weight:900;">${escHTML(x.type||"")} • ${escHTML(window.HC313.dateTime(x.date)||"—")}</div>
       <div class="muted" style="font-size:12px; margin-top:4px;">${escHTML(x.name||"—")} • DNI ${escHTML(x.dni||"—")} • Dx ${escHTML(x.dx||"—")}</div>
       <pre style="white-space:pre-wrap; font-size:12px; margin:8px 0 0;">${escHTML(x.epicText||"")}</pre>
     </div>
@@ -29558,7 +29637,7 @@ function renderAppointmentCard(a, mode="admin"){
     <div class="apptCard ${stCls}">
       <div class="apptTop">
         <div>
-          <div class="apptName">${escHTML(a.time || "—")} • ${escHTML(apptPatientName(a))}</div>
+          <div class="apptName">${escHTML(window.HC313.time(a.time)||"—")} • ${escHTML(apptPatientName(a))}</div>
           <div class="apptMeta">
             DNI: ${escHTML(a.dni || "—")} • Tel: ${escHTML(a.phone || "—")}<br>
             Médico: ${escHTML(a.doctorName || "—")} • ${appointmentConsultorio(a) ? `<span class="apptConsultorioTag">${escHTML(consultorioDisplay(appointmentConsultorio(a)))}</span> • ` : ``}Motivo: ${escHTML(a.reason || "—")}
@@ -29755,7 +29834,7 @@ function pickFreeAgendaSlot(doctorId, dateISO, time){
   if($("#apptTime")) $("#apptTime").value = time;
   if($("#apptListDate")) $("#apptListDate").value = dateISO;
   const room = refreshAppointmentConsultorioInput();
-  if($("#apptFormHint")) $("#apptFormHint").textContent = `Horario libre seleccionado: ${dmyFromDateISO(dateISO)} ${time}${room ? " • " + consultorioDisplay(room) : ""}. Completá los datos del paciente y guardá.`;
+  if($("#apptFormHint")) $("#apptFormHint").textContent = `Horario libre seleccionado: ${dmyFromDateISO(dateISO)} ${window.HC313.time(time)}${room ? " • " + consultorioDisplay(room) : ""}. Completá los datos del paciente y guardá.`;
   renderTurnosAdmin();
 }
 
@@ -29804,21 +29883,21 @@ function renderProfessionalAgenda(containerId, hintId, doctorId, startISO, mode)
           const a = slot.appt;
           const cls = agendaSlotState(a);
           if(!a && mode === "turnos"){
-            return `<button class="agendaSlot free" type="button" onclick="pickFreeAgendaSlot('${escHTML(id)}','${escHTML(slot.date)}','${escHTML(slot.time)}')"><span class="agendaSlotTime">${escHTML(slot.time)}</span><span class="agendaSlotPatient">Libre</span></button>`;
+            return `<button class="agendaSlot free" type="button" onclick="pickFreeAgendaSlot('${escHTML(id)}','${escHTML(slot.date)}','${escHTML(slot.time)}')"><span class="agendaSlotTime">${escHTML(window.HC313.time(slot.time))}</span><span class="agendaSlotPatient">Libre</span></button>`;
           }
           if(!a){
-            return `<div class="agendaSlot free"><span class="agendaSlotTime">${escHTML(slot.time)}</span><span class="agendaSlotPatient">Libre</span></div>`;
+            return `<div class="agendaSlot free"><span class="agendaSlotTime">${escHTML(window.HC313.time(slot.time))}</span><span class="agendaSlotPatient">Libre</span></div>`;
           }
           if(mode === "consultorios"){
             return `<div class="agendaSlot consultSlot ${cls}">
               <span class="agendaSlotMain" onclick="showConsultorioDayFromAgenda('${escHTML(slot.date)}')">
-                <span class="agendaSlotTime">${escHTML(slot.time)}${slot.outside ? " *" : ""}</span>
+                <span class="agendaSlotTime">${escHTML(window.HC313.time(slot.time))}${slot.outside ? " *" : ""}</span>
                 <span class="agendaSlotPatient">${escHTML(apptPatientName(a))}</span>
               </span>
               ${a.status === "turno" ? `<button class="agendaReceiveBtn" type="button" onclick="setAppointmentStatus('${escHTML(a.id)}','recepcionado')">Recepcionar</button>` : ``}
             </div>`;
           }
-          return `<button class="agendaSlot ${cls}" type="button" onclick="showTurnosDayFromAgenda('${escHTML(slot.date)}')"><span class="agendaSlotTime">${escHTML(slot.time)}${slot.outside ? " *" : ""}</span><span class="agendaSlotPatient">${escHTML(apptPatientName(a))}</span></button>`;
+          return `<button class="agendaSlot ${cls}" type="button" onclick="showTurnosDayFromAgenda('${escHTML(slot.date)}')"><span class="agendaSlotTime">${escHTML(window.HC313.time(slot.time))}${slot.outside ? " *" : ""}</span><span class="agendaSlotPatient">${escHTML(apptPatientName(a))}</span></button>`;
         }).join("")}
       </div>
     `;
@@ -29965,7 +30044,7 @@ function renderConsultoriosProfessionalAgenda(){
   hint.insertAdjacentHTML("beforeend", `
     <div class="scheduleNotice" style="border-color:rgba(80,160,255,.42); background:rgba(80,160,255,.10); margin:6px 0 10px;">
       Hay <b>${outside.length}</b> turno${outside.length === 1 ? "" : "s"} asignado${outside.length === 1 ? "" : "s"} fuera de la semana que estás viendo.
-      Próximo: <b>${escHTML(dmyFromDateISO(next.date))} ${escHTML(next.time || "")}</b> • ${escHTML(apptPatientName(next))}.
+      Próximo: <b>${escHTML(dmyFromDateISO(next.date))} ${escHTML(window.HC313.time(next.time))}</b> • ${escHTML(apptPatientName(next))}.
       <button class="btn small primary" type="button" style="margin-left:8px;"
         onclick="jumpConsultoriosToAppointment('${escHTML(doctorId)}','${escHTML(next.date)}')">Ver turno</button>
     </div>
@@ -30545,7 +30624,7 @@ function renderConsultorioHistoryHTML({doctorId="", admin=false}={}){
       <div class="consultHistoryBody">
         ${!rows.length ? `<div class="consultHistoryEmpty">Todavía no hay turnos anteriores o cerrados.</div>` : rows.map(a=>`
           <div class="consultHistoryRow">
-            <div><b>${escHTML(dmyFromDateISO(a.date || ""))}</b><br><span class="muted">${escHTML(a.time || "—")}</span></div>
+            <div><b>${escHTML(dmyFromDateISO(a.date || ""))}</b><br><span class="muted">${escHTML(window.HC313.time(a.time)||"—")}</span></div>
             <div><b>${escHTML(apptPatientName(a))}</b><br><span class="muted">DNI ${escHTML(a.dni || "—")}</span></div>
             <div><span class="apptStatus ${apptStatusClass(a.status || "turno")}">${escHTML(apptStatusText(a.status || "turno"))}</span></div>
             <div class="muted">${escHTML(a.doctorName || doctorLabelById(a.doctorId) || "—")}${a.attendedAt ? `<br>Atendido ${escHTML(dmyhmFromISODateTime(a.attendedAt))}` : ``}${a.noShowAt ? `<br>No concurrió ${escHTML(dmyhmFromISODateTime(a.noShowAt))}` : ``}</div>
@@ -30578,7 +30657,7 @@ function renderAmbulatoryConsultorioUI(appt){
           <button class="btn small" type="button" id="btnBackAmbAgenda">Volver a agenda / horarios</button>
         </div>
         <div class="t2">
-          Los membretes de institución y paciente se muestran arriba. Turno: ${escHTML(dmyFromDateISO(appt?.date || getConsultorioCensoDate()))} ${escHTML(appt?.time || "—")} ${appointmentConsultorio(appt) ? `• ${escHTML(consultorioDisplay(appointmentConsultorio(appt)))}` : ``} • Estado: ${escHTML(apptStatusText(appt?.status || "turno"))}
+          Los membretes de institución y paciente se muestran arriba. Turno: ${escHTML(dmyFromDateISO(appt?.date || getConsultorioCensoDate()))} ${escHTML(window.HC313.time(appt?.time)||"—")} ${appointmentConsultorio(appt) ? `• ${escHTML(consultorioDisplay(appointmentConsultorio(appt)))}` : ``} • Estado: ${escHTML(apptStatusText(appt?.status || "turno"))}
         </div>
       </div>
 
@@ -32777,7 +32856,7 @@ renderMedCenso=function(){
     div.title=`${triage.label}: ${triage.description}. Abrir historia clínica de Guardia Central`;
     const left=document.createElement("div");
     left.className="guardiaCensoLeft";
-    left.innerHTML=`<span>${escHTML(item.time||"—")} • Guardia</span>${guardiaTriageBadgeHTML(item,true)}`;
+    left.innerHTML=`<span>${escHTML(window.HC313.time(item.time)||"—")} • Guardia</span>${guardiaTriageBadgeHTML(item,true)}`;
     const right=document.createElement("div");
     right.className="consultorioPacienteNombre";
     right.innerHTML=`${escHTML(buildPatientDisplayName(p))}<span class="consultorioEstadoMini">${escHTML(guardiaStatusText(item.status))}</span>`;
@@ -32803,7 +32882,7 @@ renderMedCenso=function(){
     const decisionTime=String(item.decisionAt||item.finalizedAt||item.internationRequestedAt||"").slice(11,16);
     const left=document.createElement("div");
     left.className="guardiaCensoLeft";
-    left.innerHTML=`<span>${escHTML(decisionTime||item.time||"—")} • Visto</span>${guardiaSeenBadgeHTML(item)}`;
+    left.innerHTML=`<span>${escHTML(window.HC313.time(decisionTime||item.time)||"—")} • Visto</span>${guardiaSeenBadgeHTML(item)}`;
     const right=document.createElement("div");
     right.className="consultorioPacienteNombre";
     right.innerHTML=`${escHTML(buildPatientDisplayName(p))}<span class="consultorioEstadoMini">${escHTML(guardiaStatusText(item.status))}</span>`;
@@ -35089,7 +35168,7 @@ renderAppointmentCard=function(a,mode="admin"){
     <div class="apptCard ${stCls}">
       <div class="apptTop">
         <div>
-          <div class="apptName">${escHTML(a.time||"—")} • ${escHTML(apptPatientName(a))}</div>
+          <div class="apptName">${escHTML(window.HC313.time(a.time)||"—")} • ${escHTML(apptPatientName(a))}</div>
           <div class="apptMeta">
             DNI: ${escHTML(d.dni||"—")} • Tel: ${escHTML(d.phone||"—")}${birthSex?` • ${escHTML(birthSex)}`:""}<br>
             ${coverage?`Cobertura: ${escHTML(coverage)}<br>`:""}
@@ -38376,7 +38455,7 @@ renderMedCenso=function(){
     const p=findPatient(item.patientId);if(!p)return;
     const div=document.createElement("div");
     div.className="censoItem guardiaCensoItem";
-    div.innerHTML=`<div>${escHTML(item.time||"—")} • Guardia</div><div class="censoNurseBlink">${escHTML(buildPatientDisplayName(p)||"Paciente")}</div>`;
+    div.innerHTML=`<div>${escHTML(window.HC313.time(item.time)||"—")} • Guardia</div><div class="censoNurseBlink">${escHTML(buildPatientDisplayName(p)||"Paciente")}</div>`;
     div.title="Hay una prescripción de Guardia pendiente de ver/administrar";
     div.addEventListener("click",()=>{
       selectedPatientId=p.id;selectedGuardiaEpisodeId=item.id;medTab="prescripciones";
@@ -45714,7 +45793,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
   function renderAccounting(){
     const date=$("#hc229AccountingDate")?.value||localDate(),q=norm($("#hc229AccountingSearch")?.value||"");
     const rows=shiftRows().filter(x=>(!date||x.dateLocal===date)&&(!q||norm(`${x.name} ${x.user} ${x.role} ${(x.services||[]).join(" ")} ${shiftLabel(x.dutyType)}`).includes(q)));
-    $("#hc229AccountingBody").innerHTML=rows.length?rows.map(x=>`<tr><td><b>${esc(x.name||x.user||"—")}</b><div class="muted">@${esc(x.user||"")}</div></td><td>${esc(x.role||"—")}</td><td>${esc((x.services||[]).join(", ")||"—")}</td><td>${esc(shiftLabel(x.dutyType))}</td><td>${esc((x.startDate||x.dateLocal||"—")+" "+(x.startTime||"—"))}</td><td>${esc((x.endDate||x.dateLocal||"—")+" "+(x.endTime||"—"))}${x.crossesMidnight?" <span class=\"hc229ShiftBadge\">otro día</span>":""}</td><td>${esc(typeof dmyhmFromISODateTime==="function"?dmyhmFromISODateTime(x.lastModifiedAt||x.ts):(x.lastModifiedAt||x.ts||"—"))}${Array.isArray(x.history)&&x.history.length?`<div class="muted">${x.history.length} modificación/es previas</div>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">Sin jornadas registradas para este filtro.</td></tr>`;
+    $("#hc229AccountingBody").innerHTML=rows.length?rows.map(x=>`<tr><td><b>${esc(x.name||x.user||"—")}</b><div class="muted">@${esc(x.user||"")}</div></td><td>${esc(x.role||"—")}</td><td>${esc((x.services||[]).join(", ")||"—")}</td><td>${esc(shiftLabel(x.dutyType))}</td><td>${esc((window.HC313.date(x.startDate||x.dateLocal)||"—")+" "+(window.HC313.time(x.startTime)||"—"))}</td><td>${esc((window.HC313.date(x.endDate||x.dateLocal)||"—")+" "+(window.HC313.time(x.endTime)||"—"))}${x.crossesMidnight?" <span class=\"hc229ShiftBadge\">otro día</span>":""}</td><td>${esc(typeof dmyhmFromISODateTime==="function"?dmyhmFromISODateTime(x.lastModifiedAt||x.ts):(x.lastModifiedAt||x.ts||"—"))}${Array.isArray(x.history)&&x.history.length?`<div class="muted">${x.history.length} modificación/es previas</div>`:""}</td></tr>`).join(""):`<tr><td colspan="7" class="muted">Sin jornadas registradas para este filtro.</td></tr>`;
   }
   function openAccounting(){if(!session||!["admin","administrativo","contabilidad"].includes(String(session.role||"")))return;$("#hc229AccountingDate").value=localDate();$("#hc229AccountingSearch").value="";renderAccounting();const m=$("#hc229AccountingModal");m.classList.add("show");m.setAttribute("aria-hidden","false");document.body.style.overflow="hidden";}
   function closeAccounting(){const m=$("#hc229AccountingModal");m.classList.remove("show");m.setAttribute("aria-hidden","true");document.body.style.overflow="";}
@@ -45724,7 +45803,7 @@ body.hcMobile #hcMobileCensoBtn{background:var(--hc-theme-surface-2) !important;
     const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`hospitalito_jornadas_${date||localDate()}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
   function refreshAccountShiftCard(){
-    const page=$("#hcSettingsContent .hcSettingsPage"),anchor=$("#hcsProfileName");if(!page||!anchor)return;let card=$("#hc229WorkAccountCard");if(card)card.remove();const x=todayShift();card=document.createElement("div");card.id="hc229WorkAccountCard";card.className="hcSettingsCard hc229WorkAccountCard";card.innerHTML=`<div class="hcSettingsCardTitle">Jornada de hoy</div><div class="hcSettingsCardSub">Registro laboral sincronizado para tu cuenta e institución.</div>${x?`<div><b>${esc((x.services||[]).join(", "))}</b></div><div class="hcSettingsMuted" style="margin-top:5px;">${esc(shiftLabel(x.dutyType))} · ${esc(x.startDate||x.dateLocal||"—")} ${esc(x.startTime||"—")} → ${esc(x.endDate||x.dateLocal||"—")} ${esc(x.endTime||"—")}</div>`:`<div class="hcSettingsMuted">Todavía no registraste tu jornada de hoy.</div>`}<div class="hcSettingsActions"><button class="hcSettingsBtn primary" type="button" id="hc229AccountEditShift">${x?"Modificar jornada":"Registrar jornada"}</button></div>`;
+    const page=$("#hcSettingsContent .hcSettingsPage"),anchor=$("#hcsProfileName");if(!page||!anchor)return;let card=$("#hc229WorkAccountCard");if(card)card.remove();const x=todayShift();card=document.createElement("div");card.id="hc229WorkAccountCard";card.className="hcSettingsCard hc229WorkAccountCard";card.innerHTML=`<div class="hcSettingsCardTitle">Jornada de hoy</div><div class="hcSettingsCardSub">Registro laboral sincronizado para tu cuenta e institución.</div>${x?`<div><b>${esc((x.services||[]).join(", "))}</b></div><div class="hcSettingsMuted" style="margin-top:5px;">${esc(shiftLabel(x.dutyType))} · ${esc(window.HC313.date(x.startDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.startTime)||"—")} → ${esc(window.HC313.date(x.endDate||x.dateLocal)||"—")} ${esc(window.HC313.time(x.endTime)||"—")}</div>`:`<div class="hcSettingsMuted">Todavía no registraste tu jornada de hoy.</div>`}<div class="hcSettingsActions"><button class="hcSettingsBtn primary" type="button" id="hc229AccountEditShift">${x?"Modificar jornada":"Registrar jornada"}</button></div>`;
     const grid=page.querySelector(".hcSettingsGrid");(grid||page).appendChild(card);
   }
 
@@ -46270,7 +46349,7 @@ body.hcObserver::before{content:"OBSERVADOR · SOLO LECTURA";position:fixed;righ
   async function refreshContacts(forceRender=false){if(!session||session.role==='superadmin'||contactsBusy||!token())return;contactsBusy=true;try{const j=await req('listContacts',{token:token(),institutionId:inst()}),next=Array.isArray(j.contacts)?j.contacts:[];const changed=!sameDirectory(directory,next);directory=next;if(changed&&forceRender&&$('#hcSettingsContent')?.querySelector('#hcsMemberList')&&!chatRefreshGuard){chatRefreshGuard=true;setTimeout(()=>{$('[data-hcs-section="members"]')?.click();chatRefreshGuard=false;},20);}}catch(e){console.warn('v231 contactos',e)}finally{contactsBusy=false}}
   async function refreshConversation(other,forceRender=false){if(!other||!token())return;try{const j=await req('getMessages',{token:token(),institutionId:inst(),withUsername:other}),next=Array.isArray(j.messages)?j.messages:[],prev=conversations.get(other)||[];if(JSON.stringify(prev)!==JSON.stringify(next)){conversations.set(other,next);if(forceRender&&$('#hcsChatMsgs')&&!chatRefreshGuard){chatRefreshGuard=true;setTimeout(()=>{$('[data-hcs-section="members"]')?.click();chatRefreshGuard=false;},20);}}}catch(e){console.warn('v231 mensajes',e)}}
   window.hc231SendDirectMessage=async(other,text,file)=>{let attachment=null;if(file){if(file.size>120*1024)throw Error('Para mensajería directa la imagen debe pesar menos de 120 KB.');attachment={type:'image',dataUrl:await readFileAsDataURL(file)};}await req('sendMessage',{token:token(),institutionId:inst(),to:other,body:text,attachment});await refreshConversation(other,false);await refreshNotifications(true);};
-  function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):new Date(v).toLocaleString('es-AR')}catch{return String(v||'')}}
+  function formatTime(v){try{return typeof dmyhmFromISODateTime==='function'?dmyhmFromISODateTime(v):window.HC313.dateTime(new Date(v))}catch{return String(v||'')}}
   function renderNotificationsList(){const box=$('#hc231NotificationsList');if(!box)return;const all=[...localNotifs,...notifications].sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')));box.innerHTML=all.length?all.map(n=>`<div class="hc231Notification ${n.read_at?'':'unread'}"><div class="hc231NotificationTop"><span>${n.kind==='message'?'✉':n.kind==='contact'?'👤':n.kind==='sync'?'↻':'●'}</span><div class="hc231NotificationTitle">${esc(n.title||'Notificación')}</div><div class="hc231NotificationTime">${esc(formatTime(n.created_at))}</div></div><div class="hc231NotificationBody">${esc(n.body||'')}</div></div>`).join(''):'<div class="muted">No hay notificaciones.</div>'; }
   function updateBadge(){const n=notifications.filter(x=>!x.read_at).length+localNotifs.filter(x=>!x.read_at).length,b=$('#hc231NotifyBadge');if(!b)return;b.textContent=n>99?'99+':String(n);b.style.display=n?'inline-flex':'none';const version=window.HC_DEMO_VERSION||'v258';if(lastUnread>=0&&n>lastUnread){try{document.title=`(${n}) HC Demo ${version} · Supabase`;}catch(_){}}else if(!n)document.title=`HC Demo ${version} · Supabase`;lastUnread=n;}
   async function refreshNotifications(render=false){if(!session||notifyBusy||!token())return;notifyBusy=true;try{const j=await req('getNotifications',{token:token(),institutionId:inst(),limit:60});notifications=Array.isArray(j.notifications)?j.notifications:[];updateBadge();if(render)renderNotificationsList();}catch(e){console.warn('v231 notificaciones',e)}finally{notifyBusy=false}}
@@ -46499,7 +46578,7 @@ window.hc231SendDirectMessage=async(other,text,file)=>{if(String(other)==='admin
 function augmentMembersV232(){const list=$('#hcsMemberList');if(!list||$('#hc232MembersTools'))return;const card=document.createElement('div');card.id='hc232MembersTools';card.className='hcSettingsCard hc232GlobalCard';card.innerHTML=`<div class="hcSettingsCardTitle">Colaboración institucional</div><div class="hcSettingsCardSub">Chat global, conversaciones y llamadas sin salir de la historia clínica.</div><div class="hc232MembersTools"><button class="hcSettingsBtn primary" id="hc232OpenGlobal" type="button">Chat global</button><button class="hcSettingsBtn" id="hc232OpenCalls" type="button">Iniciar / ver llamada</button></div>`;list.parentElement?.insertBefore(card,list);if(session?.localSeed)$('#hc231ContactAdder')?.remove();}
 
 /* Chat global y chat flotante directo */
-function fmtTime(v){try{return new Date(v).toLocaleString('es-AR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}catch{return String(v||'')}}
+function fmtTime(v){try{return window.HC313.dateTime(new Date(v))}catch{return String(v||'')}}
 function renderFloatMessages(rows,mode,peerName=''){const box=$('#hc232ChatMsgs');if(!box)return;const me=session?.username||'';box.innerHTML=(rows||[]).map(m=>{const from=mode==='global'?String(m.sender||''):String(m.from||m.sender||m.sender_username||''),mine=from===me||(session?.localSeed&&from==='admin'),name=mode==='global'?String(m.sender_name||from):(mine?'Vos':peerName||from);return `<div class="hc232Msg ${mine?'me':''}"><div>${esc(m.body??m.text??'')}</div><div class="hc232MsgMeta">${esc(name)} · ${esc(fmtTime(m.created_at||m.ts))}</div></div>`}).join('')||'<div class="muted">Todavía no hay mensajes.</div>';box.parentElement.scrollTop=box.parentElement.scrollHeight;}
 async function refreshGlobalChat(){if(globalBusy||!token()||!inst())return;globalBusy=true;try{const j=await collabReq('globalMessages');globalMsgs=Array.isArray(j.messages)?j.messages:[];if(floatMode.type==='global'&&$('#hc232GlobalChatWindow')?.classList.contains('show'))renderFloatMessages(globalMsgs,'global');}catch(e){console.warn('v232 global chat',e)}finally{globalBusy=false}}
 function chatSelector(){let e=$('#hc283ChatTarget');if(!e){e=document.createElement('select');e.id='hc283ChatTarget';e.setAttribute('aria-label','Conversación');$('#hc232ChatMsgs')?.parentElement?.before(e);e.onchange=()=>openFloatChat(e.value?'direct':'global',e.value)}const peers=mergedDirectory().filter(u=>String(u.username)!==String(session?.username));e.innerHTML='<option value="">General · institución</option>'+peers.map(u=>`<option value="${esc(u.username)}">Privado · ${esc(u.name||u.username)} (${esc(u.role)})</option>`).join('');e.value=floatMode.type==='direct'?floatMode.peer:'';}
@@ -47237,7 +47316,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 312;
+  const CURRENT_VERSION = 313;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -47597,10 +47676,7 @@ function hc270Empty(v){return v==null||v===""||(Array.isArray(v)?!v.length:typeo
 function hc270Deleted(v){return !!(v?.deleted||v?.deletedAt||v?.status==="deleted");}
 function hc270Name(p){return String(p?.name||[p?.lastName,p?.firstNames||p?.firstName].filter(Boolean).join(", ")||"Paciente sin nombre");}
 function hc270Date(v){
-  const s=String(v||""),m=s.match(/^(\d{4})-(\d{2})-(\d{2})(?:T| )(\d{2}):(\d{2})/);
-  if(/(?:Z|[+-]\d{2}:?\d{2})$/.test(s)&&Number.isFinite(hc270Time(s)))return new Date(s).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-  if(m)return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}`;
-  const d=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);return d?`${d[3]}/${d[2]}/${d[1]}`:s||"Fecha no registrada";
+  return window.HC313.dateTime(v,{timeZone:window.HC313.argentina})||String(v||"Fecha no registrada");
 }
 function hc270Time(v){const n=Date.parse(v||"");return Number.isFinite(n)?n:NaN;}
 function hc270RecordDate(r){return r?.dateTime||r?.reportedAt||r?.requestedAt||r?.startedAt||r?.startAt||r?.procedureAt||r?.createdAt||r?.savedAt||r?.lastSavedAt||r?.date||r?.updatedAt||"";}
@@ -47867,7 +47943,9 @@ function hc270ValueHTML(value){
   entries.sort(([a],[b])=>Number(['fullText','prettyText','evolucion','resultText','report','text'].includes(b))-Number(['fullText','prettyText','evolucion','resultText','report','text'].includes(a)));
   for(const [key,item] of entries){
     const label=hc270Label(key);
-    html+=typeof item==="object"?hc270Deferred(item,`${label}${Array.isArray(item)?` (${item.length})`:""}`):`<div class="hc270Field"><b>${hc270Esc(label)}</b>${hc270ValueHTML(item)}</div>`;
+    const dated=typeof item==='string'&&/^(?:date|time|dob|at|ts|fecha|hora|[a-zA-Z]+(?:Date|Time|At)|[a-z_]+_(?:date|time|at))$/.test(key);
+    const value=dated?window.HC313.dateTime(item,{timeZone:window.HC313.argentina})||item:item;
+    html+=typeof item==="object"?hc270Deferred(item,`${label}${Array.isArray(item)?` (${item.length})`:""}`):`<div class="hc270Field"><b>${hc270Esc(label)}</b>${hc270ValueHTML(value)}</div>`;
   }
   return html||'<div class="muted">Sin otros datos registrados.</div>';
 }
@@ -48975,7 +49053,7 @@ loadJSON=function(key,fallback){const bucket=keys().get(key),v=bucket?copies.get
 const saveBase=hcSafeSetJSON;
 hcSafeSetJSON=function(key,value){const bucket=keys().get(key);if(!bucket||!session||!scope())return saveBase.apply(this,arguments);const before=loadJSON(key,null);if(JSON.stringify(before)===JSON.stringify(value))return true;hc281StoreBulk(bucket,value,{pending:true});window.hc281MarkBulkDirty?.(bucket);return true;};window.hcSafeSetJSON=hcSafeSetJSON;
 window.addEventListener('beforeunload',e=>{if(pendingDisk||failedDisk){e.preventDefault();e.returnValue='';}});
-window.hc281SyncDetails=function(){document.querySelector('#hc281SyncDetail')?.remove();const root=document.createElement('div');root.id='hc281SyncDetail';const state=window.hc281SyncState?.()||{};root.innerHTML='<h3>Conexión entre equipos</h3><p>Una indicación está enviada cuando el servidor confirma su recepción. Que esté visible en esta computadora sólo confirma el guardado local.</p><pre></pre><button class="btn">Cerrar</button>';root.querySelector('pre').textContent='Último envío de este equipo confirmado: '+(state.ultimaConfirmacionClinica?new Date(state.ultimaConfirmacionClinica).toLocaleTimeString():'todavía no hubo un envío confirmado')+'\nPacientes con cambios pendientes: '+Object.keys(state.pacientesConCambiosPendientes||{}).length+'\nÚltimo viaje al servidor: '+(state.ultimoViajeServidorMs?(state.ultimoViajeServidorMs/1000).toFixed(1)+' segundos':'sin medición')+'\n'+(state.ultimoError?'Motivo del envío pendiente: '+state.ultimoError:'La conexión clínica no registra errores.')+'\n'+(state.errorCatalogo?'Catálogo en segundo plano: '+state.errorCatalogo:'');root.querySelector('button').onclick=()=>root.remove();document.body.appendChild(root);};
+window.hc281SyncDetails=function(){document.querySelector('#hc281SyncDetail')?.remove();const root=document.createElement('div');root.id='hc281SyncDetail';const state=window.hc281SyncState?.()||{};root.innerHTML='<h3>Conexión entre equipos</h3><p>Una indicación está enviada cuando el servidor confirma su recepción. Que esté visible en esta computadora sólo confirma el guardado local.</p><pre></pre><button class="btn">Cerrar</button>';root.querySelector('pre').textContent='Último envío de este equipo confirmado: '+(state.ultimaConfirmacionClinica?window.HC313.time(new Date(state.ultimaConfirmacionClinica)):'todavía no hubo un envío confirmado')+'\nPacientes con cambios pendientes: '+Object.keys(state.pacientesConCambiosPendientes||{}).length+'\nÚltimo viaje al servidor: '+(state.ultimoViajeServidorMs?(state.ultimoViajeServidorMs/1000).toFixed(1)+' segundos':'sin medición')+'\n'+(state.ultimoError?'Motivo del envío pendiente: '+state.ultimoError:'La conexión clínica no registra errores.')+'\n'+(state.errorCatalogo?'Catálogo en segundo plano: '+state.errorCatalogo:'');root.querySelector('button').onclick=()=>root.remove();document.body.appendChild(root);};
 function statusButton(){const target=document.querySelector('#backendStatus');if(target&&!target.dataset.hc281){target.dataset.hc281='1';target.style.cursor='pointer';target.title='Ver conexión y envíos pendientes';target.onclick=window.hc281SyncDetails;}}
 new MutationObserver(statusButton).observe(document.body,{subtree:true,childList:true});statusButton();
 })();
@@ -49155,7 +49233,7 @@ const q=s=>document.querySelector(s),esc=v=>escHTML(String(v??'')),BASE='https:/
 const inst=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminInstitutionId):localStorage.getItem(LS.globalAuthCurrentInstitution))||session?.institutionId||''),token=()=>String((session?.localSeed?localStorage.getItem(LS.seedAdminToken):localStorage.getItem(LS.globalAuthToken))||session?.globalToken||''),scope=()=>`${session?.username}|${inst()}`;
 async function request(action,p={}){if(window.hc280Locked)throw Error('Confirmá tu identidad para continuar.');const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),30000);try{const r=await fetch(BASE+'hospitalito-finance?forceFunctionRegion=eu-central-1',{method:'POST',headers:{'content-type':'application/json',apikey:KEY},body:JSON.stringify({action,token:token(),institutionId:inst(),...p}),cache:'no-store',signal:ctl.signal}),j=await r.json();if(!r.ok||!j.ok)throw Error(j.error||'No se pudo guardar.');return j}finally{clearTimeout(timer)}}
 window.hc284FinanceRequest=request;
-const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(Number(n||0)/100),date=x=>x?new Date(x).toLocaleDateString('es-AR'):'—',today=()=>isoNowLocalFull().slice(0,10),amount=x=>Math.round(Number(x)*100);
+const money=n=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(Number(n||0)/100),date=x=>window.HC313.date(x,{timeZone:window.HC313.argentina})||'—',today=()=>isoNowLocalFull().slice(0,10),amount=x=>Math.round(Number(x)*100);
 const field=(label,id,value='',type='text')=>`<label>${esc(label)}<input id="${id}" type="${type}" value="${esc(value)}" ${type==='number'?'min="0" step="0.01"':''}></label>`,checkbox=(label,id,value)=>`<label class="hc284Check"><input id="${id}" type="checkbox" ${value?'checked':''}>${esc(label)}</label>`;
 function modal(id,title,body){q('#'+id)?.remove();const e=document.createElement('div');e.id=id;e.className='hc284Overlay';e.dataset.hc284Scope=scope();e.setAttribute('role','dialog');e.setAttribute('aria-modal','true');e.setAttribute('aria-label',title);e.innerHTML=`<div class="hc284Card"><div class="hc284Actions" style="justify-content:space-between"><h2>${esc(title)}</h2><button type="button" class="btn" data-hc284-close>Cerrar</button></div>${body}<p class="hc284Status" role="status" data-hc284-status></p></div>`;document.body.appendChild(e);e.querySelector('[data-hc284-close]').onclick=()=>e.remove();return e}
 function error(root,e){root.querySelector('[data-hc284-status]').textContent=e.name==='AbortError'?'El servidor no respondió a tiempo. Tus datos siguen en el formulario.':String(e.message||e)}
@@ -49365,7 +49443,7 @@ body.hc286ArchiveOpen #medPanel>.medModuleTabs,body.hc286ArchiveOpen #medPanel>#
     const query=normalize(specialty);
     return [...tools.values()].filter(tool=>!query||query==='todas las especialidades'||tool.specialties.some(s=>normalize(s)===query));
   }
-  function formatDate(iso){const [year,month,day]=iso.split('-');return day+'/'+month+'/'+year;}
+  function formatDate(iso){return window.HC313.date(iso);}
   register({id:'obstetric-due-date',title:'Gestograma: fecha probable de parto',kind:'calculator',version:'1',specialties:['Ginecología y Obstetricia','Ginecología','Obstetricia'],
     description:'Estimación por fecha de última menstruación (FUM) y duración de un ciclo regular.',
     source:{title:'Merck Manual: evaluación obstétrica',url:'https://www.merckmanuals.com/professional/gynecology-and-obstetrics/approach-to-the-pregnant-woman-and-prenatal-care/evaluation-of-the-obstetric-patient'},
@@ -49706,14 +49784,43 @@ body.hc289Client>header,body.hc289Client>#login,body.hc289Client>#loginView,body
 window.HC_DEMO_VERSION='v305';document.title='Hospitalito · Historia Clínica Digital · HC Demo v305 · Supabase';
 const q=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icon=(name)=>'<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+({user:'<circle cx="12" cy="7" r="4"/><path d="M4 21v-2a8 8 0 0116 0v2"/>',left:'<path d="m15 6-6 6 6 6"/>',right:'<path d="m9 6 6 6-6 6"/>',save:'<path d="M4 3h14l3 3v15H3V3zM7 3v6h10V3M7 21v-8h10v8"/>',print:'<path d="M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z"/>',edit:'<path d="M4 20l1-6L17 2l5 5L10 19zM14 5l5 5"/>',plus:'<path d="M12 4v16M4 12h16"/>',close:'<path d="M5 5l14 14M19 5L5 19"/>',search:'<circle cx="10" cy="10" r="7"/><path d="M15 15l7 7"/>',video:'<rect x="2" y="5" width="14" height="14" rx="2"/><path d="M16 10l6-4v12l-6-4"/>',send:'<path d="M2 3l20 9-20 9 4-9zM6 12h16"/>',refresh:'<path d="M20 7A9 9 0 104 19M20 2v6h-6"/>'}[name]||'<path d="M5 12h14"/>')+'</svg>';
-const U=()=>window.hc289ClientSession?.user||(typeof getCurrentUser==='function'?getCurrentUser():{})||{},name=()=>U().username||session?.username||'local';
+const U=()=>{
+ const client=window.hc289ClientSession?.user;if(client)return client;
+ const current=getCurrentUser?.(),saved=loadJSON(LS.globalAuthUser,{})||{};
+ if(current?.username)return saved.username===current.username?{...saved,...current}:current;
+ return q('#hc297Workspace')?saved:{};
+},name=()=>U().username||session?.username||'local';
+window.hc313Viewer=()=>window.hc289ClientSession?.user.username||session?.username||q('#hc297Workspace')?.dataset.hc313Viewer||'local';
 const legacyMap={'blue-dark':['blue','dark'],light:['default','light'],dark:['default','dark'],red:['red','dark'],pink:['pink','light'],lime:['green','dark'],sky:['blue','light'],violet:['violet','dark']};
 const colors={default:['Predeterminado',210],blue:['Azul',214],red:['Rojo',4],green:['Verde',145],violet:['Violeta',269],gray:['Gris',215],orange:['Naranja',30],pink:['Rosado',330]},fonts={default:'Actual',system:'Sistema',arial:'Arial',georgia:'Georgia',verdana:'Verdana'};
 function visual(){let v;try{v=JSON.parse(localStorage.getItem('hc289.visual.'+name()))}catch{}const u=U(),mapped=legacyMap[u.uiTheme||u.preferences?.theme||'blue-dark']||legacyMap['blue-dark'];return{color:mapped[0],mode:mapped[1],font:'default',...(u.preferences?.visual||{}),...v};}
 function palette(v){const h=colors[v.color]?.[1]||210,s=v.color==='gray'?7:v.color==='default'?20:44,dark=v.mode==='dark';return{bg:`hsl(${h} ${s}% ${dark?8:97}%)`,surface:`hsl(${h} ${s}% ${dark?13:100}%)`,surface2:`hsl(${h} ${s}% ${dark?19:93}%)`,text:dark?'#f3f6fa':'#15212c',muted:dark?'#c3cfdb':'#465564',line:dark?'#607184':'#8b9aab',accent:`hsl(${h} ${v.color==='gray'?10:65}% ${dark?63:32}%)`,soft:`hsl(${h} ${s}% ${dark?23:88}%)`};}
-function apply(){const v=visual(),p=palette(v);document.body.classList.add('hc289Visual');document.body.dataset.hc289Mode=v.mode;const root=document.documentElement;for(const [k,value]of Object.entries(p))root.style.setProperty('--hc-theme-'+({'surface2':'surface-2',soft:'accent-soft'}[k]||k),value);root.style.setProperty('--hc-theme-topbar',p.surface);root.style.setProperty('--hc-theme-topbar-text',p.text);root.style.setProperty('--hc289-font',({default:'',system:'system-ui, -apple-system, "Segoe UI", sans-serif',arial:'Arial, sans-serif',georgia:'Georgia, serif',verdana:'Verdana, sans-serif'})[v.font]||'');document.body.classList.toggle('hc289Font',v.font!=='default');const legacy=v.mode==='light'?'light':v.color==='blue'?'blue-dark':'dark';document.body.dataset.hcTheme=legacy;root.dataset.hcTheme=legacy;for(const key of ['bg','surface','surface-2','text','muted','line','accent','accent-soft','topbar','topbar-text'])document.body.style.setProperty('--hc-theme-'+key,root.style.getPropertyValue('--hc-theme-'+key),'important');for(const [k,val]of Object.entries({bg2:p.surface,input:p.bg,patient:p.soft,'accent-2':p.accent}))document.body.style.setProperty('--hc-theme-'+k,val,'important');}
-async function saveVisual(patch){const v={...visual(),...patch};localStorage.setItem('hc289.visual.'+name(),JSON.stringify(v));apply();window.hc289PersonalizeRefresh?.();const user=U(),preferences={...(user.preferences||{}),visual:v};try{const token=window.hc289ClientSession?.token||localStorage.getItem(LS.globalAuthToken);if(token){const j=await window.hc230AuthRequest('updateProfile',{token,user:{preferences}});if(window.hc289ClientSession){window.hc289ClientSession.user={...user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));}else{const old=loadJSON(LS.globalAuthUser,{});saveJSON(LS.globalAuthUser,{...old,...j.user});}}}catch(e){window.hc289Toast('Preferencia guardada en este equipo. No se pudo sincronizar: '+e.message);}}
-function personalization(){const v=visual();return '<div class="hcSettingsPage"><h2>Personalización</h2><p>Color, iluminación y tipografía para tu cuenta.</p><h3>Color</h3><div class="hc289Swatches">'+Object.entries(colors).map(([id,[label,h]])=>'<button type="button" data-vcolor="'+id+'" aria-pressed="'+(id===v.color)+'"><i style="background:hsl('+h+' 55% 45%)"></i>'+label+'</button>').join('')+'</div><h3>Iluminación</h3><div class="hc289Swatches">'+['light','dark'].map(id=>'<button type="button" data-vmode="'+id+'" aria-pressed="'+(id===v.mode)+'">'+(id==='light'?'☀ Claro':'☾ Oscuro')+'</button>').join('')+'</div>'+window.HC311.fontPicker(fonts,v.font)+'<p>Vista previa: Historia clínica, turnos y resultados. Los colores de alerta clínica se conservan.</p></div>';}
+function apply(){const v=visual(),p=palette(v);window.HC313.setPreferences(v);document.body.classList.add('hc289Visual');document.body.dataset.hc289Mode=v.mode;const root=document.documentElement;for(const [k,value]of Object.entries(p))root.style.setProperty('--hc-theme-'+({'surface2':'surface-2',soft:'accent-soft'}[k]||k),value);root.style.setProperty('--hc-theme-topbar',p.surface);root.style.setProperty('--hc-theme-topbar-text',p.text);root.style.setProperty('--hc289-font',({default:'',system:'system-ui, -apple-system, "Segoe UI", sans-serif',arial:'Arial, sans-serif',georgia:'Georgia, serif',verdana:'Verdana, sans-serif'})[v.font]||'');document.body.classList.toggle('hc289Font',v.font!=='default');const legacy=v.mode==='light'?'light':v.color==='blue'?'blue-dark':'dark';document.body.dataset.hcTheme=legacy;root.dataset.hcTheme=legacy;for(const key of ['bg','surface','surface-2','text','muted','line','accent','accent-soft','topbar','topbar-text'])document.body.style.setProperty('--hc-theme-'+key,root.style.getPropertyValue('--hc-theme-'+key),'important');for(const [k,val]of Object.entries({bg2:p.surface,input:p.bg,patient:p.soft,'accent-2':p.accent}))document.body.style.setProperty('--hc-theme-'+k,val,'important');}
+let visualSync=Promise.resolve();
+async function saveVisual(patch){
+ const user=U(),v={...visual(),...patch},owner=user.username;
+ localStorage.setItem('hc289.visual.'+name(),JSON.stringify(v));
+ apply();window.hc289PersonalizeRefresh?.();
+ const activeToken=()=>window.hc289ClientSession?.token||(!session?.localSeed&&localStorage.getItem(LS.globalAuthToken));
+ const token=activeToken();
+ if(!token)return;
+ const prefs={...(user.preferences||{}),visual:v};
+ visualSync=visualSync.then(async()=>{
+  if(activeToken()!==token)return;
+  try{
+   const j=await window.hc230AuthRequest('updateProfile',{token,user:{preferences:prefs}});
+   if(activeToken()!==token)return;
+   const client=window.hc289ClientSession;
+   if(client){client.user={...client.user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(client));}
+   else {
+    const old=loadJSON(LS.globalAuthUser,{});
+    if(old?.username===owner)saveJSON(LS.globalAuthUser,{...old,...j.user});
+   }
+  }catch(e){if(activeToken()===token)window.hc289Toast('Preferencia guardada en este equipo. No se pudo sincronizar.');}
+ });
+ await visualSync;
+}
+function personalization(){const v=visual();window.HC313.setPreferences(v);return '<div class="hcSettingsPage"><h2>Personalización</h2><p>Color, iluminación y tipografía para tu cuenta.</p><h3>Color</h3><div class="hc289Swatches">'+Object.entries(colors).map(([id,[label,h]])=>'<button type="button" data-vcolor="'+id+'" aria-pressed="'+(id===v.color)+'"><i style="background:hsl('+h+' 55% 45%)"></i>'+label+'</button>').join('')+'</div><h3>Iluminación</h3><div class="hc289Swatches">'+['light','dark'].map(id=>'<button type="button" data-vmode="'+id+'" aria-pressed="'+(id===v.mode)+'">'+(id==='light'?'☀ Claro':'☾ Oscuro')+'</button>').join('')+'</div>'+window.HC311.fontPicker(fonts,v.font)+window.HC313.settingsMarkup()+'<p>Vista previa: Historia clínica, turnos y resultados. Los colores de alerta clínica se conservan.</p></div>';}
 window.hc289PersonalizeRefresh=()=>{
  const panel=q('#hc289Dialog .hc311Font')?.closest('.hcSettingsPage');
  if(panel)panel.outerHTML=personalization();
@@ -49798,7 +49905,18 @@ document.addEventListener('click',e=>{const account=e.target.closest('#btnAccoun
   else if(window.hc289ClientSession)window.hc289ClientAccount('account');
   else window.hcSettingsOpen('account');
  }else openMenu(account);return;}const color=e.target.closest('[data-vcolor]'),mode=e.target.closest('[data-vmode]');if(color)saveVisual({color:color.dataset.vcolor});if(mode)saveVisual({mode:mode.dataset.vmode});if(e.target.closest('[data-hc289-secure]'))proxy('hc280SecurityButton');},true);
-document.addEventListener('change',e=>{if(e.target.matches('[data-vfont]')){
+document.addEventListener('change',e=>{
+ const format=e.target.dataset?.hc313Format;
+ if(format){
+   const options={dateFormat:['dmy','iso'],timeFormat:['24h','12h']};
+   if(options[format]?.includes(e.target.value)){
+     const panel=e.target.closest('.hcSettingsPage').parentElement;
+     saveVisual({[format]:e.target.value});
+     document.dispatchEvent(new Event('hc313FormatChanged'));document.querySelector('#hc297Workspace')?.dispatchEvent(new Event('hc313FormatChanged'));
+     panel.querySelector('[data-hc313-format='+format+']')?.focus();
+   }
+ }
+ if(e.target.matches('[data-vfont]')){
  const wrapper=e.target.closest('.hc311Font').parentElement.parentElement;
  saveVisual({font:e.target.value});wrapper?.querySelector('.hc311Font summary')?.focus();
 }});
@@ -50154,7 +50272,7 @@ async function signup(){
 function installSignup(){const pass=document.querySelector('#loginPass,#loginPassword,input[autocomplete="current-password"]');let host=pass?.closest('form,.loginCard,.card')||pass?.parentElement?.parentElement;if(!host||q('#hc289RegisterLink'))return;const b=document.createElement('button');b.id='hc289RegisterLink';b.type='button';b.textContent='Crear cuenta de paciente';b.style.cssText='display:block;margin:18px auto 0';b.onclick=signup;host.append(b);}setTimeout(installSignup,500);setInterval(()=>{if(!window.hc289ClientSession)installSignup();},5000);
 function monthKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}const dateKey=d=>monthKey(d)+'-'+String(d.getDate()).padStart(2,'0');
 const localDate=iso=>{const d=new Date(iso);if(!Number.isFinite(d.getTime()))return '';const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d),get=t=>parts.find(p=>p.type===t)?.value;return get('year')+'-'+get('month')+'-'+get('day');};
-const format=iso=>new Date(iso).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',dateStyle:'short',timeStyle:'short'});
+const format=iso=>window.HC313.dateTime(iso,{timeZone:window.HC313.argentina});
 const statusLabel=s=>({pending:'Pendiente de confirmación',awaiting_payment:'Pago de reserva pendiente',confirmed:'Confirmado',active:'En atención',finished:'Atendido',cancelled:'Cancelado',expired:'Reserva vencida',payment_review:'Pago en revisión',attended:'Atendido',requested:'Solicitado',draft:'En preparación',published:'Publicado'}[s]||s);
 function allBookings(){const ordinary=data.bookings||[],known=new Set(ordinary.map(b=>String(b.tele_visit_id||b.visit_id||'')));return [...ordinary,...(data.privateVisits||[]).filter(v=>!known.has(String(v.id))).map(v=>({...v,privateVisit:true}))].filter(b=>localDate(b.starts_at)).sort((a,b)=>Date.parse(a.starts_at)-Date.parse(b.starts_at));}
 function bookingColor(b){if(['cancelled','expired'].includes(b.status))return 'cancelled';if(b.status==='active')return 'future';if(b.status==='payment_review')return 'pending';const end=Date.parse(b.ends_at)||Date.parse(b.starts_at)+Number(b.minutes||30)*60000;if(['attended','finished'].includes(b.status)||end<Date.now())return 'past';return ['pending','requested','awaiting_payment'].includes(b.status)?'pending':'future';}
@@ -50179,7 +50297,7 @@ function updatePortalNavigation(){
  const count=allBookings().filter(b=>['future','pending'].includes(bookingColor(b))).length;
  document.querySelectorAll('#hc289Portal [data-hc305-count]').forEach(n=>{n.textContent=String(count);n.hidden=!count;});
  document.querySelectorAll('#hc289Portal [data-hc305-nav]').forEach(b=>{if(b.dataset.hc305Nav===current)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
- const status=q('#hc305AppointmentStatus');if(status)status.textContent=appointmentWarning()||(appointmentSync.updatedAt?'Actualizado '+new Date(appointmentSync.updatedAt).toLocaleTimeString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit'}):'');
+ const status=q('#hc305AppointmentStatus');if(status)status.textContent=appointmentWarning()||(appointmentSync.updatedAt?'Actualizado '+window.HC313.time(appointmentSync.updatedAt,{timeZone:window.HC313.argentina}):'');
 }
 function appointmentsView(loading=false){
  const root=main();if(!root)return;root.dataset.view='appointments';bookingUI=null;
@@ -50278,13 +50396,18 @@ function calendarView(day=''){
  });
 }
 function changeMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1);calendarView();}
-function dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML='<button data-289-back>‹ Calendario</button><h2>'+E(new Date(key+'T12:00').toLocaleDateString('es-AR',{dateStyle:'full'}))+'</h2>'+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'')+'<button data-289-new>Nuevo turno</button>';updatePortalNavigation();}
+function dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML='<button data-289-back>‹ Calendario</button><h2>'+E(window.HC313.dayLabel(key))+'</h2>'+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'')+'<button data-289-new>Nuevo turno</button>';updatePortalNavigation();}
 function bookingRow(b){
  const p=directory.providers.find(p=>p.id===b.provider_id),color=bookingColor(b),privateVisit=!!b.privateVisit,name=b.peer_name||p?.name||b.provider_name||'Profesional';
  return '<article class="hc289Row hc304Appointment '+color+'"><div><b>'+E(name)+'</b><p>'+E(format(b.starts_at))+' · '+E(privateVisit?(window.HC310.modeLabel(b.mode)):b.telemedicine?'Telemedicina institucional':'Institución')+'</p><span class="hc305Status '+color+'">'+E(statusLabel(b.status))+'</span>'+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class="hc305AppointmentActions">'+(privateVisit?'<button type="button" data-304-visit="'+E(b.id)+'">Ver consulta y pagos</button>':'')+'<button type="button" data-hc305-date="'+E(localDate(b.starts_at))+'">Ver en calendario</button>'+(!privateVisit&&['pending','confirmed'].includes(b.status)?'<button type="button" data-289-cancel="'+E(b.id)+'">Cancelar turno</button>':'')+'</div></div></article>';
 }
-function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Mis estudios</h2>'+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(r.date)+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
+function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Mis estudios</h2>'+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(window.HC313.dateTime(r.date))+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
 window.hc310ReleaseBooking=()=>{bookingUI=null;};
+document.addEventListener('hc313FormatChanged',()=>{
+ if(!window.hc289ClientSession||locked)return;
+ registry();
+ if(main()?.dataset.view==='appointments')appointmentsView();
+});
 function distance(i){return window.HC299Geo.distance(position,i);}
 async function newBooking(legacy=false){if(!legacy&&window.hc292Search)return window.hc292Search();main().dataset.view='booking';bookingUI={role:'medico',specialty:'',institutions:[],private:false,telemedicine:false,urgent:false,providerId:'',slot:null,month:monthKey(new Date())};main().innerHTML=close+'<h2>¿Qué buscás?</h2><div id="hc289SearchContent"><div class="hc289Search"><label>Profesional<select id="hc289Role">'+Object.entries(roleLabels).map(([id,label])=>'<option value="'+id+'">'+label+'</option>').join('')+'</select></label><label>Especialidad<select id="hc289Specialty"><option value="">Todas las especialidades</option></select></label></div><p><button id="hc289Locate">Usar mi ubicación</button><span id="hc289LocationStatus" class="hc289Notice"> '+(position?'Distancias según tu ubicación guardada.':'Agregá tu ubicación para ordenar por distancia.')+'</span></p><div class="hc289Columns"><section><h3>Profesionales sugeridos</h3><div id="hc289ProviderList" class="hc289List">Cargando…</div></section><section><h3>Instituciones cerca</h3><div id="hc289InstitutionList" class="hc289List"></div><label class="hc289Check"><input type="checkbox" id="hc289Private">Consultorio particular</label></section></div><div id="hc289ProviderDetail"></div></div><p><label class="hc289Check"><input id="hc289Tele" type="checkbox">Telemedicina</label></p><p><label class="hc289Check hc289Urgent"><input id="hc289Urgent" type="checkbox">URGENCIA</label></p><div id="hc289UrgentArea" hidden><a href="tel:107" class="hc289Call107">LLAMAR AL 107</a></div><div id="hc289BookAction"><label>Motivo de consulta<input id="hc289Reason" maxlength="1000" placeholder="Opcional"></label><p><button class="hc289Primary" id="hc289Book" disabled>Sacar turno</button></p><p class="hc289Notice">La solicitud reserva el horario en Hospitalito y queda pendiente de confirmación por el profesional. Los turneros externos aún no están conectados.</p><p id="hc289BookingStatus" role="status"></p></div>';main().querySelector('[data-289-close]').onclick=calendarView;
  q('#hc289Role').onchange=e=>{bookingUI.role=e.target.value;bookingUI.specialty='';q('#hc289Specialty').innerHTML='<option value="">Todas las especialidades</option>'+(window.hc292SpecialtyOptions?.(bookingUI.role,directory.providers.filter(p=>p.role===bookingUI.role).map(p=>p.specialty))||'');resetProvider();renderLists();};q('#hc289Specialty').onchange=e=>{bookingUI.specialty=e.target.value;resetProvider();renderLists();};q('#hc289Private').onchange=e=>{bookingUI.private=e.target.checked;bookingUI.institutions=[];resetProvider();renderLists();};q('#hc289Tele').onchange=e=>{bookingUI.telemedicine=e.target.checked;resetProvider();renderLists();};q('#hc289Urgent').onchange=e=>{bookingUI.urgent=e.target.checked;q('#hc289SearchContent').hidden=e.target.checked;q('#hc289BookAction').hidden=e.target.checked;q('#hc289UrgentArea').hidden=!e.target.checked;};q('#hc289Locate').onclick=e=>run(e.currentTarget,async()=>{position=await geo();q('#hc289LocationStatus').textContent='Distancias calculadas para esta búsqueda.';renderLists();},q('#hc289LocationStatus'));
@@ -50341,10 +50464,10 @@ async function clientAccount(section,inSettings=false){
    window.HC311.editPatientReminders(el);return;
  }
  if(!me)await refresh();
- if(opening!==accountRequest||owner!==window.hc289ClientSession?.token)return;const user=window.hc289ClientSession?.user;if(!user)return;const p=me?.client||{},profile=p.profile||{};const el=panel('Perfil','<div style="text-align:center"><span class="hc289Avatar" style="width:140px;height:140px;margin:auto">'+(image(user.photo)?'<img src="'+image(user.photo)+'" alt="Foto de perfil">':icon('user'))+'</span><h2 style="margin:16px">'+E(p.legal_name)+'</h2><p>@'+E(p.username)+' · Cliente</p></div><p>DNI '+E(p.dni)+' · Nacimiento '+E(p.dob)+'</p><p class="hc289Notice">Los cambios de identidad requieren una nueva revisión institucional.</p><section><h3>Fotos de mi DNI</h3><p id="hc290MyDocumentStatus" role="status"></p><div id="hc290MyDocuments" class="hc290DocumentGallery"></div></section><form class="hc289Form"><label class="hc289Full">Foto de perfil<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><label class="hc289Full">Dirección<input name="address" value="'+E(profile.address)+'" autocomplete="street-address"></label><label>Teléfono<input name="phone" value="'+E(profile.phone)+'" autocomplete="tel"></label><label>Correo<input name="email" type="email" value="'+E(profile.email)+'" autocomplete="email"></label><div class="hc289Full"><button type="button" id="hc289ProfileGeo">Guardar mi ubicación</button><span id="hc289ProfileGeoStatus"> '+(profile.latitude!=null?'Ubicación guardada':'Sin ubicación guardada')+'</span></div><button type="submit" class="hc289Primary">Guardar perfil</button><p role="status"></p></form><h3>Verificaciones por institución</h3>'+(me?.verifications||[]).map(v=>'<p>'+E(directory.institutions.find(i=>i.id===v.institution_id)?.name||v.institution_id)+' · '+E(({pending:'Pendiente',verified:'Verificada',rejected:'Rechazada',revoked:'Revocada'})[v.status])+'</p>').join(''));let pos={latitude:profile.latitude,longitude:profile.longitude};q('#hc289ProfileGeo').onclick=e=>run(e.currentTarget,async()=>{pos=await geo();q('#hc289ProfileGeoStatus').textContent='Ubicación obtenida; guardá el perfil para conservarla.';},q('#hc289ProfileGeoStatus'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const values=Object.fromEntries(new FormData(e.target));await api('updateClientProfile',{profile:{...values,...pos}});if(e.target.elements.photo.files[0]){const read=await fileRead(e.target.elements.photo.files[0]);const j=await window.hc230AuthRequest('updateProfile',{token:token(),user:{photo:read.data}});window.hc289ClientSession.user={...user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));}window.HC310?.avatar(q('#hc289PortalAccount'),window.hc289ClientSession.user);await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';},el.querySelector('[role=status]'));};loadPersonalDocuments(el);}
+ if(opening!==accountRequest||owner!==window.hc289ClientSession?.token)return;const user=window.hc289ClientSession?.user;if(!user)return;const p=me?.client||{},profile=p.profile||{};const el=panel('Perfil','<div style="text-align:center"><span class="hc289Avatar" style="width:140px;height:140px;margin:auto">'+(image(user.photo)?'<img src="'+image(user.photo)+'" alt="Foto de perfil">':icon('user'))+'</span><h2 style="margin:16px">'+E(p.legal_name)+'</h2><p>@'+E(p.username)+' · Cliente</p></div><p>DNI '+E(p.dni)+' · Nacimiento '+E(window.HC313.date(p.dob))+'</p><p class="hc289Notice">Los cambios de identidad requieren una nueva revisión institucional.</p><section><h3>Fotos de mi DNI</h3><p id="hc290MyDocumentStatus" role="status"></p><div id="hc290MyDocuments" class="hc290DocumentGallery"></div></section><form class="hc289Form"><label class="hc289Full">Foto de perfil<input name="photo" type="file" accept="image/jpeg,image/png,image/webp"></label><label class="hc289Full">Dirección<input name="address" value="'+E(profile.address)+'" autocomplete="street-address"></label><label>Teléfono<input name="phone" value="'+E(profile.phone)+'" autocomplete="tel"></label><label>Correo<input name="email" type="email" value="'+E(profile.email)+'" autocomplete="email"></label><div class="hc289Full"><button type="button" id="hc289ProfileGeo">Guardar mi ubicación</button><span id="hc289ProfileGeoStatus"> '+(profile.latitude!=null?'Ubicación guardada':'Sin ubicación guardada')+'</span></div><button type="submit" class="hc289Primary">Guardar perfil</button><p role="status"></p></form><h3>Verificaciones por institución</h3>'+(me?.verifications||[]).map(v=>'<p>'+E(directory.institutions.find(i=>i.id===v.institution_id)?.name||v.institution_id)+' · '+E(({pending:'Pendiente',verified:'Verificada',rejected:'Rechazada',revoked:'Revocada'})[v.status])+'</p>').join(''));let pos={latitude:profile.latitude,longitude:profile.longitude};q('#hc289ProfileGeo').onclick=e=>run(e.currentTarget,async()=>{pos=await geo();q('#hc289ProfileGeoStatus').textContent='Ubicación obtenida; guardá el perfil para conservarla.';},q('#hc289ProfileGeoStatus'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const values=Object.fromEntries(new FormData(e.target));await api('updateClientProfile',{profile:{...values,...pos}});if(e.target.elements.photo.files[0]){const read=await fileRead(e.target.elements.photo.files[0]);const j=await window.hc230AuthRequest('updateProfile',{token:token(),user:{photo:read.data}});window.hc289ClientSession.user={...user,...j.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));}window.HC310?.avatar(q('#hc289PortalAccount'),window.hc289ClientSession.user);await refresh();el.querySelector('[role=status]').textContent='Perfil guardado.';},el.querySelector('[role=status]'));};loadPersonalDocuments(el);}
 window.hc289ClientAccount=clientAccount;
 async function logoutClient(){const saved=window.hc289ClientSession;localStorage.removeItem('hc289.client');window.hc289ClientSession=null;requestSerial++;locked=false;q('#hc289Portal')?.remove();q('#hc289Dialog')?.remove();q('#hc289ClientLock')?.remove();document.body.classList.remove('hc289Client');location.reload();}
-document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(a.date)+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
+document.addEventListener('click',e=>{if(!window.hc289ClientSession||locked)return;const b=e.target.closest('button');if(!b||!b.closest('#hc289Portal'))return;if(b.hasAttribute('data-hc305-turnos')){openMyAppointments();return;}if(b.hasAttribute('data-hc305-calendar')){if(innerWidth<=760)q('#hc289Registry')?.classList.add('collapsed');calendarView();refresh();return;}if(b.dataset.hc305Filter){appointmentsTab=b.dataset.hc305Filter==='history'?'history':'upcoming';appointmentsView();return;}if(b.dataset.hc305Date){showAppointmentCalendar(b.dataset.hc305Date);return;}if(b.hasAttribute('data-hc305-refresh')){run(b,()=>refresh(),q('#hc305AppointmentStatus'));return;}if(b.hasAttribute('data-289-new'))newBooking();if(b.hasAttribute('data-289-back')){calendarView();refresh();}if(b.dataset['304Visit'])window.hc292Visit(b.dataset['304Visit']);if(b.hasAttribute('data-289-results'))resultsView();if(b.hasAttribute('data-289-refresh'))refresh(true);if(b.dataset['289Month'])changeMonth(Number(b.dataset['289Month']));if(b.dataset['289Day']&&!bookingUI)dayView(b.dataset['289Day']);if(b.dataset['289Booking']){const booking=data.bookings.find(x=>x.id===b.dataset['289Booking']);dayView(localDate(booking.starts_at));}if(b.dataset['289Admission']){const a=data.admissions[Number(b.dataset['289Admission'])];main().innerHTML='<button data-289-back>‹ Calendario</button><h2>Internación pasada</h2><p>'+E(a.institutionName)+' · '+E(window.HC313.dateTime(a.date))+'</p><pre class="hc289ResultText">'+E(a.summary||'Solicitá la documentación de esta internación a la institución.')+'</pre>';}if(b.dataset['289Cancel'])run(b,async()=>{await api('bookingStatus',{id:b.dataset['289Cancel'],status:'cancelled'});await refresh(true);});if(b.dataset['289File'])run(b,async()=>{const f=await api('reportFile',{id:b.dataset['289File'],index:Number(b.dataset.index)});if(/^https:\/\/frbuhczonftjtvmviehw\.supabase\.co\//.test(f.url))window.open(f.url,'_blank','noopener');});});
 for(const event of ['pointerdown','keydown','touchstart'])document.addEventListener(event,()=>{if(!locked)lastActivity=Date.now();},{passive:true});
 setInterval(()=>{if(!window.hc289ClientSession||document.hidden)return;if(!locked&&Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username)||0)>0&&Date.now()-lastActivity>Number(localStorage.getItem('hc306.clientIdle.'+window.hc289ClientSession.user.username))*60000){locked=true;q('#hc289Portal').inert=true;q('#hc289AccountMenu').hidden=true;const preserved=q('#hc289Dialog');if(preserved){preserved.id='hc289PreservedDialog';preserved.inert=true;}const el=dialog('Sesión bloqueada','<p>Confirmá tu contraseña para continuar. Tu formulario se conserva.</p><form><input type="password" name="password" autocomplete="current-password" aria-label="Contraseña" required><p><button type="submit">Continuar</button><button type="button" id="hc289LockedDevice">Huella, rostro o PIN</button><button type="button" id="hc289LockedExit">SALIR</button></p><p role="status"></p></form>');el.id='hc289ClientLock';el.style.zIndex=2147483646;el.querySelector('[data-289-close]').remove();el.querySelector('#hc289LockedExit').onclick=logoutClient;const device=el.querySelector('#hc289LockedDevice');device.disabled=location.origin!=='https://walterrigoni.github.io'||!window.PublicKeyCredential;device.onclick=e=>run(e.currentTarget,async()=>{const a=await window.hc280Access.authenticate(window.hc289ClientSession.user.username);if(a.user.role!=='cliente')throw Error('Cuenta no habilitada para el portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));el.querySelector('form').onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{const a=await window.hc230AuthRequest('authenticateUser',{username:window.hc289ClientSession.user.username,password:e.target.elements.password.value});if(a.user.role!=='cliente')throw Error('Esta cuenta ya no tiene acceso al portal.');window.hc289ClientSession={token:a.token,user:a.user};localStorage.setItem('hc289.client',JSON.stringify(window.hc289ClientSession));locked=false;lastActivity=Date.now();el.remove();const preserved=q('#hc289PreservedDialog');if(preserved){preserved.id='hc289Dialog';preserved.inert=false;}q('#hc289Portal').inert=false;await refresh();},el.querySelector('[role=status]'));};}else if(!locked)refresh();},8000);
 let saved;try{saved=JSON.parse(localStorage.getItem('hc289.client')||'null');}catch{}if(saved?.token&&saved.user?.role==='cliente')setTimeout(()=>window.hc289EnterClient(saved),50);
@@ -50377,7 +50500,7 @@ async function adminPortal(selected=scope()){
  const el=dialog('Portal · administración institucional','<label>Institución<select id="hc289AdminScope"></select></label><p id="hc289AdminStatus" role="status">Cargando…</p><div id="hc289InstitutionSettings"></div><h3>Clientes y verificación de identidad</h3><p>La autorización se aplica sólo a la institución elegida. Revisá la identidad antes de vincular una ficha.</p><div id="hc289PendingClients"></div>');
  let institutions=[];try{institutions=loadJSON(LS.globalAuthInstitutions,[])||[];}catch{}if(role()==='superadmin')try{const a=await window.hc230AuthRequest('platformOverview',{token:localStorage.getItem(LS.globalAuthToken)});institutions=a.institutions.filter(i=>i.active!==false).map(i=>({id:i.id,name:i.display_name||i.name}));}catch(e){q('#hc289AdminStatus').textContent=e.message;}if(!institutions.some(i=>String(i.id)===selected)&&selected)institutions.push({id:selected,name:selected});const sel=q('#hc289AdminScope');sel.innerHTML=institutions.map(i=>'<option value="'+E(i.id)+'" '+(String(i.id)===selected?'selected':'')+'>'+E(i.name||i.id)+'</option>').join('');sel.onchange=()=>adminPortal(sel.value);if(!sel.value){q('#hc289AdminStatus').textContent='Elegí o creá primero una institución desde Hospitalito.';return;}const inst=sel.value;
  try{const [a,p]=await Promise.all([api('institutionSettings',{institutionId:inst}),api('pendingClients',{institutionId:inst})]);if(!el.isConnected)return;const s=a.settings||{};q('#hc289AdminStatus').textContent='';q('#hc289InstitutionSettings').innerHTML='<h3>Directorio público de la institución</h3><form id="hc289InstPortalForm" class="hc289Form"><label class="hc289Full">Dirección<input name="address" value="'+E(s.address)+'" required></label><label>Teléfono<input name="phone" value="'+E(s.phone)+'"></label><div><button type="button" id="hc289InstGPS">Tomar ubicación actual</button></div><label>Latitud<input name="latitude" type="number" step="any" min="-90" max="90" value="'+E(s.latitude)+'"></label><label>Longitud<input name="longitude" type="number" step="any" min="-180" max="180" value="'+E(s.longitude)+'"></label>'+check('enabled','Publicar la institución y sus agendas habilitadas',s.enabled)+'<button type="submit">Guardar directorio</button><p class="hc289Full hc289Notice">Turnero externo: no conectado. La institución sólo publicará la disponibilidad registrada en Hospitalito.</p></form>';const f=q('#hc289InstPortalForm');q('#hc289InstGPS').onclick=e=>action(e.currentTarget,async()=>{const p=await window.hc289Geo();f.elements.latitude.value=p.latitude;f.elements.longitude.value=p.longitude;},q('#hc289AdminStatus'));f.onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await api('saveInstitutionSettings',{institutionId:inst,settings:{...Object.fromEntries(new FormData(f)),enabled:f.elements.enabled.checked}});q('#hc289AdminStatus').textContent='Directorio guardado.';},q('#hc289AdminStatus'));};
- q('#hc289PendingClients').innerHTML=p.clients.map((v,n)=>'<article class="hc289Panel"><b>'+E(v.client?.legal_name)+' · @'+E(v.username)+'</b><p>DNI '+E(v.client?.dni)+' · Nacimiento '+E(v.client?.dob)+' · '+E(v.status)+'</p><button data-identity="'+n+'">Ver documento privado</button><div data-document="'+n+'"></div><form data-verify="'+n+'" class="hc289Form"><label>Vincular ficha clínica<select name="patientId"><option value="">Sin ficha previa · cliente ambulatorio</option>'+(v.matches||[]).map(m=>'<option value="'+E(m.id)+'" '+(m.id===v.patient_id?'selected':'')+'>'+E(m.name)+' · DNI '+E(v.client.dni)+'</option>').join('')+'</select></label><label>Decisión<select name="status"><option value="verified">Verificar</option><option value="rejected">Rechazar</option><option value="revoked">Revocar autorización</option></select></label><label class="hc289Full">Fundamento / comprobación realizada<textarea name="note" required>'+E(v.note)+'</textarea></label>'+check('identityChecked','Comprobé la identidad y la correspondencia de la ficha')+'<button type="submit">Registrar decisión</button><p role="status" class="hc289Full"></p></form></article>').join('')||'<p>No hay solicitudes de clientes en esta institución.</p>';
+ q('#hc289PendingClients').innerHTML=p.clients.map((v,n)=>'<article class="hc289Panel"><b>'+E(v.client?.legal_name)+' · @'+E(v.username)+'</b><p>DNI '+E(v.client?.dni)+' · Nacimiento '+E(window.HC313.date(v.client?.dob))+' · '+E(v.status)+'</p><button data-identity="'+n+'">Ver documento privado</button><div data-document="'+n+'"></div><form data-verify="'+n+'" class="hc289Form"><label>Vincular ficha clínica<select name="patientId"><option value="">Sin ficha previa · cliente ambulatorio</option>'+(v.matches||[]).map(m=>'<option value="'+E(m.id)+'" '+(m.id===v.patient_id?'selected':'')+'>'+E(m.name)+' · DNI '+E(v.client.dni)+'</option>').join('')+'</select></label><label>Decisión<select name="status"><option value="verified">Verificar</option><option value="rejected">Rechazar</option><option value="revoked">Revocar autorización</option></select></label><label class="hc289Full">Fundamento / comprobación realizada<textarea name="note" required>'+E(v.note)+'</textarea></label>'+check('identityChecked','Comprobé la identidad y la correspondencia de la ficha')+'<button type="submit">Registrar decisión</button><p role="status" class="hc289Full"></p></form></article>').join('')||'<p>No hay solicitudes de clientes en esta institución.</p>';
  q('#hc289PendingClients').querySelectorAll('[data-identity]').forEach(b=>b.onclick=()=>action(b,async()=>{const j=await api('identityDocument',{institutionId:inst,username:p.clients[Number(b.dataset.identity)].username});const box=el.querySelector('[data-document="'+b.dataset.identity+'"]');box.classList.add('hc290DocumentGallery');box.innerHTML=window.hc290IdentityGallery(j);},q('#hc289AdminStatus')));
  q('#hc289PendingClients').querySelectorAll('form').forEach(f=>f.onsubmit=e=>{e.preventDefault();const v=p.clients[Number(f.dataset.verify)];action(e.submitter,async()=>{await api('verifyIdentity',{institutionId:inst,username:v.username,...Object.fromEntries(new FormData(f)),identityChecked:f.elements.identityChecked.checked});f.querySelector('[role=status]').textContent='Decisión guardada para esta institución.';},f.querySelector('[role=status]'));});
  }catch(e){if(el.isConnected)q('#hc289AdminStatus').textContent=e.message;}
@@ -50388,7 +50511,7 @@ async function outpatient(){
  q('#hc289OutRefresh').onclick=()=>{if(el.querySelector('form[data-dirty="1"]')){q('#hc289OutStatus').textContent='Guardá el borrador o la solicitud antes de actualizar; así conservás lo que estás escribiendo.';return;}outpatient();};
  try{const [r,c]=await Promise.all([api('listOrders'),api('linkedClients')]);if(!el.isConnected||scope()!==captured)return;q('#hc289OutStatus').textContent='';
  if(role()==='medico'){q('#hc289CreateOrder').innerHTML='<form id="hc289OrderForm" class="hc289Form"><label>Cliente<select name="username" required><option value="">Elegir cliente verificado</option>'+c.clients.map(p=>'<option value="'+E(p.username)+'">'+E(p.legal_name)+' · DNI '+E(p.dni)+'</option>').join('')+'</select></label><label>Servicio<select name="kind">'+Object.entries(labels).map(([id,label])=>'<option value="'+id+'">'+label+'</option>').join('')+'</select></label><label class="hc289Full">Estudios solicitados<textarea name="text" maxlength="4000" required></textarea></label><button type="submit">Emitir solicitud</button></form>';q('#hc289OrderForm').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await api('createOrder',Object.fromEntries(new FormData(e.target)));await outpatient();},q('#hc289OutStatus'));};}
- q('#hc289OutOrders').innerHTML=r.orders.map((o,i)=>{const p=c.clients.find(p=>p.username===o.username),can=({lab:'bioquimico',micro:'microbiologo',image:'imagenologo'})[o.kind]===role();return '<article class="hc289Panel"><h3>'+E(labels[o.kind])+' · '+E(p?.legal_name||o.username)+'</h3><p>'+E(o.requested_text)+'</p><p>Estado: '+E(o.status)+' · '+E(new Date(o.created_at).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}))+'</p>'+(can?'<form class="hc289Form" data-report="'+i+'"><label class="hc289Full">Informe<textarea name="text" rows="8">'+E(o.draft_text??o.report_text)+'</textarea></label><label class="hc289Full">Adjuntar PDF o imagen (hasta 5 MB)<input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp"></label><div class="hc289Full">'+[...(o.draft_text!==null?o.draft_files:o.report_files)||[]].map(f=>'<p>'+E(f.name)+'</p>').join('')+'</div><button type="submit" name="draft">Guardar borrador</button><button type="submit" name="publish" class="hc289Primary">Publicar al cliente</button><p role="status" class="hc289Full"></p></form>':'<pre class="hc289ResultText">'+E(o.status==='published'?o.report_text:'Informe pendiente de publicación')+'</pre>')+'</article>';}).join('')||'<p>No hay solicitudes ambulatorias para este servicio.</p>';
+ q('#hc289OutOrders').innerHTML=r.orders.map((o,i)=>{const p=c.clients.find(p=>p.username===o.username),can=({lab:'bioquimico',micro:'microbiologo',image:'imagenologo'})[o.kind]===role();return '<article class="hc289Panel"><h3>'+E(labels[o.kind])+' · '+E(p?.legal_name||o.username)+'</h3><p>'+E(o.requested_text)+'</p><p>Estado: '+E(o.status)+' · '+E(window.HC313.dateTime(o.created_at,{timeZone:window.HC313.argentina}))+'</p>'+(can?'<form class="hc289Form" data-report="'+i+'"><label class="hc289Full">Informe<textarea name="text" rows="8">'+E(o.draft_text??o.report_text)+'</textarea></label><label class="hc289Full">Adjuntar PDF o imagen (hasta 5 MB)<input type="file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp"></label><div class="hc289Full">'+[...(o.draft_text!==null?o.draft_files:o.report_files)||[]].map(f=>'<p>'+E(f.name)+'</p>').join('')+'</div><button type="submit" name="draft">Guardar borrador</button><button type="submit" name="publish" class="hc289Primary">Publicar al cliente</button><p role="status" class="hc289Full"></p></form>':'<pre class="hc289ResultText">'+E(o.status==='published'?o.report_text:'Informe pendiente de publicación')+'</pre>')+'</article>';}).join('')||'<p>No hay solicitudes ambulatorias para este servicio.</p>';
  q('#hc289OutOrders').querySelectorAll('form').forEach(f=>f.onsubmit=e=>{e.preventDefault();const o=r.orders[Number(f.dataset.report)],publish=e.submitter.name==='publish';action(e.submitter,async()=>{if(scope()!==captured)throw Error('Cambió la institución. Abrí nuevamente la bandeja.');const file=f.elements.file.files[0]?await window.hc289ReadFile(f.elements.file.files[0]):undefined;const j=await api('saveReport',{id:o.id,revision:o.revision,text:f.elements.text.value,publish,file,keepFiles:(o.draft_text!==null?o.draft_files:o.report_files||[]).map(f=>f.path)});r.orders[Number(f.dataset.report)]=j.order;delete f.dataset.dirty;f.elements.file.value='';f.querySelector('[role=status]').textContent=publish?'Informe publicado al cliente.':'Borrador guardado; el cliente sigue viendo la última versión publicada, si existía.';},f.querySelector('[role=status]'));});
  const signature=rows=>rows.map(o=>o.id+':'+o.revision+':'+o.status).join('|');let checking=false;const poll=setInterval(async()=>{if(!el.isConnected||scope()!==captured){clearInterval(poll);return;}if(document.hidden||checking)return;checking=true;try{const incoming=await api('listOrders');if(el.isConnected&&signature(incoming.orders)!==signature(r.orders)){if(el.querySelector('form[data-dirty="1"]'))q('#hc289OutStatus').textContent='Llegaron nuevas solicitudes o cambios. Tu texto se conserva: guardá el borrador y actualizá la bandeja.';else{clearInterval(poll);outpatient();}}}catch{}finally{checking=false;}},8000);
  }catch(e){if(el.isConnected)q('#hc289OutStatus').textContent=e.message;}
@@ -50400,8 +50523,8 @@ async function providerAgenda(privatePractice=false){
  try{const [a,b]=await Promise.all([api('providerSettings'),api('listBookings')]);if(!el.isConnected||scope()!==captured)return;let provider=a.providers.find(p=>p.private_practice===privatePractice),weekly=(!privatePractice&&stamp(a.weekly?.updatedAt)>stamp(provider?.weekly?.updatedAt)?a.weekly:provider?.weekly)||a.weekly||{days:{}};q('#hc289AgendaStatus').textContent='';
  q('#hc289AgendaSettings').innerHTML='<div class="hc289Slots"><button id="hc289InstitutionAgenda" aria-pressed="'+!privatePractice+'">Institución</button><button id="hc289PrivateAgenda" aria-pressed="'+privatePractice+'">Consultorio particular</button></div><details '+(!provider?'open':'')+'><summary>Publicación y horarios disponibles</summary><form id="hc289ProviderForm" class="hc289Form"><label>Especialidad<input name="specialty" value="'+E(provider?.specialty||getCurrentUser?.()?.specialty)+'" required></label><label>Dirección de atención<input name="address" value="'+E(provider?.address)+'" '+(privatePractice?'required':'')+'></label><label class="hc289Full">Presentación<textarea name="description">'+E(provider?.description)+'</textarea></label>'+check('telemedicine','Ofrezco Telemedicina',provider?.telemedicine)+check('public_visible','Publicar mi perfil y agenda para clientes',provider?.public_visible)+'<div class="hc289Full"><h3>Horarios semanales</h3>'+HC_WEEKDAYS.map(d=>{const row=weekly.days?.[d.n]||{};return '<div class="hc289Row" data-weekday="'+d.n+'"><label class="hc289Check"><input type="checkbox" data-active '+(row.active?'checked':'')+'>'+d.label+'</label><label>Desde<input type="time" data-start value="'+E(row.start||'08:00')+'"></label><label>Hasta<input type="time" data-end value="'+E(row.end||'12:00')+'"></label><label>Minutos<select data-minutes>'+[10,15,20,30,40,60].map(m=>'<option '+(Number(row.minutes||30)===m?'selected':'')+'>'+m+'</option>').join('')+'</select></label></div>';}).join('')+'</div>'+check('consent','Autorizo publicar estos datos profesionales y su disponibilidad')+'<button type="submit">Guardar agenda</button></form></details><p class="hc289Notice">Se combinan reservas del portal, bloqueos y turnos registrados en Hospitalito, incluso entre tus instituciones. Los turneros externos todavía no están conectados.</p>';
  q('#hc289InstitutionAgenda').onclick=()=>providerAgenda(false);q('#hc289PrivateAgenda').onclick=()=>providerAgenda(true);const form=q('#hc289ProviderForm');form.onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{if(scope()!==captured)throw Error('Cambió la institución.');const days={};form.querySelectorAll('[data-weekday]').forEach(row=>days[row.dataset.weekday]={active:row.querySelector('[data-active]').checked,start:row.querySelector('[data-start]').value,end:row.querySelector('[data-end]').value,minutes:Number(row.querySelector('[data-minutes]').value)});const j=await api('saveProvider',{provider:{specialty:form.elements.specialty.value,address:form.elements.address.value,description:form.elements.description.value,public_visible:form.elements.public_visible.checked,telemedicine:form.elements.telemedicine.checked,private_practice:privatePractice,weekly:{days}},consentPublish:form.elements.consent.checked});provider=j.provider;window.hc289Toast('Agenda guardada. La institución debe publicar su dirección para aparecer en el Portal.');await draw();},q('#hc289AgendaStatus'));};
- async function draw(){if(!provider){q('#hc289AgendaCalendar').innerHTML='<p>Guardá tu agenda para administrar los bloqueos.</p>';return;}const [c,bl]=await Promise.all([api('calendar',{providerId:provider.id,month:monthKey(agendaMonth)}),api('providerBlocks',{providerId:provider.id})]);if(!el.isConnected)return;q('#hc289AgendaCalendar').innerHTML='<div class="hc289MonthNav"><button data-agenda-month="-1">‹</button><h3>'+E(agendaMonth.toLocaleDateString('es-AR',{month:'long',year:'numeric'}))+'</h3><button data-agenda-month="1">›</button></div>'+window.hc289CalendarHTML(agendaMonth,'provider',c.days)+'<p>Elegí un día para bloquearlo o indicar horas no disponibles.</p><div id="hc289BlockEditor"></div><h3>Bloqueos manuales</h3>'+bl.blocks.map(b=>'<div class="hc289Row"><div>'+E(new Date(b.starts_at).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}))+' — '+E(new Date(b.ends_at).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}))+'<p>'+E(b.note)+'</p></div><button data-unblock="'+E(b.id)+'">Quitar bloqueo</button></div>').join('');q('#hc289AgendaCalendar').querySelectorAll('[data-agenda-month]').forEach(b=>b.onclick=()=>{agendaMonth=new Date(agendaMonth.getFullYear(),agendaMonth.getMonth()+Number(b.dataset.agendaMonth),1);draw().catch(e=>q('#hc289AgendaStatus').textContent=e.message);});q('#hc289AgendaCalendar').querySelectorAll('[data-289-day]').forEach(b=>{if(bl.blocks.some(x=>x.starts_at.slice(0,10)<=b.dataset['289Day']&&x.ends_at.slice(0,10)>=b.dataset['289Day']))b.classList.add('hc289Blocked');b.onclick=()=>{const day=b.dataset['289Day'];q('#hc289BlockEditor').innerHTML='<form class="hc289Form"><h4 class="hc289Full">No disponible · '+E(day)+'</h4><label>Desde<input name="start" type="datetime-local" value="'+day+'T00:00" required></label><label>Hasta<input name="end" type="datetime-local" value="'+day+'T23:59" required></label><label class="hc289Full">Motivo<input name="note" maxlength="500"></label><button type="submit">Bloquear horario</button></form>';q('#hc289BlockEditor form').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await api('saveBlock',{providerId:provider.id,start:e.target.elements.start.value+':00-03:00',end:e.target.elements.end.value+':00-03:00',note:e.target.elements.note.value});await draw();},q('#hc289AgendaStatus'));};};});q('#hc289AgendaCalendar').querySelectorAll('[data-unblock]').forEach(b=>b.onclick=()=>action(b,async()=>{await api('removeBlock',{id:b.dataset.unblock});await draw();},q('#hc289AgendaStatus')));}
- q('#hc289AgendaBookings').innerHTML=b.bookings.map(b=>'<article class="hc289Row"><div><b>'+E(b.client?.legal_name||b.username)+'</b><p>'+E(new Date(b.starts_at).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}))+' · '+E(b.status)+'</p><p>'+E(b.reason)+'</p></div>'+(['pending','confirmed'].includes(b.status)?'<button data-booking-id="'+E(b.id)+'" data-state="confirmed">Confirmar</button><button data-booking-id="'+E(b.id)+'" data-state="attended">Atendido</button><button data-booking-id="'+E(b.id)+'" data-state="cancelled">Cancelar</button>':'')+'</article>').join('')||'<p>No hay reservas todavía.</p>';q('#hc289AgendaBookings').querySelectorAll('[data-booking-id]').forEach(b=>b.onclick=()=>action(b,async()=>{await api('bookingStatus',{id:b.dataset.bookingId,status:b.dataset.state});await providerAgenda(privatePractice);},q('#hc289AgendaStatus')));await draw();
+ async function draw(){if(!provider){q('#hc289AgendaCalendar').innerHTML='<p>Guardá tu agenda para administrar los bloqueos.</p>';return;}const [c,bl]=await Promise.all([api('calendar',{providerId:provider.id,month:monthKey(agendaMonth)}),api('providerBlocks',{providerId:provider.id})]);if(!el.isConnected)return;q('#hc289AgendaCalendar').innerHTML='<div class="hc289MonthNav"><button data-agenda-month="-1">‹</button><h3>'+E(agendaMonth.toLocaleDateString('es-AR',{month:'long',year:'numeric'}))+'</h3><button data-agenda-month="1">›</button></div>'+window.hc289CalendarHTML(agendaMonth,'provider',c.days)+'<p>Elegí un día para bloquearlo o indicar horas no disponibles.</p><div id="hc289BlockEditor"></div><h3>Bloqueos manuales</h3>'+bl.blocks.map(b=>'<div class="hc289Row"><div>'+E(window.HC313.dateTime(b.starts_at,{timeZone:window.HC313.argentina}))+' — '+E(window.HC313.dateTime(b.ends_at,{timeZone:window.HC313.argentina}))+'<p>'+E(b.note)+'</p></div><button data-unblock="'+E(b.id)+'">Quitar bloqueo</button></div>').join('');q('#hc289AgendaCalendar').querySelectorAll('[data-agenda-month]').forEach(b=>b.onclick=()=>{agendaMonth=new Date(agendaMonth.getFullYear(),agendaMonth.getMonth()+Number(b.dataset.agendaMonth),1);draw().catch(e=>q('#hc289AgendaStatus').textContent=e.message);});q('#hc289AgendaCalendar').querySelectorAll('[data-289-day]').forEach(b=>{if(bl.blocks.some(x=>x.starts_at.slice(0,10)<=b.dataset['289Day']&&x.ends_at.slice(0,10)>=b.dataset['289Day']))b.classList.add('hc289Blocked');b.onclick=()=>{const day=b.dataset['289Day'];q('#hc289BlockEditor').innerHTML='<form class="hc289Form"><h4 class="hc289Full">No disponible · '+E(window.HC313.date(day))+'</h4><label>Desde<input name="start" type="datetime-local" value="'+day+'T00:00" required></label><label>Hasta<input name="end" type="datetime-local" value="'+day+'T23:59" required></label><label class="hc289Full">Motivo<input name="note" maxlength="500"></label><button type="submit">Bloquear horario</button></form>';q('#hc289BlockEditor form').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await api('saveBlock',{providerId:provider.id,start:e.target.elements.start.value+':00-03:00',end:e.target.elements.end.value+':00-03:00',note:e.target.elements.note.value});await draw();},q('#hc289AgendaStatus'));};};});q('#hc289AgendaCalendar').querySelectorAll('[data-unblock]').forEach(b=>b.onclick=()=>action(b,async()=>{await api('removeBlock',{id:b.dataset.unblock});await draw();},q('#hc289AgendaStatus')));}
+ q('#hc289AgendaBookings').innerHTML=b.bookings.map(b=>'<article class="hc289Row"><div><b>'+E(b.client?.legal_name||b.username)+'</b><p>'+E(window.HC313.dateTime(b.starts_at,{timeZone:window.HC313.argentina}))+' · '+E(b.status)+'</p><p>'+E(b.reason)+'</p></div>'+(['pending','confirmed'].includes(b.status)?'<button data-booking-id="'+E(b.id)+'" data-state="confirmed">Confirmar</button><button data-booking-id="'+E(b.id)+'" data-state="attended">Atendido</button><button data-booking-id="'+E(b.id)+'" data-state="cancelled">Cancelar</button>':'')+'</article>').join('')||'<p>No hay reservas todavía.</p>';q('#hc289AgendaBookings').querySelectorAll('[data-booking-id]').forEach(b=>b.onclick=()=>action(b,async()=>{await api('bookingStatus',{id:b.dataset.bookingId,status:b.dataset.state});await providerAgenda(privatePractice);},q('#hc289AgendaStatus')));await draw();
  }catch(e){if(el.isConnected)q('#hc289AgendaStatus').textContent=e.message;}
 }
 window.hc289StaffDecorate=()=>{
@@ -50447,7 +50570,7 @@ const BASE='https://frbuhczonftjtvmviehw.supabase.co/functions/v1/hospitalito-te
 const portrait=p=>{const photo=String(p.photo||'');return /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(photo)?'<img class="hc296Portrait" src="'+E(photo)+'" alt="Foto de '+E(p.name||'profesional')+'" loading="lazy">':'<span class="hc296Portrait hc296PortraitEmpty" role="img" aria-label="Sin foto de perfil">'+E(String(p.name||'P').trim().charAt(0))+'</span>';};
 const roles={medico:'Médico',enfermero:'Enfermería',kinesiologo:'Kinesiología',nutricionista:'Nutrición',bioquimico:'Bioquímica',microbiologo:'Microbiología',imagenologo:'Imágenes',hemoterapia:'Hemoterapia'};
 const catalog={medico:['Clínica médica','Medicina general y familiar','Alergia e inmunología','Alergia e inmunología pediátrica','Anatomía patológica','Anestesiología','Angiología general y hemodinamia','Cardiología','Cardiología infantil','Cirugía cardiovascular','Cirugía cardiovascular pediátrica','Cirugía de cabeza y cuello','Cirugía de tórax','Cirugía general','Cirugía pediátrica','Cirugía plástica y reparadora','Cirugía vascular periférica','Coloproctología','Dermatología','Dermatología pediátrica','Diagnóstico por imágenes','Electrofisiología cardíaca','Emergentología','Endocrinología','Endocrinología infantil','Farmacología clínica','Fisiatría','Gastroenterología','Gastroenterología infantil','Genética médica','Geriatría','Ginecología','Hematología','Hemato-oncología pediátrica','Hemoterapia e inmunohematología','Hepatología','Hepatología pediátrica','Infectología','Infectología infantil','Mastología','Medicina del deporte','Medicina del trabajo','Medicina legal','Medicina nuclear','Medicina paliativa','Nefrología','Nefrología infantil','Neonatología','Neumonología','Neumonología infantil','Neurocirugía','Neurología','Neurología infantil','Nutrición','Obstetricia','Oftalmología','Oncología','Ortopedia y traumatología','Ortopedia y traumatología infantil','Otorrinolaringología','Pediatría','Psiquiatría','Psiquiatría infantojuvenil','Radioterapia','Reumatología','Reumatología infantil','Terapia intensiva','Terapia intensiva infantil','Tocoginecología','Toxicología','Urología'],enfermero:['Enfermería general','Atención del paciente crítico','Enfermería comunitaria','Enfermería neonatal','Enfermería pediátrica','Cuidados domiciliarios','Cuidados paliativos','Salud mental'],kinesiologo:['Kinesiología general','Kinesiología respiratoria','Rehabilitación neurológica','Rehabilitación traumatológica','Rehabilitación cardiovascular','Kinesiología deportiva','Kinesiología pediátrica'],nutricionista:['Nutrición clínica','Nutrición deportiva','Nutrición pediátrica','Nutrición comunitaria'],bioquimico:['Bioquímica clínica','Hematología','Endocrinología','Inmunología'],microbiologo:['Microbiología clínica','Bacteriología','Virología','Micología','Parasitología'],imagenologo:['Diagnóstico por imágenes','Ecografía','Radiología','Tomografía','Resonancia magnética'],hemoterapia:['Hemoterapia e inmunohematología']};
-const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),money=c=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(Number(c||0)/100),dateKey=(d=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(d),when=s=>new Date(s).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires',dateStyle:'short',timeStyle:'short'});
+const fold=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase(),money=c=>new Intl.NumberFormat('es-AR',{style:'currency',currency:'ARS'}).format(Number(c||0)/100),dateKey=(d=new Date())=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'}).format(d),when=s=>window.HC313.dateTime(s,{timeZone:window.HC313.argentina});
 const labels={awaiting_payment:'Pago pendiente',confirmed:'Confirmada',active:'En consulta',finished:'Finalizada',cancelled:'Cancelada',expired:'Reserva vencida',payment_review:'Pago en revisión'};
 const token=()=>window.hc289ClientSession?.token||localStorage.getItem(LS.globalAuthToken)||'';
 async function api(action,payload={}){
@@ -50509,7 +50632,7 @@ window.hc292Search=async function(initial={}){
    q('#hc292Slots').textContent='El profesional actualizó sus tarifas u horarios. Presioná Buscar para verlos antes de reservar.';
    return;
  }
- revision=j.profileRevision;q('#hc292Slots').innerHTML=j.slots.map((s,i)=>'<button data-tele-slot="'+i+'" '+(!s.available?'disabled':'')+'>'+E(s.local.slice(-5))+(s.address?'<br><small>'+E(s.location||'Consultorio')+' · '+E(s.address)+'</small>':'')+(!s.available?' · ocupado':'')+'</button>').join('')||'No quedan horarios para esa duración.';q('#hc292Slots').querySelectorAll('button').forEach(b=>b.onclick=()=>{const slot=j.slots[Number(b.dataset.teleSlot)];
+ revision=j.profileRevision;q('#hc292Slots').innerHTML=j.slots.map((s,i)=>'<button data-tele-slot="'+i+'" '+(!s.available?'disabled':'')+'>'+E(window.HC313.time(s.local))+(s.address?'<br><small>'+E(s.location||'Consultorio')+' · '+E(s.address)+'</small>':'')+(!s.available?' · ocupado':'')+'</button>').join('')||'No quedan horarios para esa duración.';q('#hc292Slots').querySelectorAll('button').forEach(b=>b.onclick=()=>{const slot=j.slots[Number(b.dataset.teleSlot)];
  if(selected?.start!==slot.start){requestId=crypto.randomUUID();q('#hc292Accept').checked=false;}
  selected=slot;status.dataset.location='true';status.textContent=selected.address?'Ubicación elegida: '+selected.address:'';const route=q('#hc299Route'),url=window.HC299Geo.mapURL(selected);route.hidden=!url;if(url)route.href=url;q('#hc292Slots').querySelectorAll('button').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));can();});}catch(e){if(attempt===slotSerial&&plan.isConnected)q('#hc292Slots').textContent=e.message;}}
  plan.onchange=load;if(address)address.oninput=can;q('#hc292Accept').onchange=can;reserve.onclick=async()=>{
@@ -50552,7 +50675,7 @@ window.hc292Visit=async function(id){
 
 async function documents(root,id,visit){const j=await api('documents',{visitId:id});if(!root.isConnected)return;root.innerHTML='<h3>Documentos de esta consulta</h3><div>'+j.documents.map(d=>'<p>'+E(d.name)+'<button data-tele-doc="'+E(d.id)+'">Descargar / compartir PDF</button></p>').join('')+'</div>'+(!j.documents.length?'<p>No hay documentos publicados.</p>':'')+(visit.side==='provider'&&['confirmed','active','finished'].includes(visit.visit.status)?'<button data-tele-templates>Preparar receta, certificado o valoración</button><form class="hc289Form" id="hc292UploadDoc"><label>Tipo<select name="kind">'+(visit.role==='medico'?'<option value="report">Informe profesional</option><option value="prescription">Receta médica de plataforma externa</option><option value="certificate">Certificado médico</option><option value="preoperative">Valoración prequirúrgica</option>':'<option value="report">Informe profesional</option>')+'</select></label><p class="hc289Full hc310Muted">Para una receta, adjuntá el PDF firmado que emitiste en el recetario que uses. Se publicará en Mis Recetas de este paciente.</p><label>PDF firmado (hasta 5 MB)<input name="file" type="file" accept="application/pdf" required></label><label class="hc289Check"><input name="signed" type="checkbox" required>Revisé y firmé este documento. Corresponde a este paciente y a mis incumbencias profesionales.</label><button type="submit">Publicar al paciente</button><p role="status"></p></form>':'');root.querySelectorAll('[data-tele-doc]').forEach(b=>b.onclick=()=>run(b,async()=>{const d=await api('documentFile',{visitId:id,documentId:b.dataset.teleDoc}),res=await fetch(d.url,{credentials:'omit',referrerPolicy:'no-referrer'});if(!res.ok)throw Error('El enlace venció. Volvé a abrir el documento');const blob=await res.blob(),file=new File([blob],d.name,{type:'application/pdf'});const share=dialog('Compartir documento','<p>Descargá el PDF o compartilo desde este dispositivo. WhatsApp y correo requieren confirmar el destinatario y adjuntar el archivo.</p><button data-download>Descargar PDF</button><button data-share>Compartir archivo</button><button data-email>Redactar correo</button><button data-whatsapp>Abrir WhatsApp</button><p role="status"></p>');share.querySelector('[data-email]').onclick=()=>{const address=visit.side==='provider'?String(visit.patient?.profile?.email||''):'';location.href='mailto:'+encodeURIComponent(address)+'?subject='+encodeURIComponent('Documento de consulta Hospitalito')+'&body='+encodeURIComponent('Adjunto el documento de la consulta.');share.querySelector('[role=status]').textContent='Descargá el PDF y adjuntalo al correo antes de enviarlo. Verificá el destinatario.';};share.querySelector('[data-whatsapp]').onclick=()=>{const phone=visit.side==='provider'?String(visit.patient?.profile?.phone||'').replace(/\D/g,''):'';window.open('https://wa.me/'+phone+'?text='+encodeURIComponent('Te comparto el documento de la consulta Hospitalito.'),'_blank','noopener');share.querySelector('[role=status]').textContent='Descargá el PDF y adjuntalo al mensaje. Verificá el destinatario antes de enviar.';};share.querySelector('[data-download]').onclick=()=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=d.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);};share.querySelector('[data-share]').onclick=()=>run(share.querySelector('[data-share]'),async()=>{if(navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file],title:'Documento de tu consulta Hospitalito'});}catch(e){if(e.name!=='AbortError')throw e;}}else share.querySelector('[role=status]').textContent='Este navegador no comparte adjuntos. Descargá el PDF y adjuntalo en WhatsApp o correo.';},share.querySelector('[role=status]'));},root.querySelector('[role=status]')));root.querySelector('[data-tele-templates]')?.addEventListener('click',()=>template(visit));const f=root.querySelector('form');if(f)f.onsubmit=e=>{e.preventDefault();run(e.submitter,async()=>{await api('uploadDocument',{visitId:id,kind:f.elements.kind.value,file:await window.hc289ReadFile(f.elements.file.files[0]),confirmSigned:f.elements.signed.checked});await documents(root,id,visit);},f.querySelector('[role=status]'));};}
 window.hc292Documents=documents;
-function template(j){const el=dialog('Preparar documento','<p>Prepará el texto, imprimilo para completar la firma o incorporalo a tu sistema de firma autorizado. Luego adjuntá el PDF firmado en la consulta.</p><form class="hc289Form"><label>Plantilla<select name="kind"><option>Informe profesional</option><option>Receta médica</option><option>Certificado médico</option><option>Valoración prequirúrgica</option></select></label><label class="hc289Full">Contenido<textarea name="body" rows="12" required></textarea></label><button type="submit">Vista para imprimir o guardar como PDF</button></form>');const f=el.querySelector('form');if(j.role!=='medico')f.elements.kind.innerHTML='<option>Informe profesional</option>';const templates={'Informe profesional':'Motivo de consulta:\nEvaluación:\nConducta e indicaciones:\nSeguimiento:', 'Receta médica':'Medicamento (nombre genérico):\nConcentración y forma farmacéutica:\nDosis y vía:\nFrecuencia y duración:\nCantidad y observaciones:', 'Certificado médico':'Se deja constancia de:\nFecha y alcance del certificado:\nObservaciones:', 'Valoración prequirúrgica':'Cirugía / procedimiento previsto:\nAntecedentes y medicación:\nExamen físico:\nECG y estudios complementarios:\nEvaluación del riesgo:\nConclusión e indicaciones:'};f.elements.body.value=templates[f.elements.kind.value];f.elements.kind.onchange=()=>f.elements.body.value=templates[f.elements.kind.value];f.onsubmit=e=>{e.preventDefault();const w=window.open('about:blank','_blank');if(!w)return window.hc289Toast('Permití abrir la vista de impresión');w.opener=null;w.document.write('<!doctype html><html lang="es"><meta charset="utf-8"><title>Documento para revisión y firma</title><style>body{font:16px Arial;max-width:760px;margin:40px auto;padding:24px}pre{white-space:pre-wrap;font:inherit;line-height:1.6}.draft{border:1px solid #777;padding:12px}@media print{button{display:none}}</style><h1>'+E(f.elements.kind.value)+'</h1><p>Paciente: '+E(j.patient?.legal_name||'')+' · DNI '+E(j.patient?.dni||'')+'</p><p>Fecha: '+E(dateKey())+'</p><pre>'+E(f.elements.body.value)+'</pre><p>Profesional: '+E(window.hc297CurrentProfessionalName?.()||session?.name||'')+'</p><p>Firma y matrícula: _______________________________</p><p class="draft">Borrador para revisión y firma. Este archivo no incorpora firma electrónica ni digital.</p><button onclick="window.print()">Imprimir / guardar como PDF</button></html>');w.document.close();};}
+function template(j){const el=dialog('Preparar documento','<p>Prepará el texto, imprimilo para completar la firma o incorporalo a tu sistema de firma autorizado. Luego adjuntá el PDF firmado en la consulta.</p><form class="hc289Form"><label>Plantilla<select name="kind"><option>Informe profesional</option><option>Receta médica</option><option>Certificado médico</option><option>Valoración prequirúrgica</option></select></label><label class="hc289Full">Contenido<textarea name="body" rows="12" required></textarea></label><button type="submit">Vista para imprimir o guardar como PDF</button></form>');const f=el.querySelector('form');if(j.role!=='medico')f.elements.kind.innerHTML='<option>Informe profesional</option>';const templates={'Informe profesional':'Motivo de consulta:\nEvaluación:\nConducta e indicaciones:\nSeguimiento:', 'Receta médica':'Medicamento (nombre genérico):\nConcentración y forma farmacéutica:\nDosis y vía:\nFrecuencia y duración:\nCantidad y observaciones:', 'Certificado médico':'Se deja constancia de:\nFecha y alcance del certificado:\nObservaciones:', 'Valoración prequirúrgica':'Cirugía / procedimiento previsto:\nAntecedentes y medicación:\nExamen físico:\nECG y estudios complementarios:\nEvaluación del riesgo:\nConclusión e indicaciones:'};f.elements.body.value=templates[f.elements.kind.value];f.elements.kind.onchange=()=>f.elements.body.value=templates[f.elements.kind.value];f.onsubmit=e=>{e.preventDefault();const w=window.open('about:blank','_blank');if(!w)return window.hc289Toast('Permití abrir la vista de impresión');w.opener=null;w.document.write('<!doctype html><html lang="es-AR"><meta charset="utf-8"><title>Documento para revisión y firma</title><style>body{font:16px Arial;max-width:760px;margin:40px auto;padding:24px}pre{white-space:pre-wrap;font:inherit;line-height:1.6}.draft{border:1px solid #777;padding:12px}@media print{button{display:none}}</style><h1>'+E(f.elements.kind.value)+'</h1><p>Paciente: '+E(j.patient?.legal_name||'')+' · DNI '+E(j.patient?.dni||'')+'</p><p>Fecha: '+E(window.HC313.date(dateKey()))+'</p><pre>'+E(f.elements.body.value)+'</pre><p>Profesional: '+E(window.hc297CurrentProfessionalName?.()||session?.name||'')+'</p><p>Firma y matrícula: _______________________________</p><p class="draft">Borrador para revisión y firma. Este archivo no incorpora firma electrónica ni digital.</p><button onclick="window.print()">Imprimir / guardar como PDF</button></html>');w.document.close();};}
 window.hc292Admin=async function(){const el=dialog('Hospitalito · Telemedicina y cobros','<p id="hc292AdminStatus" role="status">Cargando…</p><div id="hc292AdminBody"></div>');try{const j=await api('adminSettings');if(!el.isConnected)return;const s=j.settings;q('#hc292AdminStatus').textContent=j.credentialsReady?'Pasarela configurada en el servidor.':'Falta configurar la aplicación Marketplace de Mercado Pago y sus credenciales en el servidor. No se realizan cobros.';q('#hc292AdminBody').innerHTML='<form class="hc289Form"><label>Comisión Hospitalito sobre el total (%)<input name="percent" type="number" min="0.01" max="99.99" step="0.01" value="'+E(s.commission_bps==null?'':s.commission_bps/100)+'" required></label><label>Anticipo para reservar Consultorio Privado (%)<input name="officeDeposit" type="number" min="0.01" max="99.99" step="0.01" value="'+E(s.office_deposit_bps==null?'':s.office_deposit_bps/100)+'" placeholder="A definir por Hospitalito" required></label><label class="hc289Full">Condiciones de cancelación y reintegros<textarea name="policy" rows="5" required>'+E(s.cancellation_policy)+'</textarea></label><label class="hc289Check hc289Full"><input name="enabled" type="checkbox" '+(s.enabled?'checked':'')+'>Habilitar cobros reales con la cuenta configurada</label><p class="hc289Notice">Telemedicina: pago total antes de la consulta y reparto por comisión. Consultorio Privado: anticipo al reservar y saldo al iniciar la atención; ambos se acreditan en Hospitalito. El anticipo forma parte del precio y es independiente de la comisión. Los honorarios del profesional quedan registrados para su liquidación.</p><button type="submit">Guardar configuración</button></form><h3>Calidad de videollamada</h3><p>'+E(j.relayConfigured?'Relevo TURN configurado.':'Falta configurar el relevo TURN para redes que impiden una conexión directa.')+'</p><h3>Reintegros por revisar</h3>'+j.refunds.map(r=>'<article class="hc289Panel">'+E(r.reason)+' · '+money(r.hc_tele_payments?.amount_cents)+'<p>Pago: '+E(r.hc_tele_payments?.payment_id||'Ver revisión de pagos')+'</p><p>Gestioná el reintegro desde Mercado Pago y comprobá su estado antes de informar al paciente.</p></article>').join('')+'<h3>Pagos duplicados o fuera de reserva</h3>'+j.paymentReviews.map(r=>'<p>'+E(r.payment_id)+' · '+E(r.review_reason)+'</p>').join('');el.querySelector('form').onsubmit=e=>{e.preventDefault();const f=e.target;run(e.submitter,async()=>{await api('saveAdminSettings',{revision:s.revision,settings:{commission_bps:Math.round(Number(f.elements.percent.value)*100),office_deposit_bps:Math.round(Number(f.elements.officeDeposit.value)*100),cancellation_policy:f.elements.policy.value,enabled:f.elements.enabled.checked}});await window.hc292Admin();},q('#hc292AdminStatus'));};}catch(e){if(el.isConnected)q('#hc292AdminStatus').textContent=e.message;}};
 let decorating=false;function decorate(){if(decorating)return;decorating=true;try{const professional=session&&roles[session.role]&&!window.hc289ClientSession;const shift=q('#hc229ShiftServices');if(shift&&professional&&!q('#hc292ShiftService')){const b=document.createElement('button');b.id='hc292ShiftService';b.type='button';b.className='hcSettingsBtn';b.textContent='Telemedicina de esta institución';b.onclick=()=>window.hc297InstitutionTele();shift.parentElement.append(b);}const right=q('#btnAccount')?.parentElement;if(right&&professional&&!q('#hc292ProTop')){const b=document.createElement('button');b.id='hc292ProTop';b.className='btn';b.textContent='Telemedicina institucional';b.onclick=()=>window.hc297InstitutionTele();right.insertBefore(b,q('#btnAccount'));}if(q('#hc292ProTop'))q('#hc292ProTop').hidden=!professional;if(session?.role==='superadmin'&&!q('#hc292AdminTop')){const parent=q('#adminApp .topbar .right')||right;if(parent){const b=document.createElement('button');b.id='hc292AdminTop';b.className='btn';b.textContent='Telemedicina · cobros';b.onclick=()=>window.hc292Admin();parent.append(b);}}}finally{decorating=false;}}
 let queued=false;new MutationObserver(()=>{if(!queued){queued=true;queueMicrotask(()=>{queued=false;decorate();});}}).observe(document.body,{childList:true,subtree:true});decorate();
@@ -50675,7 +50798,7 @@ window.hc297MountClinical=async function(host,id){
 window.addEventListener('beforeunload',e=>{if(document.querySelector('[data-clinical-dirty=\"1\"]')||[...clinicalDrafts.keys()].some(k=>k.startsWith(owner()+':'))){e.preventDefault();e.returnValue='';}});
 window.hc297Workspace=async function(mode){
  if(!['telemedicine','office','home'].includes(mode))return;hcInstitutionChooserClose();$('#hc297Workspace')?.remove();
- const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.dataset.mode=mode;root.innerHTML='<header><div><b>'+E(window.HC310.modeLabel(mode))+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>'+window.hc289Icon('edit')+'<span>Días, horarios y tarifas</span></button><button type="button" data-pro-alerts>Avisos</button><button type="button" data-pro-profile aria-label="Perfil" aria-haspopup="menu" aria-expanded="false">Perfil</button><button type="button" data-switch>Cambiar lugar de atención</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div><p data-list-status role="status"></p><div data-visits></div></aside><main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main></div>';document.body.append(root);
+ const workspaceOwner=owner();let openSequence=0;const root=document.createElement('section');root.id='hc297Workspace';root.dataset.mode=mode;root.dataset.hc313Viewer=workspaceOwner;root.innerHTML='<header><div><b>'+E(window.HC310.modeLabel(mode))+'</b><small>'+E(user().name)+'</small></div><button type="button" data-settings>'+window.hc289Icon('edit')+'<span>Días, horarios y tarifas</span></button><button type="button" data-pro-alerts>Avisos</button><button type="button" data-pro-profile aria-label="Perfil" aria-haspopup="menu" aria-expanded="false">Perfil</button><button type="button" data-switch>Cambiar lugar de atención</button></header><div class="hc297WorkspaceGrid"><aside><h2>Mis consultas</h2><div class="hc309VisitFilters"><label>Ver <select data-visit-filter><option value="next">Próximas y en atención</option><option value="past">Historial</option></select></label><button type="button" data-refresh>Actualizar</button></div><p data-list-status role="status"></p><div data-visits></div></aside><main hidden><button type="button" data-visit-back>‹ Mis consultas</button><section data-visit-content></section></main></div>';document.body.append(root);
  $('[data-settings]',root).onclick=()=>window.hc292Professional(mode);
  window.HC310.avatar($('[data-pro-profile]',root),user());
  root.hc310Account=section=>{
@@ -50691,6 +50814,7 @@ window.hc297Workspace=async function(mode){
  const list=$('[data-visits]',root),status=$('[data-list-status]',root);
  const filter=$('[data-visit-filter]',root),reload=$('[data-refresh]',root);
  const visitPane=$('main',root);
+ root.addEventListener('hc313FormatChanged',()=>renderList());
  let visits=[],loaded=false;
  const statesArchived=new Set(['finished','cancelled','expired']);
  function currentVisit(visit){
@@ -51145,7 +51269,7 @@ window.hc306ReadNutritionMeals=root=>{
  const values=meals.flatMap(([name],i)=>root.querySelector('[data-hc306-meal="'+i+'"]')?.checked?[{name,time:root.querySelector('[data-hc306-mealtime="'+i+'"]')?.value||'',diet:root.querySelector('[data-hc306-mealdiet="'+i+'"]')?.value.trim()||''}]:[]);
  if(/oral/i.test(q('#nutType')?.value||'')&&!values.length){alert('Elegí al menos una comida para la dieta oral.');return null;}return values;
 };
-window.hc306NutritionMealsText=r=>r.meals?.length?'<div class="moduleMeta"><b>Comidas:</b> '+r.meals.map(m=>esc(m.name)+(m.time?' '+esc(m.time):'')+(m.diet?': '+esc(m.diet):'')).join(' · ')+'</div>':'';
+window.hc306NutritionMealsText=r=>r.meals?.length?'<div class="moduleMeta"><b>Comidas:</b> '+r.meals.map(m=>esc(m.name)+(m.time?' '+esc(window.HC313.time(m.time)):'')+(m.diet?': '+esc(m.diet):'')).join(' · ')+'</div>':'';
 const microBase=openMicroRequest;openMicroRequest=window.openMicroRequest=function(pid,req){const value=microBase.apply(this,arguments),stage=q('#microStage'),flag=q('#microDefFlag');if(stage&&flag){stage.previousElementSibling.textContent='Tipo de informe';flag.closest('.field').hidden=true;stage.onchange=()=>{flag.value=stage.value==='Resultado definitivo'?'si':'no';};stage.onchange();}return value;};
 const renderMicroBase=renderMIC;renderMIC=window.renderMIC=function(){const value=renderMicroBase.apply(this,arguments);const root=q('#medMicro');if(root&&selectedPatientId&&!q('#hc306MicroReports')){const button=document.createElement('button');button.id='hc306MicroReports';button.type='button';button.className='btn';button.textContent='Ver / imprimir informes parciales y definitivos';const pid=selectedPatientId;button.onclick=()=>window.hc306ChooseMicro(pid);root.prepend(button);}return value;};
 function updateHeaders(){
@@ -51217,7 +51341,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v312";document.title="Hospitalito · Historia Clínica Digital · v312";
+window.HC_DEMO_VERSION="v313";document.title="Hospitalito · Historia Clínica Digital · v313";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -51867,10 +51991,8 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   const argentina = new Intl.DateTimeFormat('fr-CA', {
     timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
   });
-  const dayLabel = key => toDate(key).toLocaleDateString('es-AR', {dateStyle:'full'});
-  const time = date => new Date(date).toLocaleTimeString('es-AR', {
-    timeZone: 'America/Argentina/Buenos_Aires', hour:'2-digit', minute:'2-digit', hour12:false
-  });
+  const dayLabel = key => window.HC313.dayLabel(key);
+  const time = date => window.HC313.time(date,{timeZone:window.HC313.argentina});
   const past = new Set(['cancelled', 'finished', 'attended', 'expired']);
   function touch(event) {
     return event.pointerType === 'touch' || event.pointerType === 'pen' || matchMedia('(hover:none)').matches;
@@ -51888,7 +52010,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v312</small></button>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v313</small></button>'+
       '<span class="hc289PortalWho">'+E(user.name)+'</span><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
@@ -52217,7 +52339,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     const {profile, slots}=record, institution=directory.institutions?.find(i=>i.id===profile.institution_id);
     root.innerHTML='<section class="hc310ResultDetail"><button type="button" class="hc311Close" data-close-detail aria-label="Cerrar ficha" title="Cerrar ficha">'+window.hc289Icon('close')+'</button><h3>'+E(profile.name)+'</h3><p>'+
       E(profile.specialty)+' · '+E(institution?.name||'Institución')+'</p><h4>'+E(dayLabel(date))+
-      '</h4><div class="hc289Slots">'+slots.map((slot,i)=>'<button type="button" data-slot-index="'+i+'" aria-pressed="false">'+E(slot.local.slice(-5))+'</button>').join('')+
+      '</h4><div class="hc289Slots">'+slots.map((slot,i)=>'<button type="button" data-slot-index="'+i+'" aria-pressed="false">'+E(window.HC313.time(slot.local))+'</button>').join('')+
       '</div><label>Motivo de consulta <input maxlength="1000"></label><button type="button" data-reserve disabled>Solicitar turno</button><p role="status"></p></section>';
     const reserve=$('[data-reserve]',root), status=$('[role=status]',root);
     let selected=null,saving=false;
@@ -52632,7 +52754,7 @@ body #hc289Portal #hc310UrgentHelp a:hover {background:#98182e;}
         button.type = 'button';
         button.className = 'hc310VisitLine';
         const date = new Date(item.published_at);
-        button.textContent = item.name + (Number.isNaN(+date)?'':' · '+date.toLocaleDateString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}));
+        button.textContent = item.name + (Number.isNaN(+date)?'':' · '+window.HC313.date(date,{timeZone:window.HC313.argentina}));
         button.onclick = async () => {
           button.disabled = true;
           status.textContent = 'Preparando el PDF…';
@@ -52726,6 +52848,154 @@ body #hc297Workspace > header [data-settings] > svg {
 }
 button[data-hc289-icon] > :is(svg,.hc308ActionLabel) {
   vertical-align:middle;
+}
+</style>
+<style id="hc-v313-styles">
+.hc313Format {
+  margin:20px 0 0;padding:12px;min-width:0;
+  background:var(--hc-theme-surface);color:var(--hc-theme-text);
+  border:1px solid var(--hc-theme-line);border-radius:9px;
+}
+.hc313Format legend {padding:0 5px;font-weight:750;}
+.hc313Format > div {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:12px;
+}
+.hc313Format label {display:grid;gap:5px;}
+.hc313Format select {width:100%;min-height:40px;padding:6px 9px;font:inherit;}
+
+/* Keep a surface, its text and its secondary information on the same palette. */
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.prEVRuleText,.prEVContinuousHint,.freeTextRxBox,.labReqBox,
+  .imgExternalPortal,.labBioRequestCard,.hcRxModeChoice
+) {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.prEVRuleText,.prEVContinuousHint,.freeTextRxBox,.labReqBox,
+  .imgExternalPortal,.labBioRequestCard,.hcRxModeChoice
+) :is(p,label,h2,h3,h4,summary,b,strong,small,legend):not(:where(button *,a *,.labBadge *)) {
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.imgExternalPortal,.labBioRequestCard,.labReqBox,.freeTextRxBox
+) :is(.muted,.moduleMeta,.labMeta) {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent,.hc284Card,.hc283ModalBox,.hc292Video) :is(
+  input:not([type=radio],[type=checkbox],[type=range],[type=color]),select,option,textarea
+) {
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+  background:var(--hc-theme-surface)!important;
+  border-color:var(--hc-theme-line)!important;
+  caret-color:var(--hc-theme-text)!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent,.hc284Card,.hc283ModalBox,.hc292Video) :is(input,textarea)::placeholder {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+  opacity:1;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(input,select,textarea):disabled {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+  opacity:1!important;
+}
+
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox,.hc280Overlay .card,.hc289Dialog .hc298Profile,.hc289Dialog .hc298Rates) {
+  background:var(--hc-theme-surface)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) :is(.hc284Box,.hc284LogoPreview,.hc283Panel) {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) small {
+  color:var(--hc-theme-muted)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) :is(.hc284Badge,.hc284Status) {
+  background:var(--hc310-yellow);color:var(--hc310-yellow-text)!important;
+}
+
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) :is(label,span) {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) button {
+  color:var(--hc-theme-text)!important;
+  background:var(--hc-theme-surface)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) :is(.hc310ProviderLine,.hc310MonthGrid [data-state=future]) :is(b,small,span) {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid [data-state=pending] :is(small,span) {
+  color:var(--hc310-yellow-text)!important;
+}
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid [data-state=cancelled] :is(small,span) {
+  color:var(--hc310-red-text)!important;
+}
+body[data-hc289-mode] #medPanel :is(.hcRxDetailsSection,.hcRxDetailsModalCard,.labTrendChartWrap) {
+  background:var(--hc-theme-surface)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+
+/* The old patient banner used white labels over the pale end of a gradient. */
+body[data-hc289-mode] .pacBar {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] .pacBar :is(.l1,.l2,.l3,.muted) {
+  color:var(--hc-theme-text)!important;
+}
+
+body[data-hc289-mode] #medPanel .nrMulti.hasSelection > summary {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] #medPanel .nrMulti.hasSelection .nrMultiSummary {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode=light] #medPanel .nrAttachBtn.nrOn {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+  box-shadow:none;
+}
+body[data-hc289-mode=light] #medPanel .nrAttachBtn.nrOn::before {
+  color:var(--hc310-green-text);
+}
+body[data-hc289-mode=light] #medPanel #medSV :is(td,input,.svChartValue,.svChartSub,.svChartDot).sv-good {
+  color:#175d36!important;fill:#175d36!important;
+}
+body[data-hc289-mode=light] #medPanel #medSV :is(td,input,.svChartValue,.svChartSub,.svChartDot).sv-bad {
+  color:#902633!important;fill:#902633!important;
+}
+body[data-hc289-mode=light] #medPanel .hc275ConfiguredClockHint {
+  background:var(--hc-theme-surface-2);color:var(--hc-theme-text);
+}
+body[data-hc289-mode=light] #medPanel label.imgStudyChoice {
+  background:var(--hc-theme-surface-2);color:var(--hc-theme-text)!important;
+}
+body[data-hc289-mode=light] #medPanel label.imgStudyChoice:has(input:checked) {
+  background:var(--hc310-green);color:var(--hc310-green-text)!important;
 }
 </style>
 </body>

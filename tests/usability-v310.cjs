@@ -25,7 +25,8 @@ async function contrast(locator){
     const lum=c=>c.slice(0,3).map(v=>v/255).map(n=>n<=0.04045?n/12.92:((n+0.055)/1.055)**2.4).reduce((v,n,i)=>v+n*[0.2126,0.7152,0.0722][i],0);
     let node=el,background=[255,255,255,255];
     while(node){const c=rgb(getComputedStyle(node).backgroundColor);if(c[3]===255){background=c;break;}node=node.parentElement;}
-    const values=[lum(rgb(getComputedStyle(el).color)),lum(background)].sort((a,b)=>b-a);
+    const style=getComputedStyle(el);
+    const values=[lum(rgb(style.webkitTextFillColor||style.color)),lum(background)].sort((a,b)=>b-a);
     return (values[0]+0.05)/(values[1]+0.05);
   });
   assert(ratio>=4.5,'Insufficient contrast: '+ratio.toFixed(2));
@@ -157,6 +158,32 @@ async function run() {
       assert.equal(await page.locator('#evoOpenText').innerText(),'EVOLUCIÓN (TEXTO LIBRE)\n\nTexto de prueba');
       await page.locator('#evoList button').first().click();
       assert.equal(await page.locator('#evoList button[aria-pressed=true]').count(),1);
+      if(width===1280){
+        await page.evaluate(()=>{
+          const fixture=document.createElement('section');
+          fixture.id='qa-contrast';
+          fixture.innerHTML='<div class="heparinStatusBox"><p data-contrast>Estado de heparina</p><small class="muted" data-contrast>Último KPTT</small></div>'+
+            '<div class="insulinProtocolFormBox"><label data-contrast>Protocolo de insulina<input data-contrast value="13:00"></label></div>'+
+            '<div class="prEVRuleText"><p data-contrast>Regla de infusión</p></div>'+
+            '<details class="nrMulti hasSelection"><summary data-contrast>Adjuntos seleccionados</summary></details>'+
+            '<div id="medSV"><table class="svTable"><tbody><tr><td class="sv-good" data-contrast>95</td><td class="sv-bad" data-contrast>85</td></tr></tbody></table></div>'+
+            '<article class="pacBar"><div class="l1" data-contrast>Paciente de prueba</div></article>';
+          document.querySelector('#medPanel').append(fixture);
+        });
+        for(const mode of ['light','dark','light']){
+          await page.evaluate(mode=>{localStorage.setItem('hc289.visual.qa308',JSON.stringify({mode,color:'green'}));window.hc289ApplyVisual();},mode);
+          for(const cell of await page.locator('#qa-contrast [data-contrast]').all())await contrast(cell);
+        }
+        await page.evaluate(()=>document.querySelector('#qa-contrast').remove());
+        await page.evaluate(()=>hcSettingsOpen('personalization'));
+        const institutional=page.locator('#hcSettingsContent .hc313Format');
+        assert.equal(await institutional.getByLabel('Formato de fecha').inputValue(),'dmy');
+        assert.equal(await institutional.getByLabel('Formato de hora').inputValue(),'24h');
+        await institutional.getByLabel('Formato de hora').selectOption('12h');
+        assert.equal(await page.evaluate(()=>dmyhmFromISODateTime('2026-11-12T13:00')),'12/11/2026 1:00 p. m.');
+        await institutional.getByLabel('Formato de hora').selectOption('24h');
+        await page.locator('#hcSettingsCloseBtn').click();
+      }
       await capture(page,'evolucion-'+width);
       await centeredIcon(page.locator('#btnAccount'));
       if(width<800)await page.locator('#btnAccount').tap();
@@ -192,6 +219,13 @@ async function run() {
       await page.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
       await page.locator('#hc289Dialog').getByRole('button',{name:'Apariencia',exact:true}).click();
       await page.locator('#hc289Dialog [data-vmode=dark]').waitFor();
+      const professionalFormat=page.locator('#hc289Dialog .hc313Format');
+      await professionalFormat.getByLabel('Formato de fecha').selectOption('iso');
+      await professionalFormat.getByLabel('Formato de hora').selectOption('12h');
+      assert.equal(await page.evaluate(()=>dmyhmFromISODateTime('2026-11-12T13:00')),'2026-11-12 1:00 p. m.');
+      await professionalFormat.getByLabel('Formato de fecha').selectOption('dmy');
+      await professionalFormat.getByLabel('Formato de hora').selectOption('24h');
+
       await page.locator('#hc289Dialog [data-289-close]').click();
       await page.locator('#hc297Workspace [data-settings]').click();
       const agenda=page.locator('.hc298Compact');
@@ -321,6 +355,17 @@ async function run() {
         await contrast(patientSettings.locator('[aria-current=page]'));
         await contrast(accountPanel.getByRole('button',{name:'Cerrar',exact:true}));
       }
+      const patientFormat=patientSettings.locator('.hc313Format');
+      assert.equal(await patientFormat.getByLabel('Formato de fecha').inputValue(),'dmy');
+      assert.equal(await patientFormat.getByLabel('Formato de hora').inputValue(),'24h');
+      await patientFormat.getByLabel('Formato de fecha').selectOption('iso');
+      await patientFormat.getByLabel('Formato de hora').selectOption('12h');
+      assert.equal(await page.evaluate(()=>dmyhmFromISODateTime('2026-11-12T13:00')),'2026-11-12 1:00 p. m.');
+      const stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('hc289.visual.test')));
+      assert.equal(stored.dateFormat,'iso');
+      assert.equal(stored.timeFormat,'12h');
+      await patientFormat.getByLabel('Formato de fecha').selectOption('dmy');
+      await patientFormat.getByLabel('Formato de hora').selectOption('24h');
       await patientSettings.locator('.hc311Font summary').click();
       assert.match(await patientSettings.getByText('Georgia',{exact:true}).evaluate(e=>getComputedStyle(e).fontFamily),/Georgia/);
       await patientSettings.getByText('Georgia',{exact:true}).click();

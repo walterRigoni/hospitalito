@@ -1,0 +1,146 @@
+.hc313Format {
+  margin:20px 0 0;padding:12px;min-width:0;
+  background:var(--hc-theme-surface);color:var(--hc-theme-text);
+  border:1px solid var(--hc-theme-line);border-radius:9px;
+}
+.hc313Format legend {padding:0 5px;font-weight:750;}
+.hc313Format > div {
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(180px,100%),1fr));gap:12px;
+}
+.hc313Format label {display:grid;gap:5px;}
+.hc313Format select {width:100%;min-height:40px;padding:6px 9px;font:inherit;}
+
+/* Keep a surface, its text and its secondary information on the same palette. */
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.prEVRuleText,.prEVContinuousHint,.freeTextRxBox,.labReqBox,
+  .imgExternalPortal,.labBioRequestCard,.hcRxModeChoice
+) {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.prEVRuleText,.prEVContinuousHint,.freeTextRxBox,.labReqBox,
+  .imgExternalPortal,.labBioRequestCard,.hcRxModeChoice
+) :is(p,label,h2,h3,h4,summary,b,strong,small,legend):not(:where(button *,a *,.labBadge *)) {
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(
+  .heparinStatusBox,.heparinProtocolFormBox,.insulinStatusBox,.insulinProtocolFormBox,
+  .amioProtocolFormBox,.imgExternalPortal,.labBioRequestCard,.labReqBox,.freeTextRxBox
+) :is(.muted,.moduleMeta,.labMeta) {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent,.hc284Card,.hc283ModalBox,.hc292Video) :is(
+  input:not([type=radio],[type=checkbox],[type=range],[type=color]),select,option,textarea
+) {
+  color:var(--hc-theme-text)!important;
+  -webkit-text-fill-color:currentColor!important;
+  background:var(--hc-theme-surface)!important;
+  border-color:var(--hc-theme-line)!important;
+  caret-color:var(--hc-theme-text)!important;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent,.hc284Card,.hc283ModalBox,.hc292Video) :is(input,textarea)::placeholder {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+  opacity:1;
+}
+body[data-hc289-mode] :is(#medPanel,#labModalContent) :is(input,select,textarea):disabled {
+  color:var(--hc-theme-muted)!important;
+  -webkit-text-fill-color:currentColor!important;
+  opacity:1!important;
+}
+
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox,.hc280Overlay .card,.hc289Dialog .hc298Profile,.hc289Dialog .hc298Rates) {
+  background:var(--hc-theme-surface)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) :is(.hc284Box,.hc284LogoPreview,.hc283Panel) {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) small {
+  color:var(--hc-theme-muted)!important;
+}
+body[data-hc289-mode] :is(.hc284Card,.hc283ModalBox) :is(.hc284Badge,.hc284Status) {
+  background:var(--hc310-yellow);color:var(--hc310-yellow-text)!important;
+}
+
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) :is(label,span) {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode] #hc289Dialog.hc298ServiceActive [data-day]:has([data-active]:checked) button {
+  color:var(--hc-theme-text)!important;
+  background:var(--hc-theme-surface)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) :is(.hc310ProviderLine,.hc310MonthGrid [data-state=future]) :is(b,small,span) {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid [data-state=pending] :is(small,span) {
+  color:var(--hc310-yellow-text)!important;
+}
+body[data-hc289-mode] :is(#hc289Portal,#hc289Dialog) .hc310MonthGrid [data-state=cancelled] :is(small,span) {
+  color:var(--hc310-red-text)!important;
+}
+body[data-hc289-mode] #medPanel :is(.hcRxDetailsSection,.hcRxDetailsModalCard,.labTrendChartWrap) {
+  background:var(--hc-theme-surface)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+
+/* The old patient banner used white labels over the pale end of a gradient. */
+body[data-hc289-mode] .pacBar {
+  background:var(--hc-theme-surface-2)!important;
+  color:var(--hc-theme-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] .pacBar :is(.l1,.l2,.l3,.muted) {
+  color:var(--hc-theme-text)!important;
+}
+
+body[data-hc289-mode] #medPanel .nrMulti.hasSelection > summary {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+}
+body[data-hc289-mode] #medPanel .nrMulti.hasSelection .nrMultiSummary {
+  color:var(--hc310-green-text)!important;
+}
+body[data-hc289-mode=light] #medPanel .nrAttachBtn.nrOn {
+  background:var(--hc310-green)!important;
+  color:var(--hc310-green-text)!important;
+  border-color:var(--hc-theme-line)!important;
+  box-shadow:none;
+}
+body[data-hc289-mode=light] #medPanel .nrAttachBtn.nrOn::before {
+  color:var(--hc310-green-text);
+}
+body[data-hc289-mode=light] #medPanel #medSV :is(td,input,.svChartValue,.svChartSub,.svChartDot).sv-good {
+  color:#175d36!important;fill:#175d36!important;
+}
+body[data-hc289-mode=light] #medPanel #medSV :is(td,input,.svChartValue,.svChartSub,.svChartDot).sv-bad {
+  color:#902633!important;fill:#902633!important;
+}
+body[data-hc289-mode=light] #medPanel .hc275ConfiguredClockHint {
+  background:var(--hc-theme-surface-2);color:var(--hc-theme-text);
+}
+body[data-hc289-mode=light] #medPanel label.imgStudyChoice {
+  background:var(--hc-theme-surface-2);color:var(--hc-theme-text)!important;
+}
+body[data-hc289-mode=light] #medPanel label.imgStudyChoice:has(input:checked) {
+  background:var(--hc310-green);color:var(--hc310-green-text)!important;
+}
