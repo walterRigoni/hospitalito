@@ -74,6 +74,9 @@ async function run() {
             return route.fulfill({json:{ok:true,visit}});
           }
           if(b.action==='myVisits'&&!b.token)return route.fulfill({json:{ok:true,visits:[prior,upcoming]}});
+          if(b.action==='notifications'&&b.token)return route.fulfill({json:{ok:true,notifications:[{
+            id:'recordatorio-ficticio',kind:'tele_reminder',title:'Recordatorio de turno · 24 horas',body:'Turno de prueba'
+          }]}});
           if(b.action==='notifications'&&!b.token)return route.fulfill({json:{ok:true,notifications:[{
             id:'aviso-ficticio',kind:'tele_booking',title:'Nueva solicitud de turno',body:'Atención a Domicilio',
             payload:{visitId:'aviso-domicilio',mode:'home'}
@@ -226,6 +229,7 @@ async function run() {
       assert.equal(await portal.locator('.hc305PortalNav').count(),0);
       const start=portal.locator('.hc310CalendarTall .hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]');
       await start.waitFor();
+      await portal.locator('[data-hc310-reminders]').filter({hasText:'Avisos · 1'}).waitFor({state:'attached'});
       const equal=await portal.locator('.hc310MonthGrid:not([inert])').first().locator('button').evaluateAll(buttons=>{
         const dims=buttons.map(b=>b.getBoundingClientRect());
         return Math.max(...dims.map(d=>d.height))-Math.min(...dims.map(d=>d.height))<1 &&

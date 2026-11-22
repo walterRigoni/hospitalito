@@ -244,6 +244,9 @@ change("data-pro-profile aria-label=\"Perfil\">Perfil",
 change(" $('[data-pro-profile]',root).onclick=()=>window.HC310.professionalProfile(mode,user());\n window.HC310.professionalAlerts(root);",
     " root.hc310Account=section=>{\n   if(section==='logout')return $('[data-exit]',root).click();\n   if(section==='notifications')return window.hc296Notifications();\n   return window.HC310.professionalProfile(mode,user(),section);\n };\n $('[data-pro-alerts]',root).onclick=()=>window.hc296Notifications();\n const alertTimer=setInterval(()=>{if(!root.isConnected)clearInterval(alertTimer);else window.HC310.professionalAlerts(user());},5000);\n window.HC310.professionalAlerts(user());")
 
+change("if(!window.hc289ClientSession)window.HC310.professionalAlerts(JSON.parse(localStorage.getItem(LS.globalAuthUser)||'{}'),true);",
+    "if(window.hc289ClientSession)q('#hc289Portal')?.hc310RefreshReminders?.();\n else window.HC310.professionalAlerts(JSON.parse(localStorage.getItem(LS.globalAuthUser)||'{}'),true);")
+
 assets = ['ui/v310.css', 'ui/v310.js']
 insertion = ''.join(
     f'<{tag} id="hc-v310-{kind}">\n{(root / file).read_text(encoding="utf-8")}\n</{tag}>\n'

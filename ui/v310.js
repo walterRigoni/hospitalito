@@ -94,6 +94,28 @@
     setOpen(!mobile.matches);
     if (!mobile.matches) width(290);
     avatar($('#hc289PortalAccount',portal),window.hc289ClientSession?.user);
+    watchPatientReminders(portal);
+  }
+
+  function watchPatientReminders(portal) {
+    const button=$('[data-hc310-reminders]',portal);
+    let previous=null, checking=false;
+    async function refresh() {
+      if(!portal.isConnected||document.hidden||checking||!window.hc292Tele)return;
+      checking=true;
+      try{
+        const result=await window.hc292Tele.api('notifications');
+        if(!portal.isConnected)return;
+        const unread=(result.notifications||[]).filter(n=>!n.read_at);
+        button.textContent=unread.length?'Avisos · '+unread.length:'Avisos';
+        button.classList.toggle('hc310NewAlerts',unread.length>0);
+        if(previous&&unread.some(n=>!previous.has(n.id)))window.hc289Toast('Tenés un recordatorio de turno.');
+        previous=new Set(unread.map(n=>n.id));
+      }catch{}finally{checking=false;}
+    }
+    const timer=setInterval(()=>{if(portal.isConnected)refresh();else clearInterval(timer);},30000);
+    portal.hc310RefreshReminders=refresh;
+    refresh();
   }
 
   function renderSidebar(bookings,directory,ready,warning,ui) {
