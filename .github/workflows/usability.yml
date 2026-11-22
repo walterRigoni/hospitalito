@@ -1,8 +1,8 @@
 name: Hospitalito - revisión de interfaz
 on:
   push:
-    branches: [main, codex/hospitalito-v315]
-    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'ui/v313.*', 'ui/v314.*', 'ui/v315.*', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tools/build-v313.py', 'tools/build-v314.py', 'tools/build-v315.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', 'tests/formats-v313.cjs', '.github/workflows/usability.yml']
+    branches: [main, codex/hospitalito-v316]
+    paths: ['index.html', 'ui/v311.*', 'ui/v312.css', 'ui/v313.*', 'ui/v314.*', 'ui/v315.*', 'ui/v316.css', 'tests/portal-camera.cjs', 'tools/build-v311.py', 'tools/build-v312.py', 'tools/build-v313.py', 'tools/build-v314.py', 'tools/build-v315.py', 'tools/build-v316.py', 'tests/usability-v310.cjs', 'tests/access-v311.cjs', 'tests/formats-v313.cjs', '.github/workflows/usability.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,7 +24,8 @@ jobs:
           python3 tools/build-v313.py
           python3 tools/build-v314.py
           python3 tools/build-v315.py
-          git diff --exit-code -- index.html Hospitalito_v311.html Hospitalito_v312.html Hospitalito_v313.html Hospitalito_v314.html Hospitalito_v315.html
+          python3 tools/build-v316.py
+          git diff --exit-code -- index.html Hospitalito_v311.html Hospitalito_v312.html Hospitalito_v313.html Hospitalito_v314.html Hospitalito_v315.html Hospitalito_v316.html
       - name: Probar respuestas del inicio de sesión
         run: node tests/access-v311.cjs
       - name: Probar formatos de cada cuenta

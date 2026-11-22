@@ -44,7 +44,12 @@ module.exports=async function run(options={}){
   check(await front.locator('[data-photo-source="album"]').getAttribute('accept')==='image/*','Album includes all image formats');
   check(await front.locator('[data-photo-source="camera"]').getAttribute('capture')==='environment','Native fallback requests rear camera');
   check(await front.locator('[data-photo-source="files"]').getAttribute('accept')===null,'Files fallback is not filtered by gallery image formats');
-  const photo=async color=>Buffer.from(await page.evaluate(color=>{const c=document.createElement('canvas');c.width=480;c.height=300;const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,480,300);return c.toDataURL('image/png').split(',')[1];},color),'base64');
+  const photo=async(color,portrait=false)=>Buffer.from(await page.evaluate(({color,portrait})=>{
+   const c=document.createElement('canvas');c.width=portrait?300:480;c.height=portrait?480:300;
+   const ctx=c.getContext('2d');ctx.fillStyle=color;ctx.fillRect(0,0,c.width,c.height);
+   if(portrait){ctx.fillStyle='#ffff00';ctx.fillRect(0,0,c.width,c.height/4);}
+   return c.toDataURL('image/png').split(',')[1];
+  },{color,portrait}),'base64');
   const red=await photo('#c00000'),blue=await photo('#0000c0');
   const choose=async(panel,source,buffer,name='foto-reciente.png',mimeType='image/png')=>{
    const pickerPromise=page.waitForEvent('filechooser');await panel.locator('[data-pick-document="'+source+'"]').click();const picker=await pickerPromise;
@@ -64,7 +69,14 @@ module.exports=async function run(options={}){
   await front.locator('[data-photo-source="files"]').setInputFiles({name:'incorrecto.txt',mimeType:'text/plain',buffer:Buffer.from('invalid')});
   await front.locator('.hc290PhotoStatus').filter({hasText:'Elegí un archivo de imagen'}).waitFor();
   check(await front.locator('.hc290PhotoPreview img').getAttribute('src')===valid,'Invalid replacement preserves the valid photo');
-  await choose(back,'album',blue);const backBefore=await back.locator('.hc290PhotoPreview img').getAttribute('src');
+  await choose(back,'album',await photo('#0000c0',true));
+  const backFrame=back.locator('.hc290PhotoPreview'),backBefore=await backFrame.locator('img').getAttribute('src');
+  check(await backFrame.getAttribute('data-dni-turns')==='1','A portrait DNI opens with a landscape rotation');
+  const frameRatio=await backFrame.evaluate(el=>el.clientWidth/el.clientHeight);
+  check(frameRatio>1.5&&frameRatio<1.7,'The DNI preview has a landscape frame on mobile');
+  const rotateBack=back.getByRole('button',{name:'Girar dorso del DNI 90°'});
+  await rotateBack.click();await rotateBack.click();
+  check(await backFrame.getAttribute('data-dni-turns')==='3','The patient can correct the rotation before saving');
   await front.locator('[data-open-camera]').click();await front.locator('[data-take-photo]:enabled').waitFor();
   check(await page.evaluate(()=>__constraints.at(-1).audio===false&&__constraints.at(-1).video.facingMode.ideal==='environment'),'Camera prefers rear lens and never requests the microphone');
   await front.locator('[data-take-photo]').click();await front.locator('.hc290PhotoStatus').filter({hasText:'Foto lista.'}).waitFor();
@@ -98,6 +110,14 @@ module.exports=async function run(options={}){
   await form.locator('button[type=submit]').click();await page.locator('#hc289SignupStatus').filter({hasText:'Fallo de prueba'}).waitFor();
   check(registrations.length===1&&registrations[0].document.data.startsWith('data:image/jpeg;base64,')&&registrations[0].documentBack.data.startsWith('data:image/jpeg;base64,'),'Explicit registration converts both sources to server-compatible JPEGs');
   check(registrations[0].document.data!==registrations[0].documentBack.data,'Registration keeps the two DNI sides distinct');
+  const reverse=await page.evaluate(async src=>{
+   const img=new Image();img.src=src;await img.decode();
+   const c=document.createElement('canvas');c.width=img.naturalWidth;c.height=img.naturalHeight;
+   const ctx=c.getContext('2d');ctx.drawImage(img,0,0);
+   return {width:c.width,height:c.height,left:[...ctx.getImageData(10,30,1,1).data],right:[...ctx.getImageData(c.width-10,30,1,1).data]};
+  },registrations[0].documentBack.data);
+  check(reverse.width===480&&reverse.height===300&&reverse.left[0]>200&&reverse.right[2]>120,
+    'The uploaded JPEG is landscape and uses the selected rotation');
   check(await form.locator('[name=name]').inputValue()==='PERSONA FICTICIA','Submission error preserves the review fields');
   await previous.click();
   check(await front.locator('.hc290PhotoPreview').isVisible()&&await back.locator('.hc290PhotoPreview').isVisible(),'A registration error preserves both photos');

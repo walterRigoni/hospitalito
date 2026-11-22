@@ -1,0 +1,31 @@
+.hc316DniFrame {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  margin-inline: auto;
+  background: var(--hc-theme-bg);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.hc316DniFrame img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(var(--dni-rotation, 0deg));
+}
+.hc316DniFrame[data-dni-turns="1"] { --dni-rotation: 90deg; }
+.hc316DniFrame[data-dni-turns="2"] { --dni-rotation: 180deg; }
+.hc316DniFrame[data-dni-turns="3"] { --dni-rotation: 270deg; }
+.hc316DniFrame:is([data-dni-turns="1"], [data-dni-turns="3"]) img {
+  width: 62.5%;
+  height: 160%;
+}
+.hc290SavedDocument [data-dni-rotate] { margin-top: 10px; }

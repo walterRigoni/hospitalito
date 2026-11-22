@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v315 · Historia Clínica Digital</title>
+<title>Hospitalito v316 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v315</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v316</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -47474,7 +47474,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 315;
+  const CURRENT_VERSION = 316;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -50253,25 +50253,46 @@ function identityImage(file){
     img.onload=()=>resolve({img,url});img.onerror=()=>{URL.revokeObjectURL(url);reject(Error('No pude abrir esa foto. Usá la cámara o elegí una imagen JPG, PNG o WebP.'));};img.src=url;
   });
 }
-async function identityCanvas(file,ocr=false){
+async function identityCanvas(file,ocr=false,turns=0){
   const {img,url}=await identityImage(file);
   try{
     if(!img.naturalWidth||!img.naturalHeight)throw Error('La foto está vacía. Elegí otra.');
     const longest=Math.max(img.naturalWidth,img.naturalHeight),ratio=ocr?Math.min(2.5,3600/longest,Math.sqrt(8000000/(img.naturalWidth*img.naturalHeight)),Math.max(1,2400/longest)):Math.min(1,2000/longest);
     const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*ratio));canvas.height=Math.max(1,Math.round(img.naturalHeight*ratio));
     const ctx=canvas.getContext('2d',{willReadFrequently:ocr});if(!ctx)throw Error('No se pudo preparar la foto. Probá con otra imagen.');
-    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,canvas.width,canvas.height);return ocr&&window.HC292OCR?window.HC292OCR.rotate(canvas,file.__hc292Rotation||0):canvas;
+    ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,canvas.width,canvas.height);return window.HC292OCR.rotate(canvas,turns);
   }finally{URL.revokeObjectURL(url);}
+}
+function initialDniTurns(img){
+  return img.naturalHeight>img.naturalWidth?1:0;
+}
+function orientSavedDocuments(gallery){
+  for(const card of gallery.querySelectorAll('.hc290SavedDocument')){
+    const frame=card.querySelector('.hc316DniFrame'),img=frame.querySelector('img'),button=card.querySelector('[data-dni-rotate]');
+    const initialize=()=>{
+      if(!img.naturalWidth)return;
+      frame.dataset.dniTurns=initialDniTurns(img);
+      button.disabled=false;
+    };
+    if(img.complete)initialize();
+    else img.addEventListener('load',initialize,{once:true});
+    button.onclick=()=>{frame.dataset.dniTurns=(Number(frame.dataset.dniTurns)+1)%4;};
+  }
 }
 function identityGallery(result){
   const docs=Array.isArray(result.documents)?result.documents:result.data?[{side:'front',data:result.data}]:[];
-  return docs.filter(d=>image(d.data)).map(d=>'<figure class="hc290SavedDocument"><figcaption>'+E(d.side==='back'?'Dorso del DNI':'Frente del DNI')+'</figcaption><a href="'+image(d.data)+'" download="dni-'+(d.side==='back'?'dorso':'frente')+'.jpg" aria-label="Descargar '+(d.side==='back'?'dorso':'frente')+' del DNI"><img src="'+image(d.data)+'" alt="'+(d.side==='back'?'Dorso':'Frente')+' del DNI"></a></figure>').join('');
+  return docs.filter(d=>image(d.data)).map(d=>'<figure class="hc290SavedDocument"><figcaption>'+E(d.side==='back'?'Dorso del DNI':'Frente del DNI')+'</figcaption><a class="hc316DniFrame" href="'+image(d.data)+'" download="dni-'+(d.side==='back'?'dorso':'frente')+'.jpg" aria-label="Descargar '+(d.side==='back'?'dorso':'frente')+' del DNI"><img src="'+image(d.data)+'" alt="'+(d.side==='back'?'Dorso':'Frente')+' del DNI"></a><button type="button" data-dni-rotate disabled aria-label="Girar '+(d.side==='back'?'dorso':'frente')+' del DNI 90°">Girar foto</button></figure>').join('');
+}
+function renderDniGallery(gallery,result){
+  gallery.innerHTML=identityGallery(result);
+  orientSavedDocuments(gallery);
 }
 window.hc290IdentityGallery=identityGallery;
+window.hc316RenderDniGallery=renderDniGallery;
 async function loadPersonalDocuments(el){
   const status=el.querySelector('#hc290MyDocumentStatus'),gallery=el.querySelector('#hc290MyDocuments');if(!status||!gallery)return;
   status.textContent='Cargando las fotos de tu DNI…';
-  try{const j=await api('myIdentityDocuments');if(!el.isConnected)return;gallery.innerHTML=identityGallery(j);status.textContent=!j.documents?.length?'Todavía no hay fotos de DNI guardadas.':j.documents.some(d=>d.side==='back')?'Fotos guardadas en tu cuenta.':'Tu cuenta tiene el frente guardado. El dorso se solicita en los nuevos registros.';}
+  try{const j=await api('myIdentityDocuments');if(!el.isConnected)return;renderDniGallery(gallery,j);status.textContent=!j.documents?.length?'Todavía no hay fotos de DNI guardadas.':j.documents.some(d=>d.side==='back')?'Fotos guardadas en tu cuenta.':'Tu cuenta tiene el frente guardado. El dorso se solicita en los nuevos registros.';}
   catch(error){if(!el.isConnected)return;status.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.textContent='Volver a cargar el DNI';retry.onclick=()=>loadPersonalDocuments(el);status.append(document.createElement('br'),retry);}
 }
 function registrationUsername(value){
@@ -50281,7 +50302,7 @@ function registrationUsername(value){
 async function signup(){
   const photoPanel=(side,label)=>{
     const face=side==='front'?'frente':'dorso',id='hc290Document'+side;
-    return '<fieldset class="hc290Document" data-document-side="'+side+'"><legend>'+label+'</legend><p class="hc290PhotoHint">Que se vea completo, con buena luz y sin reflejos.</p><div class="hc290PhotoPreview" hidden><img alt="Vista previa del '+face+' del DNI"></div><input class="hc290File" id="'+id+'" name="'+(side==='front'?'document':'documentBack')+'" type="file" accept="image/*" data-photo-source="album" aria-label="Elegir foto del '+face+' del DNI"><input class="hc290File" type="file" accept="image/*" capture="environment" data-photo-source="camera" aria-label="Sacar foto del '+face+' del DNI"><input class="hc290File" type="file" data-photo-source="files" aria-label="Buscar foto del '+face+' del DNI en archivos"><div class="hc290PhotoActions"><button type="button" class="hc290Choose" data-pick-document="album">Elegir del álbum</button><button type="button" data-open-camera aria-expanded="false" aria-controls="hc291Camera'+side+'">Usar cámara</button><button type="button" data-remove-document hidden>Eliminar foto</button></div><div id="hc291Camera'+side+'" class="hc291Camera" hidden><video autoplay playsinline muted aria-label="Cámara para el '+face+' del DNI"></video><p data-camera-status role="status" aria-live="polite"></p><div class="hc290PhotoActions"><button type="button" data-take-photo disabled>Sacar foto</button><button type="button" data-pick-document="camera" hidden>Abrir cámara del dispositivo</button><button type="button" data-close-camera>Cerrar cámara</button></div></div><details class="hc291PhotoHelp"><summary>¿No aparece tu foto reciente?</summary><p>Volvé a abrir el álbum y buscá en Recientes o Cámara. Si no aparece, podés buscarla en Archivos o usar la cámara de arriba. Revisá también que el navegador tenga permiso para ver esa foto.</p><button type="button" data-pick-document="files">Buscar en archivos</button></details><p class="hc290PhotoStatus" role="status" aria-live="polite"></p></fieldset>';
+    return '<fieldset class="hc290Document" data-document-side="'+side+'"><legend>'+label+'</legend><p class="hc290PhotoHint">Poné el DNI en horizontal, con buena luz y sin reflejos.</p><div class="hc290PhotoPreview hc316DniFrame" hidden><img alt="Vista previa del '+face+' del DNI"></div><input class="hc290File" id="'+id+'" name="'+(side==='front'?'document':'documentBack')+'" type="file" accept="image/*" data-photo-source="album" aria-label="Elegir foto del '+face+' del DNI"><input class="hc290File" type="file" accept="image/*" capture="environment" data-photo-source="camera" aria-label="Sacar foto del '+face+' del DNI"><input class="hc290File" type="file" data-photo-source="files" aria-label="Buscar foto del '+face+' del DNI en archivos"><div class="hc290PhotoActions"><button type="button" class="hc290Choose" data-pick-document="album">Elegir del álbum</button><button type="button" data-open-camera aria-expanded="false" aria-controls="hc291Camera'+side+'">Usar cámara</button><button type="button" data-dni-rotate hidden aria-label="Girar '+face+' del DNI 90°">Girar foto</button><button type="button" data-remove-document hidden>Eliminar foto</button></div><div id="hc291Camera'+side+'" class="hc291Camera" hidden><video autoplay playsinline muted aria-label="Cámara para el '+face+' del DNI"></video><p data-camera-status role="status" aria-live="polite"></p><div class="hc290PhotoActions"><button type="button" data-take-photo disabled>Sacar foto</button><button type="button" data-pick-document="camera" hidden>Abrir cámara del dispositivo</button><button type="button" data-close-camera>Cerrar cámara</button></div></div><details class="hc291PhotoHelp"><summary>¿No aparece tu foto reciente?</summary><p>Volvé a abrir el álbum y buscá en Recientes o Cámara. Si no aparece, podés buscarla en Archivos o usar la cámara de arriba. Revisá también que el navegador tenga permiso para ver esa foto.</p><button type="button" data-pick-document="files">Buscar en archivos</button></details><p class="hc290PhotoStatus" role="status" aria-live="polite"></p></fieldset>';
   };
   const el=dialog('Registro de paciente','<p>Creá tu cuenta para consultar turnos y resultados. Las fotos del DNI se guardan de forma privada en tus datos personales.</p><form id="hc289Signup" class="hc289Form" novalidate><h3 class="hc289Full hc290Step">1. Tu acceso</h3><label>Correo electrónico o nombre de usuario<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" minlength="3" maxlength="100" required aria-describedby="hc290UsernameHelp hc290UsernameStatus"><small id="hc290UsernameHelp">Lo vas a usar para iniciar sesión.</small><span id="hc290UsernameStatus" role="status"></span></label><label>Contraseña<input name="password" type="password" minlength="10" maxlength="200" autocomplete="new-password" required><small>Usá 10 caracteres o más.</small></label><h3 class="hc289Full hc290Step">2. Fotos del DNI</h3>'+photoPanel('front','Frente del DNI')+photoPanel('back','Dorso del DNI')+'<div class="hc289Full"><button type="button" id="hc289Scan" disabled>Leer datos del DNI</button><progress id="hc290OCRProgress" max="100" value="0" hidden aria-label="Progreso de lectura del DNI"></progress><p id="hc289OCRStatus" role="status" aria-live="polite">Agregá las fotos. Intentaremos completar tus datos automáticamente.</p><p class="hc290PhotoHint">Revisá lo que se leyó. Si falta algún dato, podés escribirlo abajo.</p></div><h3 class="hc289Full hc290Step">3. Revisá tus datos</h3><label class="hc289Full">Nombre completo<input name="name" autocomplete="name" maxlength="150" required></label><label>DNI<input name="dni" inputmode="numeric" autocomplete="off" pattern="[0-9]{6,9}" maxlength="9" required></label><label>Fecha de nacimiento<input name="dob" type="date" min="1900-01-01" max="'+new Date().toISOString().slice(0,10)+'" required></label><label class="hc289Full">Institución<select name="institutionId"><option value="">Elegir después</option></select><small>También podés elegirla más adelante.</small></label><label class="hc289Full hc289Check"><input name="confirmedData" type="checkbox" required>Revisé mis datos y autorizo el uso de las fotos del DNI para verificar mi identidad y vincular mi ficha en la institución que elija.</label><button class="hc289Primary hc289Full" type="submit">Crear cuenta</button><p id="hc289SignupStatus" class="hc289Full" role="status" aria-live="polite"></p><button type="button" id="hc290ExistingLogin" class="hc289Full">Ya tengo cuenta · Iniciar sesión</button></form>');
   el.classList.add('hc290Registration');
@@ -50314,7 +50335,7 @@ async function signup(){
   form.elements.dni.addEventListener('input',()=>{form.elements.dni.value=form.elements.dni.value.replace(/\D/g,'').slice(0,9);});
   form.elements.username.addEventListener('input',()=>{form.elements.username.removeAttribute('aria-invalid');form.elements.username.setCustomValidity('');el.querySelector('#hc290UsernameStatus').textContent='';});
   const resetRead=()=>{stop();for(const key of ['name','dni','dob'])if(auto[key]&&form.elements[key].value===auto[key]&&!edited.has(key)){form.elements[key].value='';delete auto[key];}form.elements.confirmedData.checked=false;status.textContent='';};
-  const updatePanel=side=>{const panel=el.querySelector('[data-document-side="'+side+'"]'),p=photos[side],preview=panel.querySelector('.hc290PhotoPreview');preview.hidden=!p;if(p)preview.querySelector('img').src=p.url;else preview.querySelector('img').removeAttribute('src');panel.querySelector('.hc290Choose').textContent=p?'Cambiar del álbum':'Elegir del álbum';panel.querySelector('[data-remove-document]').hidden=!p;panel.querySelector('.hc290PhotoStatus').textContent=p?'Foto lista.':'Sin foto seleccionada.';window.HC292OCR?.attach(panel,p,()=>scheduleRead());};
+  const updatePanel=side=>{const panel=el.querySelector('[data-document-side="'+side+'"]'),p=photos[side],preview=panel.querySelector('.hc290PhotoPreview');preview.hidden=!p;preview.dataset.dniTurns=p?.ocrRotation||0;if(p)preview.querySelector('img').src=p.url;else preview.querySelector('img').removeAttribute('src');panel.querySelector('.hc290Choose').textContent=p?'Cambiar del álbum':'Elegir del álbum';panel.querySelector('[data-remove-document]').hidden=!p;panel.querySelector('[data-dni-rotate]').hidden=!p;panel.querySelector('.hc290PhotoStatus').textContent=p?'Foto lista.':'Sin foto seleccionada.';window.HC292OCR.attach(panel,p,()=>{stop();scheduleRead();});};
   function scheduleRead(){clearTimeout(timer);timer=setTimeout(()=>readDocuments(),450);}
   async function receivePhoto(side,f){
     if(!f||saving||disposed)return false;
@@ -50325,7 +50346,7 @@ async function signup(){
       const decoded=await identityImage(f);
       if(pick!==selections[side]||disposed||!el.isConnected||saving){URL.revokeObjectURL(decoded.url);return false;}
       if(!decoded.img.naturalWidth||!decoded.img.naturalHeight){URL.revokeObjectURL(decoded.url);throw Error('La foto está vacía. Elegí otra.');}
-      resetRead();if(photos[side])URL.revokeObjectURL(photos[side].url);photos[side]={file:f,url:decoded.url};updatePanel(side);scanButton.disabled=false;ocrStatus.textContent='Foto lista. Preparando la lectura de los datos…';scheduleRead();return true;
+      resetRead();if(photos[side])URL.revokeObjectURL(photos[side].url);photos[side]={file:f,url:decoded.url,ocrRotation:initialDniTurns(decoded.img)};updatePanel(side);scanButton.disabled=false;ocrStatus.textContent='Foto lista. Preparando la lectura de los datos…';scheduleRead();return true;
     }catch(error){if(pick===selections[side]&&el.isConnected&&!disposed)panel.querySelector('.hc290PhotoStatus').textContent=error.message;return false;}
     finally{if(photoBusy[side]===pick)photoBusy[side]=0;}
   }
@@ -50389,7 +50410,7 @@ async function signup(){
       for(const side of ['front','back']){
         if(!snapshot[side])continue;if(!live(job))return;
         ocrStatus.textContent='Leyendo el '+(side==='front'?'frente':'dorso')+' del DNI…';
-        snapshot[side].file.__hc292Rotation=snapshot[side].ocrRotation||0;const canvas=await identityCanvas(snapshot[side].file,true);if(!live(job)){canvas.width=canvas.height=1;return;}
+        const canvas=await identityCanvas(snapshot[side].file,true,snapshot[side].ocrRotation);if(!live(job)){canvas.width=canvas.height=1;return;}
         let result=await deadline(localWorker.recognize(canvas,{rotateAuto:true}),45000,'La lectura está tardando demasiado. Reintentá con una foto más clara o escribí los datos a mano.');
         if(!live(job))return;readings[side]=result.data?.text||'';let parsed=applyRead();
         const weak=side==='front'&&(!parsed.name||!parsed.dni||!parsed.dob||Number(result.data?.confidence??100)<72);
@@ -50420,7 +50441,7 @@ async function signup(){
     const values=Object.fromEntries(new FormData(form)),snapshot={...photos},credentials={username:user.value,password:form.elements.password.value};values.username=credentials.username;values.password=credentials.password;values.confirmedData=form.elements.confirmedData.checked;
     stop();closeCamera();saving=true;form.setAttribute('aria-busy','true');const controls=[...form.querySelectorAll('button,input,select')].map(node=>({node,disabled:node.disabled}));controls.forEach(({node})=>node.disabled=true);status.textContent='Guardando tus fotos y creando la cuenta…';let created=false;
     try{
-      const documents={};for(const side of ['front','back']){const canvas=await identityCanvas(snapshot[side].file);documents[side]={name:'dni-'+(side==='front'?'frente':'dorso')+'.jpg',data:canvas.toDataURL('image/jpeg',.9)};canvas.width=canvas.height=1;}
+      const documents={};for(const side of ['front','back']){const canvas=await identityCanvas(snapshot[side].file,false,snapshot[side].ocrRotation);documents[side]={name:'dni-'+(side==='front'?'frente':'dorso')+'.jpg',data:canvas.toDataURL('image/jpeg',.9)};canvas.width=canvas.height=1;}
       values.document=documents.front;values.documentBack=documents.back;
       await api('register',values);created=true;form.elements.password.value='';status.textContent='Cuenta creada. Abriendo tu portal…';
       try{const auth=await window.hc230AuthRequest('authenticateUser',credentials);if(auth.user?.role!=='cliente')throw Error('Iniciá sesión para continuar.');el.remove();dispose();await window.hc289EnterClient(auth);window.hc289Toast('Tu cuenta está lista. Las fotos del DNI están en Datos personales.');}
@@ -50719,7 +50740,7 @@ async function adminPortal(selected=scope()){
  let institutions=[];try{institutions=loadJSON(LS.globalAuthInstitutions,[])||[];}catch{}if(role()==='superadmin')try{const a=await window.hc230AuthRequest('platformOverview',{token:localStorage.getItem(LS.globalAuthToken)});institutions=a.institutions.filter(i=>i.active!==false).map(i=>({id:i.id,name:i.display_name||i.name}));}catch(e){q('#hc289AdminStatus').textContent=e.message;}if(!institutions.some(i=>String(i.id)===selected)&&selected)institutions.push({id:selected,name:selected});const sel=q('#hc289AdminScope');sel.innerHTML=institutions.map(i=>'<option value="'+E(i.id)+'" '+(String(i.id)===selected?'selected':'')+'>'+E(i.name||i.id)+'</option>').join('');sel.onchange=()=>adminPortal(sel.value);if(!sel.value){q('#hc289AdminStatus').textContent='Elegí o creá primero una institución desde Hospitalito.';return;}const inst=sel.value;
  try{const [a,p]=await Promise.all([api('institutionSettings',{institutionId:inst}),api('pendingClients',{institutionId:inst})]);if(!el.isConnected)return;const s=a.settings||{};q('#hc289AdminStatus').textContent='';q('#hc289InstitutionSettings').innerHTML='<h3>Directorio público de la institución</h3><form id="hc289InstPortalForm" class="hc289Form"><label class="hc289Full">Dirección<input name="address" value="'+E(s.address)+'" required></label><label>Teléfono<input name="phone" value="'+E(s.phone)+'"></label><div><button type="button" id="hc289InstGPS">Tomar ubicación actual</button></div><label>Latitud<input name="latitude" type="number" step="any" min="-90" max="90" value="'+E(s.latitude)+'"></label><label>Longitud<input name="longitude" type="number" step="any" min="-180" max="180" value="'+E(s.longitude)+'"></label>'+check('enabled','Publicar la institución y sus agendas habilitadas',s.enabled)+'<button type="submit">Guardar directorio</button><p class="hc289Full hc289Notice">Turnero externo: no conectado. La institución sólo publicará la disponibilidad registrada en Hospitalito.</p></form>';const f=q('#hc289InstPortalForm');q('#hc289InstGPS').onclick=e=>action(e.currentTarget,async()=>{const p=await window.hc289Geo();f.elements.latitude.value=p.latitude;f.elements.longitude.value=p.longitude;},q('#hc289AdminStatus'));f.onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await api('saveInstitutionSettings',{institutionId:inst,settings:{...Object.fromEntries(new FormData(f)),enabled:f.elements.enabled.checked}});q('#hc289AdminStatus').textContent='Directorio guardado.';},q('#hc289AdminStatus'));};
  q('#hc289PendingClients').innerHTML=p.clients.map((v,n)=>'<article class="hc289Panel"><b>'+E(v.client?.legal_name)+' · @'+E(v.username)+'</b><p>DNI '+E(v.client?.dni)+' · Nacimiento '+E(window.HC313.date(v.client?.dob))+' · '+E(v.status)+'</p><button data-identity="'+n+'">Ver documento privado</button><div data-document="'+n+'"></div><form data-verify="'+n+'" class="hc289Form"><label>Vincular ficha clínica<select name="patientId"><option value="">Sin ficha previa · cliente ambulatorio</option>'+(v.matches||[]).map(m=>'<option value="'+E(m.id)+'" '+(m.id===v.patient_id?'selected':'')+'>'+E(m.name)+' · DNI '+E(v.client.dni)+'</option>').join('')+'</select></label><label>Decisión<select name="status"><option value="verified">Verificar</option><option value="rejected">Rechazar</option><option value="revoked">Revocar autorización</option></select></label><label class="hc289Full">Fundamento / comprobación realizada<textarea name="note" required>'+E(v.note)+'</textarea></label>'+check('identityChecked','Comprobé la identidad y la correspondencia de la ficha')+'<button type="submit">Registrar decisión</button><p role="status" class="hc289Full"></p></form></article>').join('')||'<p>No hay solicitudes de clientes en esta institución.</p>';
- q('#hc289PendingClients').querySelectorAll('[data-identity]').forEach(b=>b.onclick=()=>action(b,async()=>{const j=await api('identityDocument',{institutionId:inst,username:p.clients[Number(b.dataset.identity)].username});const box=el.querySelector('[data-document="'+b.dataset.identity+'"]');box.classList.add('hc290DocumentGallery');box.innerHTML=window.hc290IdentityGallery(j);},q('#hc289AdminStatus')));
+ q('#hc289PendingClients').querySelectorAll('[data-identity]').forEach(b=>b.onclick=()=>action(b,async()=>{const j=await api('identityDocument',{institutionId:inst,username:p.clients[Number(b.dataset.identity)].username});const box=el.querySelector('[data-document="'+b.dataset.identity+'"]');box.classList.add('hc290DocumentGallery');window.hc316RenderDniGallery(box,j);},q('#hc289AdminStatus')));
  q('#hc289PendingClients').querySelectorAll('form').forEach(f=>f.onsubmit=e=>{e.preventDefault();const v=p.clients[Number(f.dataset.verify)];action(e.submitter,async()=>{await api('verifyIdentity',{institutionId:inst,username:v.username,...Object.fromEntries(new FormData(f)),identityChecked:f.elements.identityChecked.checked});f.querySelector('[role=status]').textContent='Decisión guardada para esta institución.';},f.querySelector('[role=status]'));});
  }catch(e){if(el.isConnected)q('#hc289AdminStatus').textContent=e.message;}
 }
@@ -50774,8 +50795,15 @@ function rotate(source,turns){turns=((turns||0)%4+4)%4;if(!turns)return source;c
 function region(source,r){const x=Math.max(0,Math.floor(source.width*r.x)),y=Math.max(0,Math.floor(source.height*r.y)),w=Math.min(source.width-x,Math.max(1,Math.floor(source.width*r.w))),h=Math.min(source.height-y,Math.max(1,Math.floor(source.height*r.h))),scale=Math.min(2.5,3600/Math.max(w,h),Math.sqrt(8000000/(w*h)));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(w*scale));c.height=Math.max(1,Math.round(h*scale));const ctx=c.getContext('2d',{willReadFrequently:true});ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,x,y,w,h,0,0,c.width,c.height);return c;}
 function enhance(source){const c=copy(source),ctx=c.getContext('2d',{willReadFrequently:true}),img=ctx.getImageData(0,0,c.width,c.height),d=img.data,hist=new Uint32Array(256),gray=new Uint8Array(c.width*c.height);for(let i=0,p=0;i<d.length;i+=4,p++){const v=Math.round(d[i]*.299+d[i+1]*.587+d[i+2]*.114);gray[p]=v;hist[v]++;}const total=gray.length;let sum=0,lo=0,hi=255;for(let n=0;n<256;n++){sum+=hist[n];if(sum<total*.02)lo=n;if(sum<total*.98)hi=n;}const span=Math.max(50,hi-lo);for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){const p=y*c.width+x,i=p*4,v=gray[p];let sharp=v;if(x>0&&x<c.width-1&&y>0&&y<c.height-1)sharp=v+.45*(v-(gray[p-1]+gray[p+1]+gray[p-c.width]+gray[p+c.width])/4);const out=Math.max(0,Math.min(255,(sharp-lo)*255/span));d[i]=d[i+1]=d[i+2]=out;d[i+3]=255;}ctx.putImageData(img,0,0);return c;}
 async function imageCanvas(file){const url=URL.createObjectURL(file);try{const img=new Image();img.src=url;await img.decode();const scale=Math.min(1,1000/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');c.width=Math.round(img.naturalWidth*scale);c.height=Math.round(img.naturalHeight*scale);c.getContext('2d').drawImage(img,0,0,c.width,c.height);return c;}finally{URL.revokeObjectURL(url);}}
-function attach(panel,photo,read){let details=panel.querySelector('[data-292-ocr]');if(!details){details=document.createElement('details');details.dataset['292Ocr']='';details.className='hc292OCRAdjust';details.innerHTML='<summary>Mejorar lectura de letras pequeñas</summary><p>Si sobra fondo, marcá con el dedo o el mouse el rectángulo que ocupa el DNI. Acercá la cámara y evitá reflejos: ampliar una imagen borrosa no recupera el detalle.</p><button type="button" data-crop-open>Ajustar encuadre</button><button type="button" data-crop-reset>Usar foto completa</button><button type="button" data-crop-rotate>Girar lectura 90°</button><p data-crop-status role="status"></p><canvas data-crop-canvas hidden aria-label="Marcá el área del DNI arrastrando un rectángulo"></canvas>';panel.append(details);}if(details._photo!==photo)details.querySelector('canvas').hidden=true;details._photo=photo;details.querySelectorAll('button').forEach(b=>b.disabled=!photo);if(!photo){details.querySelector('canvas').hidden=true;details.querySelector('[data-crop-status]').textContent='Primero agregá una foto.';return;}let source=null,start=null,selection=null;const canvas=details.querySelector('canvas'),status=details.querySelector('[data-crop-status]');const point=e=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))};};const paint=()=>{if(!source)return;const ctx=canvas.getContext('2d');ctx.drawImage(source,0,0);const r=selection||photo.ocrCrop;if(r){ctx.fillStyle='rgba(30,140,240,.15)';ctx.fillRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);ctx.strokeStyle='#1685e8';ctx.lineWidth=3;ctx.strokeRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);}};
-details.querySelector('[data-crop-open]').onclick=async()=>{const selected=details._photo;try{source=rotate(await imageCanvas(selected.file),selected.ocrRotation);if(selected!==details._photo||!details.isConnected){source.width=source.height=1;return;}canvas.width=source.width;canvas.height=source.height;canvas.hidden=false;paint();status.textContent='Arrastrá desde una esquina del DNI hasta la esquina opuesta. Luego usá Leer DNI.';}catch{status.textContent='No se pudo abrir el encuadre. Probá otra foto.';}};canvas.onpointerdown=e=>{if(!source)return;e.preventDefault();start=point(e);canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!start)return;const end=point(e);selection={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(end.x-start.x),h:Math.abs(end.y-start.y)};paint();};canvas.onpointerup=e=>{if(!start)return;canvas.releasePointerCapture(e.pointerId);start=null;if(selection?.w>.1&&selection?.h>.1){photo.ocrCrop=selection;status.textContent='Encuadre listo. Se usa para leer; la foto original se conserva.';read();}else{selection=null;status.textContent='Marcá un rectángulo más grande, que incluya todo el DNI.';}paint();};canvas.onpointercancel=()=>{start=null;selection=null;paint();};details.querySelector('[data-crop-reset]').onclick=()=>{photo.ocrCrop=null;selection=null;paint();status.textContent='Se leerá la foto completa.';read();};details.querySelector('[data-crop-rotate]').onclick=()=>{photo.ocrRotation=((photo.ocrRotation||0)+1)%4;photo.ocrCrop=null;source=null;canvas.hidden=true;status.textContent='Lectura girada '+photo.ocrRotation*90+'°. La foto original se conserva.';read();};}
+function attach(panel,photo,read){let details=panel.querySelector('[data-292-ocr]');if(!details){details=document.createElement('details');details.dataset['292Ocr']='';details.className='hc292OCRAdjust';details.innerHTML='<summary>Mejorar lectura de letras pequeñas</summary><p>Si sobra fondo, marcá con el dedo o el mouse el rectángulo que ocupa el DNI. Acercá la cámara y evitá reflejos: ampliar una imagen borrosa no recupera el detalle.</p><button type="button" data-crop-open>Ajustar encuadre</button><button type="button" data-crop-reset>Usar foto completa</button><p data-crop-status role="status"></p><canvas data-crop-canvas hidden aria-label="Marcá el área del DNI arrastrando un rectángulo"></canvas>';panel.append(details);}if(details._photo!==photo)details.querySelector('canvas').hidden=true;details._photo=photo;details.querySelectorAll('button').forEach(b=>b.disabled=!photo);if(!photo){details.querySelector('canvas').hidden=true;details.querySelector('[data-crop-status]').textContent='Primero agregá una foto.';return;}let source=null,start=null,selection=null;const canvas=details.querySelector('canvas'),status=details.querySelector('[data-crop-status]');const point=e=>{const rect=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width)),y:Math.max(0,Math.min(1,(e.clientY-rect.top)/rect.height))};};const paint=()=>{if(!source)return;const ctx=canvas.getContext('2d');ctx.drawImage(source,0,0);const r=selection||photo.ocrCrop;if(r){ctx.fillStyle='rgba(30,140,240,.15)';ctx.fillRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);ctx.strokeStyle='#1685e8';ctx.lineWidth=3;ctx.strokeRect(r.x*canvas.width,r.y*canvas.height,r.w*canvas.width,r.h*canvas.height);}};
+details.querySelector('[data-crop-open]').onclick=async()=>{const selected=details._photo,rotation=selected.ocrRotation;try{const prepared=rotate(await imageCanvas(selected.file),rotation);if(selected!==details._photo||rotation!==selected.ocrRotation||!details.isConnected){prepared.width=prepared.height=1;return;}source=prepared;canvas.width=source.width;canvas.height=source.height;canvas.hidden=false;paint();status.textContent='Arrastrá desde una esquina del DNI hasta la esquina opuesta. Luego usá Leer DNI.';}catch{status.textContent='No se pudo abrir el encuadre. Probá otra foto.';}};canvas.onpointerdown=e=>{if(!source)return;e.preventDefault();start=point(e);canvas.setPointerCapture(e.pointerId);};canvas.onpointermove=e=>{if(!start)return;const end=point(e);selection={x:Math.min(start.x,end.x),y:Math.min(start.y,end.y),w:Math.abs(end.x-start.x),h:Math.abs(end.y-start.y)};paint();};canvas.onpointerup=e=>{if(!start)return;canvas.releasePointerCapture(e.pointerId);start=null;if(selection?.w>.1&&selection?.h>.1){photo.ocrCrop=selection;status.textContent='Encuadre listo. Se usa para leer; la foto original se conserva.';read();}else{selection=null;status.textContent='Marcá un rectángulo más grande, que incluya todo el DNI.';}paint();};canvas.onpointercancel=()=>{start=null;selection=null;paint();};details.querySelector('[data-crop-reset]').onclick=()=>{photo.ocrCrop=null;selection=null;paint();status.textContent='Se leerá la foto completa.';read();};panel.querySelector('[data-dni-rotate]').onclick=()=>{
+  photo.ocrRotation=(photo.ocrRotation+1)%4;
+  panel.querySelector('.hc290PhotoPreview').dataset.dniTurns=photo.ocrRotation;
+  photo.ocrCrop=null;source=null;start=null;selection=null;canvas.hidden=true;
+  panel.querySelector('.hc290PhotoStatus').textContent='Foto lista. Vista girada '+photo.ocrRotation*90+'°.';
+  status.textContent='';
+  read();
+};}
 window.HC292OCR={rotate,region,enhance,attach};
 })();
 
@@ -51560,7 +51588,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v315";document.title="Hospitalito · Historia Clínica Digital · v315";
+window.HC_DEMO_VERSION="v316";document.title="Hospitalito · Historia Clínica Digital · v316";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -52229,7 +52257,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v315</small></button>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v316</small></button>'+
       '<span class="hc289PortalWho">'+E(user.name)+'</span><div class="hc314AccountActions"><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button><button id="hc314AccountMenuTrigger" type="button" class="hc314Ghost hc312IconOnly" aria-haspopup="menu" aria-expanded="false" aria-label="Opciones de cuenta" title="Opciones de cuenta">'+window.hc289Icon('down')+'</button></div></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
@@ -53412,5 +53440,38 @@ body #hc289Portal .hc315Location [data-location-status]:empty {display:none;}
   window.HC315={rankProviders,distanceLabel};
 })();
 </script>
+<style id="hc-v316-dni">
+.hc316DniFrame {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  margin-inline: auto;
+  background: var(--hc-theme-bg);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.hc316DniFrame img {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  transform: translate(-50%, -50%) rotate(var(--dni-rotation, 0deg));
+}
+.hc316DniFrame[data-dni-turns="1"] { --dni-rotation: 90deg; }
+.hc316DniFrame[data-dni-turns="2"] { --dni-rotation: 180deg; }
+.hc316DniFrame[data-dni-turns="3"] { --dni-rotation: 270deg; }
+.hc316DniFrame:is([data-dni-turns="1"], [data-dni-turns="3"]) img {
+  width: 62.5%;
+  height: 160%;
+}
+.hc290SavedDocument [data-dni-rotate] { margin-top: 10px; }
+</style>
 </body>
 </html>

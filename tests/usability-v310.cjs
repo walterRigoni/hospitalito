@@ -56,6 +56,11 @@ async function run() {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
       const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[],availabilityRequests=[];
+      const identityPhotos=await page.evaluate(()=>['front','back'].map(side=>{
+        const canvas=document.createElement('canvas');
+        canvas.width=side==='front'?32:20;canvas.height=side==='front'?20:32;
+        return {side,data:canvas.toDataURL('image/png')};
+      }));
       let failDirectory=true,changedQuote=true,resolveNote;
       let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test',latitude:-31.4,longitude:-64.2};
       let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
@@ -80,7 +85,7 @@ async function run() {
           myReports:{reports:[{id:'r1',visit_id:'visita-de-prueba',name:'Informe de prueba'}]},
           myPrescriptions:{prescriptions:[{id:'rx1',visit_id:'visita-de-prueba',name:'Receta de prueba.pdf'}]},
           documentFile:{url:'https://frbuhczonftjtvmviehw.supabase.co/storage/v1/object/sign/test/rx.pdf',name:'Receta de prueba.pdf'},
-          myIdentityDocuments:{documents:[]},
+          myIdentityDocuments:{documents:identityPhotos},
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
           myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings}
         };
@@ -411,6 +416,20 @@ async function run() {
       await telephone.getByText('1100001122').waitFor();
       assert.equal(personal.address,'Dirección de prueba 42');
       assert.equal(personal.email,'paciente@example.test');
+      const savedPhoto=accountPanel.locator('#hc290MyDocuments .hc290SavedDocument');
+      const frontFrame=savedPhoto.nth(0).locator('.hc316DniFrame');
+      const backFrame=savedPhoto.nth(1).locator('.hc316DniFrame');
+      const rotateReverse=savedPhoto.nth(1).getByRole('button',{name:'Girar dorso del DNI 90°'});
+      await accountPanel.locator('#hc290MyDocuments [data-dni-rotate]:enabled').first().waitFor();
+      await savedPhoto.nth(1).locator('[data-dni-rotate]:enabled').waitFor();
+      assert.equal(await frontFrame.getAttribute('data-dni-turns'),'0');
+      assert.equal(await backFrame.getAttribute('data-dni-turns'),'1');
+      const reverseBounds=await backFrame.boundingBox();
+      assert(reverseBounds.width/reverseBounds.height>1.5);
+      await rotateReverse.click();
+      assert.equal(await backFrame.getAttribute('data-dni-turns'),'2');
+      assert.equal(await frontFrame.getAttribute('data-dni-turns'),'0');
+      assert.equal(await backFrame.getAttribute('href'),identityPhotos[1].data);
       if(width>800){
         const layout=await accountPanel.evaluate(el=>{
           const outer=el.getBoundingClientRect(),nav=el.querySelector('.hcSettingsNav').getBoundingClientRect(),stage=el.querySelector('.hcSettingsStage').getBoundingClientRect();
