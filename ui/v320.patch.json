@@ -362,6 +362,26 @@
     [
       "${showRxPanel ? \"Cerrar panel\" : \"Nueva prescripción\"}",
       "${showRxPanel ? \"Cerrar panel\" : \"+ Nueva prescripción\"}"
+    ],
+    [
+      "let menuTrigger=null,hoverTimer;\ndocument.addEventListener('pointerover',event=>{\n if(event.pointerType!=='mouse')return;",
+      "let menuTrigger=null,hoverTimer,menuPinned=false;\ndocument.addEventListener('pointerover',event=>{\n if(event.pointerType!=='mouse'||menuPinned||!matchMedia('(any-hover:hover)').matches)return;"
+    ],
+    [
+      " if(event.pointerType==='mouse'&&event.target.closest('#btnAccount,#hc289PortalAccount,[data-pro-profile],#hc289AccountMenu'))\n   hoverTimer=setTimeout(()=>{if(!menu.matches(':hover')&&!menuTrigger?.matches(':hover'))closeMenu();},180);",
+      " if(event.pointerType==='mouse'&&!menuPinned&&event.target.closest('#btnAccount,#hc289PortalAccount,[data-pro-profile],#hc289AccountMenu'))\n   hoverTimer=setTimeout(()=>{if(!menuPinned&&!menu.matches(':hover')&&!menuTrigger?.matches(':hover'))closeMenu();},180);"
+    ],
+    [
+      "function closeMenu(restore=false){\n menu.hidden=true;menuTrigger?.setAttribute('aria-expanded','false');",
+      "function closeMenu(restore=false){\n clearTimeout(hoverTimer);menuPinned=false;\n menu.hidden=true;menuTrigger?.setAttribute('aria-expanded','false');"
+    ],
+    [
+      "new MutationObserver(()=>{if(menu.hidden)menuTrigger?.setAttribute('aria-expanded','false');}).observe(menu,{attributes:true,attributeFilter:['hidden']});",
+      "new MutationObserver(()=>{if(menu.hidden){clearTimeout(hoverTimer);menuPinned=false;menuTrigger?.setAttribute('aria-expanded','false');}}).observe(menu,{attributes:true,attributeFilter:['hidden']});"
+    ],
+    [
+      "   if(window.HC310.touch(e)&&!menu.hidden&&menuTrigger===account)closeMenu();else openMenu(account);",
+      "   if(menuPinned&&!menu.hidden&&menuTrigger===account)closeMenu();\n   else{clearTimeout(hoverTimer);openMenu(account);menuPinned=true;}"
     ]
   ]
 }

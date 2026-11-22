@@ -297,9 +297,7 @@ async function run() {
       await professionalAvatar.evaluate(button=>window.HC310.avatar(button,{}));
       const accountMenu=page.locator('#hc289AccountMenu');
       const openProfessionalMenu=async()=>{
-        if(!await accountMenu.isVisible()){
-          if(width<800)await professionalAvatar.tap();else await professionalAvatar.click();
-        }
+        if(width<800)await professionalAvatar.tap();else await professionalAvatar.click();
         await accountMenu.waitFor();
       };
       await openProfessionalMenu();
