@@ -136,12 +136,14 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
    const at=str(b.start,40),previous=str(b.previousStart,40);
    if(!Number.isFinite(Date.parse(at))||!Number.isFinite(Date.parse(previous)))throw Error('Horario inválido');
    const result=check(await c.rpc('hc317_change_private_visit',{account:a.username,visit:v.id,previous_start:previous,new_start:at}));
+   if(Date.parse(v.starts_at)!==Date.parse(result.starts_at))await audit(c,a,'reschedule',v.id,{previousStart:previous,startsAt:result.starts_at});
    return reply({ok:true,visit:result});
  }
  if(act==='cancel'){
    const result=check(await c.rpc('hc317_change_private_visit',{
      account:a.username,visit:v.id,previous_start:typeof b.previousStart==='string'?str(b.previousStart,40):v.starts_at,new_start:null
    }));
+   if(v.status!=='cancelled')await audit(c,a,'cancel',v.id);
    return reply({ok:true,refundPending:result.refundPending});
  }
  if(act==='documents')return reply({ok:true,documents:check(await c.from('hc_tele_documents').select('id,name,kind,mime,published_at').eq('visit_id',v.id).order('published_at',{ascending:false}))});

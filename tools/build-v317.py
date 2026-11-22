@@ -115,7 +115,7 @@ change("""        lastSearch={results,partial,institution,directory,selectedMode
         if(!results.length&&!partial){
           const search=lastSearch;
           alternatives.hidden=false;
-          alternatives.innerHTML='<h3>Próximos turnos disponibles</h3><p data-next-status role="status">Consultando las próximas dos semanas…</p><div data-next-results></div>'+
+          alternatives.innerHTML='<h3>Próximos turnos disponibles</h3><p data-next-status role="status">Consultando las próximas fechas…</p><div data-next-results></div>'+
             '<p>Si se libera un turno para esta búsqueda dentro de las próximas dos semanas, te avisamos en Avisos.</p>'+
             '<button type="button" data-join-waitlist>Anotarme en lista de espera</button><p data-wait-status role="status"></p>';
           const join=$('[data-join-waitlist]',alternatives),waitStatus=$('[data-wait-status]',alternatives);

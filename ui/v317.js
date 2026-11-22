@@ -131,17 +131,34 @@
   }
 
   async function nextOffers({providers,institution,directory,mode,day,today,monthFor,privateSlots,isCurrent}) {
-    const first=shifted(day,1), last=[shifted(day,14),shifted(today,90)].sort()[0];
+    const horizon=shifted(today,90);
+    const verified=new Set((directory.verifications||[]).filter(v=>v.status==='verified').map(v=>v.institution_id));
+    const eligible=institution?providers.filter(p=>!p.private_practice&&verified.has(p.institution_id)):
+      providers.filter(p=>p.modes?.[mode]?.enabled&&p.modes[mode].rates?.length&&
+        Object.values(p.modes[mode].weekly?.days||{}).some(day=>day?.active));
+    const calendars=new Map();
+    const monthCalendar=(provider,month)=>{
+      const key=provider+':'+month;
+      if(!calendars.has(key))calendars.set(key,monthFor(provider,month));
+      return calendars.get(key);
+    };
+    let last=horizon;
+    for(let first=shifted(day,1);eligible.length&&first<=horizon&&isCurrent();first=shifted(last,1)){
+      last=[shifted(first,13),horizon].sort()[0];
+      const found=await offerWindow({eligible,institution,mode,first,last,monthCalendar,privateSlots,isCurrent});
+      if(found.offers.length||found.partial)return {...found,last};
+    }
+    return {offers:[],partial:false,last};
+  }
+
+  async function offerWindow({eligible,institution,mode,first,last,monthCalendar,privateSlots,isCurrent}) {
     const offers=[];
     let partial=false;
-    if(first>last)return {offers,partial,last};
     if(institution){
-      const verified=new Set((directory.verifications||[]).filter(v=>v.status==='verified').map(v=>v.institution_id));
-      const eligible=providers.filter(p=>!p.private_practice&&verified.has(p.institution_id));
       const months=[...new Set([first.slice(0,7),last.slice(0,7)])];
       for(let i=0;i<eligible.length&&isCurrent();i+=6){
         const found=await Promise.allSettled(eligible.slice(i,i+6).map(async profile=>{
-          const calendars=await Promise.all(months.map(month=>monthFor(profile.id,month)));
+          const calendars=await Promise.all(months.map(month=>monthCalendar(profile.id,month)));
           const slots=calendars.flatMap(j=>j.days||[]).filter(d=>d.date>=first&&d.date<=last)
             .flatMap(d=>d.slots||[]).filter(s=>s.available);
           return slots.slice(0,2).map(slot=>({profile,slot,day:slot.local.slice(0,10),minutes:null}));
@@ -152,7 +169,6 @@
         }
       }
     }else{
-      const eligible=providers.filter(p=>p.modes?.[mode]?.enabled&&p.modes[mode].rates?.length);
       for(let i=0;i<eligible.length&&isCurrent();i+=20){
         const group=eligible.slice(i,i+20);
         try {
@@ -166,7 +182,7 @@
         } catch { partial=true; }
       }
     }
-    return {offers,partial,last};
+    return {offers,partial};
   }
 
   function offerList(root, offers, directory, mode, origin, select) {

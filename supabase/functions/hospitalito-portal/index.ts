@@ -181,6 +181,8 @@ Deno.serve(async(req:Request)=>{
    const booking=ok(await c.rpc('hc317_change_institution_booking',{
      patient:a.username,booking:text(b.id,40),previous_start:previous,new_start:start+':00-03:00'
    }));
+   const p=await provider(c,booking.provider_id);
+   await audit(c,a,'booking_rescheduled',p.institution_id,booking.id,{previousStart:previous,startsAt:booking.starts_at});
    return response({ok:true,booking});
  }
  if(action==='bookingStatus'){
@@ -191,6 +193,10 @@ Deno.serve(async(req:Request)=>{
      ok(await c.rpc('hc317_change_institution_booking',{
        patient:a.username,booking:booking.id,previous_start:typeof b.previousStart==='string'?text(b.previousStart,40):booking.starts_at,new_start:null
      }));
+     if(booking.status!=='cancelled'){
+       const p=await provider(c,booking.provider_id);
+       await audit(c,a,'booking_cancelled',p.institution_id,booking.id);
+     }
    }else{
      const p=await provider(c,booking.provider_id);await providerAuthority(c,a,p);
      if(!['confirmed','cancelled','attended'].includes(status))throw Error('Estado inválido.');

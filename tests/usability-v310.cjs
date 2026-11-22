@@ -664,7 +664,7 @@ async function run() {
       await search.click();
       const alternative=mainPane.locator('[data-next-offer]').first();
       await alternative.waitFor();
-      assert.match(await alternative.innerText(),/09:00.*Profesional de prueba.*Calle de prueba 100.*0 km/s);
+      assert.match(await alternative.innerText(),/09:00.*Profesional de prueba.*Calle de prueba 100.*10,2 km/s);
       await alternative.click();
       await mainPane.locator('#hc292Slots button[aria-pressed=true]').waitFor();
       assert(await mainPane.locator('#hc292Reserve').isDisabled());
