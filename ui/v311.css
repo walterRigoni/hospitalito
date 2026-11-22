@@ -1,0 +1,113 @@
+/* Apply a matched theme background and foreground to each full-screen surface. */
+body #hc289Portal .hc311FullAccount {
+  position:fixed;inset:0;z-index:1000006;box-sizing:border-box;margin:0;
+  max-width:none;overflow:auto;background:var(--hc310-bg);color:var(--hc310-text);
+  padding:clamp(14px,2.5vw,30px) max(16px,calc((100vw - 1080px)/2));
+}
+body :is(#hc289Dialog,#hc289Portal,#hcSettingsModal) .hc310Settings {
+  height:auto;min-height:0;align-items:start;grid-template-columns:minmax(148px,215px) minmax(0,1fr);
+  gap:clamp(12px,2.5vw,26px);background:var(--hc310-bg)!important;color:var(--hc310-text);
+}
+body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsNav {
+  display:grid;gap:4px;overflow:visible;margin:0;padding:9px;border:1px solid var(--hc310-line);
+  border-radius:12px;background:var(--hc310-surface);color:var(--hc310-text);
+}
+body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsNavBtn {
+  display:flex;justify-content:flex-start;align-items:center;min-height:40px;text-align:left;
+  line-height:1.25;white-space:normal;padding:7px 10px;border:0;color:var(--hc310-text);background:transparent;
+}
+body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsNavBtn[aria-current=page] {
+  background:var(--hc-theme-accent-soft);color:var(--hc310-text);
+}
+body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsStage {
+  display:block;min-width:0;height:auto;overflow:visible;padding:clamp(12px,2.1vw,22px);
+  background:var(--hc310-surface)!important;color:var(--hc310-text);border:1px solid var(--hc310-line);border-radius:12px;
+}
+body :is(#hc289Dialog,#hc289Portal,#hcSettingsModal) :is(.hcSettingsPage,.hc289Swatches,.hc311Font) {color:var(--hc310-text);}
+body :is(#hc289Dialog,#hc289Portal,#hcSettingsModal) .hc289Swatches button {
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;
+  background:var(--hc310-raised);color:var(--hc310-text);line-height:1.2;
+}
+body :is(#hc289Dialog,#hc289Portal,#hcSettingsModal) .hc289Swatches button[aria-pressed=true] {
+  background:var(--hc-theme-accent-soft);color:var(--hc310-text);outline-color:var(--hc310-focus);
+}
+.hc311Font {display:flex;flex-wrap:wrap;gap:8px 12px;align-items:baseline;margin-top:18px;}
+.hc311Font details {position:relative;min-width:146px;}
+.hc311Font summary,.hc311Font fieldset {
+  margin:0;padding:8px 12px;background:var(--hc310-surface);color:var(--hc310-text);
+  border:1px solid var(--hc310-line);border-radius:8px;
+}
+.hc311Font summary {cursor:pointer;}
+.hc311Font fieldset {padding:5px;margin-top:3px;}
+.hc311Font fieldset label {display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;}
+.hc311Font input[type=radio] {width:auto;accent-color:var(--hc310-focus);}
+.hc311Font fieldset label:hover {background:var(--hc310-raised);}
+.hc311Font select,.hc311Font summary,.hc311Font label {max-width:100%;}
+
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal) :is(.hc289Panel,.hc289Row,.hc309CareChoices,.hc310ProfessionalAgenda,.hc310ResultDetail) {
+  color:var(--hc310-text);
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal) :is(.hc289Notice,.hc310Muted,.hcSettingsCardSub,.hcSettingsHero p) {
+  color:var(--hc310-muted);
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal) :is(.hc289Row,.hc310ProfessionalAgenda,.hc310ResultDetail) {
+  background:var(--hc310-surface);border-color:var(--hc310-line);
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace) :is(.hc310ProfessionalAgenda,.hc310Calendar,.hc310Booking) :is(button,select) {
+  opacity:1;
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace) .hc310MonthGrid>button[disabled] {opacity:1;}
+.hc310MonthGrid {transform-origin:center;}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal,#hc289AccountMenu) :is(header button,.hc310SideToggle,.hc310MonthHeader button,.hc289Slots button) {
+  align-items:center;justify-content:center;line-height:1.2;text-align:center;
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace,#hcSettingsModal,#hc289AccountMenu) :is(header button,.hc310SideToggle,.hc310MonthHeader button):not(.hc310Avatar) {
+  display:inline-flex;
+}
+body :is(#hc289Portal,#hc289Dialog,#hc297Workspace) .hc310VisitLine {justify-content:flex-start;}
+body #hc289Portal .hc310Booking .hc309CareChoices button {
+  display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;
+}
+body .hc311Close:is(button),body #hcSettingsModal .hc311Close {
+  display:inline-grid!important;place-items:center;align-content:center;justify-content:center;
+  box-sizing:border-box;width:40px;height:40px;min-width:40px;min-height:40px;padding:0!important;
+  border:0!important;background:transparent!important;color:var(--hc310-text)!important;
+  box-shadow:none!important;border-radius:8px;cursor:pointer;font:26px/1 system-ui!important;
+}
+body .hc311Close:is(button):hover,body #hcSettingsModal .hc311Close:hover {
+  background:var(--hc310-raised)!important;
+}
+body .hc311Close:focus-visible {outline:2px solid var(--hc310-focus);outline-offset:2px;}
+body .hc311Close svg {display:block;width:21px;height:21px;flex:none;pointer-events:none;}
+body #hc289Portal .hc310SideNav {
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 5px;padding-top:10px;
+}
+body #hc289Portal .hc310SideNav button {
+  position:relative;display:inline-flex;align-items:center;justify-content:center;
+  min-height:38px;padding:6px 3px;line-height:1.2;white-space:normal;text-align:center;
+}
+body #hc289Portal .hc310SideNav button::after {
+  position:absolute;content:"";inset:auto 10% 2px;height:2px;border-radius:2px;
+  background:currentColor;transform:scaleX(0);opacity:0;transition:transform 200ms ease,opacity 200ms ease;
+}
+body #hc289Portal .hc310SideNav button[aria-current=page]::after {transform:scaleX(1);opacity:1;}
+#hc289Portal #hc310UrgentHelp {background:transparent;padding:0;}
+body #hc289Portal #hc310UrgentHelp a {
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  width:min(100%,560px);min-height:clamp(112px,24vh,225px);margin:20px auto;
+  box-sizing:border-box;padding:18px;background:#b51f38;color:#fff;
+  border-radius:14px;text-decoration:none;font-size:clamp(26px,5vw,52px);font-weight:850;
+}
+body #hc289Portal #hc310UrgentHelp a:hover {background:#98182e;}
+@media (max-width:650px) {
+  body :is(#hc289Dialog,#hc289Portal) .hc310Settings {grid-template-columns:1fr;}
+  body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsNav {
+    grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
+  }
+  body :is(#hc289Dialog,#hc289Portal) .hc310Settings .hcSettingsNavBtn {
+    justify-content:center;text-align:center;
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  body #hc289Portal .hc310SideNav button::after {transition:none;}
+}

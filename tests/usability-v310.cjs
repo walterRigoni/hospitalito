@@ -45,6 +45,8 @@ async function run() {
       page.on('pageerror',error=>{errors.push(error.message);console.error('Error de interfaz:',error.stack);});
       await page.route('**/*',async route=>{
         if(route.request().url()===site) return route.fulfill({contentType:'text/html',body:html});
+        if(route.request().url().includes('/storage/v1/object/sign/test/rx.pdf'))
+          return route.fulfill({contentType:'application/pdf',body:'%PDF-1.4\n%%EOF'});
         const b=route.request().postDataJSON()||{};
         const responses={
           publicBranding:{settings:{programName:'Hospitalito'}},
@@ -53,6 +55,8 @@ async function run() {
           calendar:{days:[{date:today,free:1,total:1,slots:[{local:today+'T22:00',available:true}]}]},
           calendarVisits:{visits:[upcoming]},
           myReports:{reports:[{id:'r1',visit_id:'visita-de-prueba',name:'Informe de prueba'}]},
+          myPrescriptions:{prescriptions:[{id:'rx1',visit_id:'visita-de-prueba',name:'Receta de prueba.pdf'}]},
+          documentFile:{url:'https://frbuhczonftjtvmviehw.supabase.co/storage/v1/object/sign/test/rx.pdf',name:'Receta de prueba.pdf'},
           myIdentityDocuments:{documents:[]},
           myProfile:{role:'medico',professionalPhoto:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jWZkAAAAASUVORK5CYII=',profile:null},
           myVisits:{visits}, clientData:{admissions:[],results:[],orders:[],bookings}
@@ -246,7 +250,17 @@ async function run() {
         const vp=await portal.locator('.hc310CalendarViewport').boundingBox();
         const transform=await portal.locator('.hc310CalendarTrack').evaluate(e=>e.style.transform);
         await page.mouse.move(vp.x+vp.width*.7,vp.y+80);await page.mouse.down();
-        await page.mouse.move(vp.x+vp.width*.35,vp.y+80,{steps:6});
+        const cards=portal.locator('.hc310CalendarTrack > .hc310MonthGrid');
+        const measure=()=>cards.evaluateAll(nodes=>nodes.map(node=>[
+          Number(getComputedStyle(node).opacity),new DOMMatrix(getComputedStyle(node).transform).a
+        ]));
+        await page.mouse.move(vp.x+vp.width*.67,vp.y+80);
+        const early=await measure();
+        await page.mouse.move(vp.x+vp.width*.21,vp.y+80,{steps:6});
+        const middle=await measure();
+        assert(early[2][0]<.25&&early[2][1]<.85);
+        assert(middle[2][0]>early[2][0]&&middle[2][1]>early[2][1]);
+        assert(middle[1][0]<early[1][0]&&middle[1][1]<early[1][1]);
         assert.notEqual(await portal.locator('.hc310CalendarTrack').evaluate(e=>e.style.transform),transform);
         await page.mouse.up();
         assert.equal(await page.evaluate(()=>getSelection().toString()),'');
@@ -265,17 +279,43 @@ async function run() {
         await profile.click();
       }
       await portal.locator('#hc289Dialog').getByRole('heading',{name:'Perfil',exact:true}).waitFor();
+      const accountPanel=portal.locator('#hc289Dialog');
+      await accountPanel.getByRole('button',{name:'Cerrar',exact:true}).click();
       if(width<800)await profile.tap();else {
         await page.mouse.move(0,0);
         await profile.hover();
       }
       await accountMenu.getByRole('menuitem',{name:'Configuración'}).click();
       const patientSettings=portal.locator('#hc289Dialog .hc310Settings');
+      const accountBounds=await accountPanel.boundingBox();
+      assert.equal(accountBounds.width,width);
+      assert.equal(accountBounds.height,844);
+      for(const theme of ['light','dark']){
+        await patientSettings.locator('[data-vmode='+theme+']').click();
+        await contrast(patientSettings.locator('[data-vmode='+theme+']'));
+        await contrast(patientSettings.locator('[aria-current=page]'));
+        await contrast(accountPanel.getByRole('button',{name:'Cerrar',exact:true}));
+      }
+      await patientSettings.locator('.hc311Font summary').click();
+      assert.match(await patientSettings.getByText('Georgia',{exact:true}).evaluate(e=>getComputedStyle(e).fontFamily),/Georgia/);
+      await patientSettings.getByText('Georgia',{exact:true}).click();
+      assert.match(await patientSettings.locator('.hc311Font summary').innerText(),/Georgia/);
+      await patientSettings.getByRole('button',{name:'Avisos de turnos'}).click();
+      await patientSettings.getByRole('checkbox',{name:/avisos emergentes/}).uncheck();
+      assert.equal(await page.evaluate(()=>localStorage.getItem('hc311.patientReminders.test')),'off');
       await patientSettings.getByRole('button',{name:'Seguridad'}).click();
       await patientSettings.getByLabel('Contraseña actual').waitFor();
       await patientSettings.getByRole('button',{name:'Apariencia'}).click();
       await patientSettings.locator('[data-vmode=dark]').waitFor();
+      await accountPanel.getByRole('button',{name:'Cerrar',exact:true}).click();
       await home.click();
+      await openSidebar();
+      await portal.getByRole('button',{name:'Mis Recetas'}).click();
+      await portal.getByRole('heading',{name:'Mis Recetas'}).waitFor();
+      assert.equal(await portal.locator('[data-portal-section=prescriptions]').getAttribute('aria-current'),'page');
+      const download=page.waitForEvent('download');
+      await portal.getByRole('button',{name:'Receta de prueba.pdf'}).click();
+      assert.equal((await download).suggestedFilename(),'Receta de prueba.pdf');
       await openSidebar();
       await portal.getByRole('button',{name:'Mis Estudios'}).click();
       await portal.getByRole('heading',{name:/Mis estudios/i}).waitFor();
@@ -288,8 +328,13 @@ async function run() {
         assert(await portal.locator('#hc289Urgent').isVisible());
       }
       await portal.locator('#hc289Urgent').check();
-      await portal.getByRole('link',{name:'Llamar al 107'}).waitFor();
+      const urgent=portal.getByRole('link',{name:'Llamar al 107'});
+      await urgent.waitFor();
+      assert.equal(await urgent.getAttribute('href'),'tel:107');
+      assert.equal(await portal.locator('[data-booking-controls]').isVisible(),false);
+      assert((await urgent.boundingBox()).height>=112);
       await portal.locator('#hc289Urgent').uncheck();
+      assert.equal(await urgent.isVisible(),false);
       await portal.locator('.hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]').click();
       const search=portal.getByRole('button',{name:'Buscar',exact:true});
       await search.click();

@@ -48,11 +48,15 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
    const names=visits.length?check(await c.from('hc_auth_users').select('username,name').in('username',[...new Set(visits.map((visit:any)=>visit.client))])):[];
    return reply({ok:true,visits:visits.map(({client,...visit}:any)=>({...visit,peer_name:names.find((user:any)=>user.username===client)?.name||''}))});
  }
- if(act==='myReports'){
+ if(act==='myReports'||act==='myPrescriptions'){
    if(a.default_role!=='cliente')throw Error('Acceso del paciente requerido');
+   const isPrescription=act==='myPrescriptions';
    const documents=check(await c.from('hc_tele_documents').select('id,visit_id,name,published_at,hc_tele_visits!inner(client)')
-     .eq('hc_tele_visits.client',a.username).eq('kind','report').order('published_at',{ascending:false}).limit(200));
-   return reply({ok:true,reports:documents.map(({id,visit_id,name,published_at}:any)=>({id,visit_id,name,published_at}))});
+     .eq('hc_tele_visits.client',a.username).eq('kind',isPrescription?'prescription':'report')
+     .order('published_at',{ascending:false}).limit(200));
+   return reply({ok:true,[isPrescription?'prescriptions':'reports']:documents.map(
+     ({id,visit_id,name,published_at}:any)=>({id,visit_id,name,published_at})
+   )});
  }
  if(act==='myProfile'){const role=await pro(c,a),p=check(await c.from('hc_tele_profiles').select('*').eq('username',a.username).maybeSingle()),s=check(await c.from('hc_tele_sellers').select('collector_id,expires_at').eq('username',a.username).maybeSingle());return reply({ok:true,profile:p,role,professionalPhoto:/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(a.profile?.photo||'')?str(a.profile.photo,400000):'',paymentsConnected:!!s,trialAvailable:!s,oauthReady:configured()});}
  if(act==='saveProfile'){if(b.profileProtocol!==299)throw Error('Actualizá Hospitalito para editar la agenda con múltiples ubicaciones');const role=await pro(c,a),p=cleanProfile(b.profile,role);if(p.public_visible&&b.consentPublish!==true)throw Error('Confirmá la publicación de tu perfil');const existing=check(await c.from('hc_tele_profiles').select('revision').eq('username',a.username).maybeSingle());let r;if(existing){r=check(await c.from('hc_tele_profiles').update({...p,revision:existing.revision+1,updated_at:new Date().toISOString()}).eq('username',a.username).eq('revision',Number(b.revision)).select('*'));if(!r.length)throw Error('La agenda cambió en otro dispositivo. Volvé a abrirla');}else r=check(await c.from('hc_tele_profiles').insert({...p,username:a.username}).select('*'));await audit(c,a,'profile',a.username);return reply({ok:true,profile:r[0]});}

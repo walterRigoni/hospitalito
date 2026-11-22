@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const html=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
 let scripts=0;for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)){if(m[1].trim()){new vm.Script(m[1]);scripts++;}}
 const expectedVersion = 'v' + html.match(/const CURRENT_VERSION = (\d+);/)[1];
-const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62}[expectedVersion];
+const expectedScripts = {v306:58, v307:59, v308:60, v309:61,v310:62,v311:63}[expectedVersion];
 assert(html.includes('id="hc-v306-ui"'));assert.equal(scripts,expectedScripts);
 function fn(name){const start=html.indexOf('function '+name+'(');assert(start>=0,name);let depth=0,open=html.indexOf('{',start);for(let i=open;i<html.length;i++){if(html[i]==='{')depth++;if(html[i]==='}'&&!--depth)return html.slice(start,i+1);}throw Error(name);}
 const now=Date.parse('2026-11-21T02:00:00-03:00');class FakeDate extends Date{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}}
@@ -101,8 +101,8 @@ const {chromium}=require('playwright'),http=require('node:http');
  },expectedVersion);
  console.log('PASS browser:',checks.join(', '));console.log('page errors:',JSON.stringify(errors));
  await page.setViewportSize({width:390,height:844});await page.waitForTimeout(500);
- const layout=await page.evaluate(()=>{document.body.classList.add('hcMobile');const h=document.querySelector('#hc306ClinicalHeader');return {sticky:getComputedStyle(h).position,width:document.documentElement.scrollWidth,viewport:innerWidth,light:document.body.dataset.hc289Mode,back:getComputedStyle(document.querySelector('#hc300GlobalExit')).right};});
- assert.equal(layout.sticky,'sticky');assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
+ const layout=await page.evaluate(()=>{document.body.classList.add('hcMobile');const h=document.querySelector('#hc306ClinicalHeader');return {sticky:getComputedStyle(h).position,width:document.documentElement.scrollWidth,viewport:innerWidth,light:document.body.dataset.hc289Mode,logoutVisible:document.querySelector('#btnLogout').getClientRects().length>0};});
+ assert.equal(layout.sticky,'sticky');assert.equal(layout.logoutVisible,false);assert.equal(layout.light,'light');assert(layout.width<=layout.viewport+2,JSON.stringify(layout));console.log('PASS mobile layout',layout);
  await page.evaluate(()=>{const spacer=document.createElement('div');spacer.style.height='2000px';spacer.id='hc306StickyTest';document.querySelector('#medPanel').append(spacer);window.scrollTo(0,450);});
  await page.waitForTimeout(1100);
  const sticky=await page.evaluate(()=>({top:document.querySelector('#hc306ClinicalHeader').getBoundingClientRect().top,bar:document.querySelector('.topbar').getBoundingClientRect().bottom,scroll:scrollY}));
