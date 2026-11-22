@@ -83,7 +83,7 @@ async function run() {
       let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
       const profileRequest=()=>({client:{...patient,profile:personal},verifications:[{institution_id:'inst',status:'verified'}]});
       const prior={id:'consulta-anterior',mode:'office',status:'finished',starts_at:new Date(date.getTime()-86400000).toISOString(),minutes:30,is_trial:true,peer_name:'Persona anterior'};
-      const upcoming={...prior,id:'consulta-proxima',status:'confirmed',starts_at:new Date(today+'T23:59:00-03:00').toISOString(),peer_name:'Persona próxima'};
+      const upcoming={...prior,id:'consulta-proxima',status:'confirmed',starts_at:new Date(today+'T23:59:00-03:00').toISOString(),peer_name:'Persona próxima',location_snapshot:'Consultorio · Calle ficticia 10'};
       const next = new Date(today+'T23:59:00-03:00');
       const nextDay=today;
       page.setDefaultTimeout(8000);
@@ -99,7 +99,7 @@ async function run() {
           me:profileRequest(),
           calendar:{days:[{date:today,free:1,total:1,slots:[{local:today+'T22:00',available:true}]},
             {date:tomorrow,free:1,total:1,slots:[alternativeSlot]}]},
-          calendarVisits:{visits:[upcoming]},
+          calendarVisits:{visits:b.mode==='office'?[upcoming]:[]},
           myReports:{reports:[{id:'r1',visit_id:'visita-de-prueba',name:'Informe de prueba'}]},
           myPrescriptions:{prescriptions:[{id:'rx1',visit_id:'visita-de-prueba',name:'Receta de prueba.pdf'}]},
           documentFile:{url:'https://frbuhczonftjtvmviehw.supabase.co/storage/v1/object/sign/test/rx.pdf',name:'Receta de prueba.pdf'},
@@ -181,6 +181,7 @@ async function run() {
             id:'aviso-ficticio',kind:'tele_booking',title:'Nueva solicitud de turno',body:'Atención a Domicilio',
             payload:{visitId:'aviso-domicilio',mode:'home'}
           }]}});
+          if(b.action==='visitDirections')return route.fulfill({json:{ok:true,distance:1500,duration:150,steps:['Girás a la derecha']}});
           if(b.action==='visit'&&b.visitId==='aviso-domicilio')return route.fulfill({json:{ok:true,side:'provider',visit:{...upcoming,mode:'home'},peerName:'Paciente de domicilio'}});
           if(b.action==='clinicalRecord')return route.fulfill({json:{ok:true,note:null,history:[]}});
           if(b.action==='saveClinicalRecord'){
@@ -296,7 +297,9 @@ async function run() {
       await professionalAvatar.evaluate(button=>window.HC310.avatar(button,{}));
       const accountMenu=page.locator('#hc289AccountMenu');
       const openProfessionalMenu=async()=>{
-        if(width<800)await professionalAvatar.tap();else await professionalAvatar.hover();
+        if(!await accountMenu.isVisible()){
+          if(width<800)await professionalAvatar.tap();else await professionalAvatar.click();
+        }
         await accountMenu.waitFor();
       };
       await openProfessionalMenu();
@@ -306,6 +309,14 @@ async function run() {
       const workplaceDay=workspace.locator('[data-agenda-month] .hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]');
       await workplaceDay.click();
       await workspace.locator('[data-agenda-day] [data-calendar-visit]').first().waitFor();
+      const directions=workspace.locator('[data-agenda-day] [data-route-visit]').first();
+      await directions.locator('summary').click();
+      const origin={latitude:-31.4,longitude:-64.2};
+      await page.evaluate(point=>{window.HC299Geo.locate=async()=>point;},origin);
+      const routeRequest=page.waitForRequest(req=>req.method()==='POST'&&req.postDataJSON()?.action==='visitDirections');
+      await directions.getByRole('button',{name:'Calcular desde mi ubicación'}).click();
+      assert.deepEqual((await routeRequest).postDataJSON().origin,origin);
+      await directions.getByText('Girás a la derecha').waitFor();
       await workspace.locator('[data-day-back]').click();
       await workspace.locator('[data-month-picker]').click();
       await page.locator('dialog[open] [name=month]').waitFor();
