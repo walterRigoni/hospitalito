@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>Hospitalito v314 · Historia Clínica Digital</title>
+<title>Hospitalito v315 · Historia Clínica Digital</title>
 
 <link rel="manifest" href="manifest.webmanifest">
 <meta name="theme-color" content="#071a33">
@@ -5665,7 +5665,7 @@ html::-webkit-scrollbar-corner{
 
 <div class="topbar hc304Mainbar">
   <div style="display:flex; align-items:center; gap:10px;">
-    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v314</span></div>
+    <div style="font-weight:1000;"><span id="hc308BrandName">Historia Clínica</span> <span id="hc307Version">v315</span></div>
     <div class="muted" id="whoami" style="font-size:12px;">sin sesión</div>
   </div>
   <div style="display:flex; gap:8px; align-items:center;">
@@ -47474,7 +47474,7 @@ document.title='HC Demo v249 · Supabase';setTimeout(updateMobileCensoAlert,200)
   // Actualización automática del demo:
   // GitHub Pages puede demorar en publicar un commit. Una vez que la versión
   // nueva está disponible, Hospitalito la detecta sin depender del caché/PWA.
-  const CURRENT_VERSION = 314;
+  const CURRENT_VERSION = 315;
   function remoteVersionFromHtml(html){
     const s = String(html || "");
     const declared = s.match(/const CURRENT_VERSION\s*=\s*(\d+)/);
@@ -50559,13 +50559,14 @@ function calendarView(day=''){
  });
 }
 function changeMonth(n){month=new Date(month.getFullYear(),month.getMonth()+n,1);calendarView();}
-function dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML='<button data-289-back>‹ Calendario</button><h2>'+E(window.HC313.dayLabel(key))+'</h2>'+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'')+'<button data-289-new>Nuevo turno</button>';updatePortalNavigation();}
+function dayView(key){main().dataset.view='day';bookingUI=null;selectedDay=key;const rows=allBookings().filter(b=>localDate(b.starts_at)===key);main().innerHTML=window.HC314.sectionHeader(window.HC313.dayLabel(key))+rows.map(bookingRow).join('')+(!rows.length?'<p>No tenés turnos para este día.</p>':'');updatePortalNavigation();}
 function bookingRow(b){
  const p=directory.providers.find(p=>p.id===b.provider_id),color=bookingColor(b),privateVisit=!!b.privateVisit,name=b.peer_name||p?.name||b.provider_name||'Profesional';
  return '<article class="hc289Row hc304Appointment '+color+'"><div><b>'+E(name)+'</b><p>'+E(format(b.starts_at))+' · '+E(privateVisit?(window.HC310.modeLabel(b.mode)):b.telemedicine?'Telemedicina institucional':'Institución')+'</p><span class="hc305Status '+color+'">'+E(statusLabel(b.status))+'</span>'+(b.location_snapshot?'<p>'+E(b.location_snapshot)+'</p>':'')+'<div class="hc305AppointmentActions">'+(privateVisit?'<button type="button" data-304-visit="'+E(b.id)+'">Ver consulta y pagos</button>':'')+'<button type="button" data-hc305-date="'+E(localDate(b.starts_at))+'">Ver en calendario</button>'+(!privateVisit&&['pending','confirmed'].includes(b.status)?'<button type="button" data-289-cancel="'+E(b.id)+'">Cancelar turno</button>':'')+'</div></div></article>';
 }
 function resultsView(){main().dataset.view='results';window.HC311.markPortal('studies');bookingUI=null;main().innerHTML=window.HC314.sectionHeader('Mis Estudios')+data.orders.map(o=>'<article class="hc289Panel"><b>'+E(({lab:'Laboratorio',micro:'Microbiología',image:'Imágenes'})[o.kind])+'</b><p>'+E(o.requestedText)+'</p><p>'+E(statusLabel(o.status))+'</p>'+(o.status==='published'?'<pre class="hc289ResultText">'+E(o.text)+'</pre>'+o.files.map(f=>'<button data-289-file="'+E(o.id)+'" data-index="'+f.index+'">'+E(f.name)+'</button>').join(''):'')+'</article>').join('')+data.results.map(r=>'<article class="hc289Panel"><b>'+E(r.institutionName)+' · '+E(r.kind)+'</b><p>'+E(window.HC313.dateTime(r.date))+'</p><pre class="hc289ResultText">'+E(r.text)+'</pre></article>').join('')+(!data.orders.length&&!data.results.length?'<p class="hc289Notice">No hay resultados disponibles. Los informes aparecen cuando el profesional los publica.</p>':'');window.HC310.privateReports(main());}
 window.hc310ReleaseBooking=()=>{bookingUI=null;};
+window.hc315PatientPosition=()=>window.HC299Geo.point(me?.client?.profile);
 document.addEventListener('hc313FormatChanged',()=>{
  if(!window.hc289ClientSession||locked)return;
  registry();
@@ -50824,6 +50825,7 @@ window.hc292Search=async function(initial={}){
  let directory={providers:[],paymentsReady:false};
  await window.HC310.booking(main,{
    initial, roles, options, money, dateKey, alive:()=>seq===searchSerial,
+   patientPosition:()=>window.hc315PatientPosition?.(),
    privateDirectory:async()=>{const value=await api('directory');directory=value;return value;},
    institutionDirectory:async()=>{
    const [directory,profile]=await Promise.all([window.hc289PortalApi('directory'),window.hc289PortalApi('me')]);
@@ -51558,7 +51560,7 @@ body #medBAL .hc307BalanceScroll th{white-space:nowrap}
 
 </style>
 <script id="hc-v307-ui">
-window.HC_DEMO_VERSION="v314";document.title="Hospitalito · Historia Clínica Digital · v314";
+window.HC_DEMO_VERSION="v315";document.title="Hospitalito · Historia Clínica Digital · v315";
 </script>
 <style id="hc-v308-styles">
 /* Shared visual hierarchy, with the user's theme and font. */
@@ -52227,7 +52229,7 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
     button.innerHTML = src ? '<img alt="" src="'+src+'">' : window.hc289Icon('user');
   }
   function portalMarkup(user) {
-    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v314</small></button>'+
+    return '<header><button type="button" data-hc310-home aria-label="Volver al calendario">Hospitalito <small>v315</small></button>'+
       '<span class="hc289PortalWho">'+E(user.name)+'</span><div class="hc314AccountActions"><button id="hc289PortalAccount" type="button" aria-haspopup="menu">Perfil</button><button id="hc314AccountMenuTrigger" type="button" class="hc314Ghost hc312IconOnly" aria-haspopup="menu" aria-expanded="false" aria-label="Opciones de cuenta" title="Opciones de cuenta">'+window.hc289Icon('down')+'</button></div></header>'+
       '<div class="hc289PortalLayout hc310Layout"><aside id="hc289Registry" class="hc289Registry">'+
       '<nav class="hc310SideNav" aria-label="Portal del paciente">'+
@@ -52455,12 +52457,14 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
   async function booking(main, api) {
     const today=api.dateKey();
     let day='', mode=Object.hasOwn(modes,api.initial.mode)?api.initial.mode:'telemedicine', revision=0;
-    main.innerHTML='<div class="hc310Booking">'+
+    main.innerHTML=window.HC314.sectionHeader('Nuevo Turno')+'<div class="hc310Booking">'+
       '<label class="hc310Urgency"><input type="checkbox" id="hc289Urgent"> URGENCIA</label>'+
       '<div id="hc310UrgentHelp" hidden><a href="tel:107">Llamar al 107</a></div>'+
-      '<div data-booking-controls><button type="button" data-hc310-close>‹ Calendario</button><h2>Nuevo Turno</h2>'+
+      '<div data-booking-controls>'+
       '<div class="hc309CareChoices" role="group" aria-label="Modalidad">'+Object.entries(modes).map(([key,label])=>
         '<button type="button" data-care-mode="'+key+'"><b>'+E(label)+'</b></button>').join('')+'</div>'+
+      '<div class="hc315Location" hidden><button type="button" class="hc314Ghost" data-search-location>Usar mi ubicación actual</button>'+
+      '<p data-location-note></p><p data-location-status role="status"></p></div>'+
       '<div id="hc310BookingCalendar"></div><p id="hc310ChosenDate" class="hc310Muted">Elegí el día del turno.</p>'+
       '<form id="hc292SearchForm" class="hc289Form" hidden><label>Profesional<select name="role">'+
       Object.entries(api.roles).map(([role,label])=>'<option value="'+role+'">'+E(label)+'</option>').join('')+'</select></label>'+
@@ -52468,6 +52472,10 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
       '<p id="hc292Status" role="status"></p><div id="hc292Directory"></div><div id="hc292Provider"></div></div></div>';
     const root=$('.hc310Booking',main), form=$('form',root), list=$('#hc292Directory',root), details=$('#hc292Provider',root);
     const status=$('#hc292Status',root), submit=$('[type=submit]',form);
+    const locationBox=$('.hc315Location',root), locateButton=$('[data-search-location]',root);
+    const locationNote=$('[data-location-note]',root), locationStatus=$('[data-location-status]',root);
+    let localPosition=null, lastSearch=null;
+    const searchPosition=()=>localPosition||api.patientPosition?.();
     const alive=number=>root.isConnected&&api.alive()&&number===revision;
     form.elements.role.value=api.initial.role||'medico';
     function specialties(extra=[]) {
@@ -52475,12 +52483,34 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
       form.elements.specialty.innerHTML='<option value="">Todas</option>'+api.options(form.elements.role.value,extra);
       if([...form.elements.specialty.options].some(o=>o.value===old))form.elements.specialty.value=old;
     }
-    function reset() {revision++;list.replaceChildren();details.replaceChildren();status.textContent='';submit.disabled=false;}
+    function reset() {
+      revision++;lastSearch=null;list.replaceChildren();details.replaceChildren();
+      status.textContent='';submit.disabled=false;updateLocationNote();
+    }
+    function updateLocationNote() {
+      locationNote.textContent=localPosition?'Distancias en línea recta desde tu ubicación actual.'
+        :searchPosition()?'Distancias en línea recta desde la ubicación guardada en tu perfil.'
+        :'La lista se ordena por nombre hasta que compartas tu ubicación.';
+    }
+    locateButton.onclick=async()=>{
+      locateButton.disabled=true;locationStatus.textContent='Buscando tu ubicación…';
+      try{
+        const point=await window.HC299Geo.locate();
+        if(!root.isConnected)return;
+        localPosition=point;
+        locationStatus.textContent='';
+        updateLocationNote();
+        if(mode==='office'&&lastSearch)renderResults(lastSearch);
+      }catch{
+        if(root.isConnected)locationStatus.textContent='No pudimos obtener tu ubicación actual. Revisá los permisos de ubicación y volvé a intentar.';
+      }finally{locateButton.disabled=false;}
+    };
     function chooseMode() {
       root.querySelectorAll('[data-care-mode]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.careMode===mode)));
+      locationBox.hidden=mode!=='office';
+      if(!locationBox.hidden)updateLocationNote();
     }
     root.querySelectorAll('[data-care-mode]').forEach(b=>b.onclick=()=>{if(mode!==b.dataset.careMode){mode=b.dataset.careMode;reset();chooseMode();}});
-    $('[data-hc310-close]',root).onclick=portalActions.home;
     $('#hc289Urgent',root).onchange=event=>{
       const checked=event.target.checked;
       $('[data-booking-controls]',root).hidden=checked;
@@ -52531,26 +52561,36 @@ body :is(#hc289Portal,#hc289Dialog) .hc289Slots button[aria-pressed=true] {
               for(const provider of response.providers||[]){
                 if(provider.failed){partial=true;continue;}
                 const profile=group.find(p=>p.username===provider.id);
-                if(profile&&provider.available)results.push({profile});
+                if(profile&&provider.available)results.push({profile,locations:provider.locations});
               }
             }catch{partial=true;}
           }
         }
         if(!alive(current))return;
-        results.sort((a,b)=>a.profile.name.localeCompare(b.profile.name,'es'));
-        status.textContent=partial?'La búsqueda quedó incompleta. Podés presionar Buscar para reintentar.':results.length?'Profesionales disponibles':'Sin horarios publicados para ese día.';
-        list.innerHTML=results.map(({profile:p},i)=>{
-          const rate = institution?'Turnos institucionales':p.trialAvailable?'Prueba gratuita':'Desde '+api.money(Math.min(...p.modes[selectedMode].rates.map(r=>r.amount_cents)));
-          return '<button class="hc310ProviderLine" type="button" data-result="'+i+'"><b>'+E(p.name)+'</b><small>'+E(p.specialty)+' · '+E(rate)+'</small></button>';
-        }).join('');
-        list.querySelectorAll('[data-result]').forEach(b=>b.onclick=()=>{
-          const record=results[Number(b.dataset.result)];
-          if(institution)institutionDetail(record,directory,details,selectedDay,api);
-          else api.detail(record.profile,selectedMode,selectedDay);
-        });
+        lastSearch={results,partial,institution,directory,selectedMode,selectedDay};
+        renderResults(lastSearch);
       }catch(error){if(alive(current))status.textContent=error.message+' Podés volver a buscar.';}
       finally{if(alive(current))submit.disabled=false;}
     };
+
+    function renderResults({results,partial,institution,directory,selectedMode,selectedDay}) {
+      const origin=selectedMode==='office'?searchPosition():null;
+      const ordered=window.HC315.rankProviders(results,origin);
+      const ranked=ordered.some(item=>item.closest);
+      if(selectedMode==='office')updateLocationNote();
+      status.textContent=partial?'La búsqueda quedó incompleta. Podés presionar Buscar para reintentar.'
+        :ordered.length?'Profesionales disponibles'+(ranked?' · por cercanía':''):'Sin horarios publicados para ese día.';
+      list.innerHTML=ordered.map(({profile:p,closest},i)=>{
+        const rate=institution?'Turnos institucionales':p.trialAvailable?'Prueba gratuita':'Desde '+api.money(Math.min(...p.modes[selectedMode].rates.map(r=>r.amount_cents)));
+        const distance=origin?'<small>'+E(window.HC315.distanceLabel(closest))+'</small>':'';
+        return '<button class="hc310ProviderLine" type="button" data-result="'+i+'"><b>'+E(p.name)+'</b><small>'+E(p.specialty)+' · '+E(rate)+'</small>'+distance+'</button>';
+      }).join('');
+      list.querySelectorAll('[data-result]').forEach(b=>b.onclick=()=>{
+        const record=ordered[Number(b.dataset.result)];
+        if(institution)institutionDetail(record,directory,details,selectedDay,api);
+        else api.detail(record.profile,selectedMode,selectedDay);
+      });
+    }
   }
 
   function institutionDetail(record, directory, root, date, api) {
@@ -53327,5 +53367,50 @@ body #hc289Portal #hc314AccountMenuTrigger {display:none;min-width:27px;width:27
   body #hc289Portal #hc314AccountMenuTrigger {display:inline-flex;}
 }
 </style>
+<style id="hc-v315-styles">
+body #hc289Portal .hc315Location:not([hidden]) {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  margin:8px 0;
+  color:var(--hc310-muted);
+}
+body #hc289Portal .hc315Location button {min-height:38px;}
+body #hc289Portal .hc315Location p {margin:0;font-size:13px;}
+body #hc289Portal .hc315Location [data-location-status]:empty {display:none;}
+</style>
+<script id="hc-v315-booking">
+(() => {
+  'use strict';
+  const kilometers = new Intl.NumberFormat('es-AR',{maximumFractionDigits:1});
+
+  function rankProviders(results, origin) {
+    const {distance} = window.HC299Geo;
+    return results.map(record=>{
+      let closest = null;
+      for (const location of Array.isArray(record.locations)?record.locations:[]) {
+        const km = distance(origin,location);
+        if (km!==null && (!closest || km<closest.km)) closest={location,km};
+      }
+      return {...record,closest};
+    }).sort((a,b)=>{
+      if(a.closest && b.closest && a.closest.km!==b.closest.km) return a.closest.km-b.closest.km;
+      if(Boolean(a.closest)!==Boolean(b.closest)) return a.closest?-1:1;
+      return a.profile.name.localeCompare(b.profile.name,'es');
+    });
+  }
+
+  function distanceLabel(closest) {
+    if(!closest)return 'Distancia no disponible';
+    const {location,km}=closest;
+    const distance=km<1?Math.round(km*1000)+' m':kilometers.format(km)+' km';
+    const address=[location.location,location.address].filter(Boolean).join(' · ');
+    return 'Sede disponible a '+distance+(address?' · '+address:'');
+  }
+
+  window.HC315={rankProviders,distanceLabel};
+})();
+</script>
 </body>
 </html>

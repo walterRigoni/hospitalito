@@ -1,0 +1,11 @@
+body #hc289Portal .hc315Location:not([hidden]) {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 12px;
+  margin:8px 0;
+  color:var(--hc310-muted);
+}
+body #hc289Portal .hc315Location button {min-height:38px;}
+body #hc289Portal .hc315Location p {margin:0;font-size:13px;}
+body #hc289Portal .hc315Location [data-location-status]:empty {display:none;}

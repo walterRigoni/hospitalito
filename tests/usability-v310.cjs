@@ -11,6 +11,10 @@ const date = new Date();
 const argentina = new Intl.DateTimeFormat('fr-CA',{timeZone:'America/Argentina/Buenos_Aires',year:'numeric',month:'2-digit',day:'2-digit'});
 const today=argentina.format(date);
 const provider = {id:'qa',role:'medico',name:'Profesional de prueba',institution_id:'inst',specialty:'Cardiología',private_practice:false};
+const nearProvider={...provider,id:'near',username:'near',name:'Zoe Consultorios'};
+const unmappedProvider={...provider,id:'unknown',username:'unknown',name:'Ana Consultorios'};
+const nearOffice={location:'Sede cercana',address:'Calle de prueba 42',latitude:-31.401,longitude:-64.201};
+const farOffice={location:'Sede lejana',latitude:-31.47,longitude:-64.27};
 async function capture(page,name) {
   if (!screenshotDir) return;
   fs.mkdirSync(screenshotDir,{recursive:true});
@@ -51,9 +55,9 @@ async function run() {
   try {
     for (const width of [390,320,1280]) {
       const context = await browser.newContext({viewport:{width,height:844},hasTouch:width<800,isMobile:width<800,serviceWorkers:'block'});
-      const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[];
+      const page = await context.newPage(), errors=[],bookings=[],visits=[],reserveRequests=[],availabilityRequests=[];
       let failDirectory=true,changedQuote=true,resolveNote;
-      let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test'};
+      let personal={address:'Dirección de prueba 42',phone:'1112345678',email:'paciente@example.test',latitude:-31.4,longitude:-64.2};
       let patient={username:'test',legal_name:'Paciente de prueba',dni:'12345678',dob:'1985-12-03'};
       const profileRequest=()=>({client:{...patient,profile:personal},verifications:[{institution_id:'inst',status:'verified'}]});
       const prior={id:'consulta-anterior',mode:'office',status:'finished',starts_at:new Date(date.getTime()-86400000).toISOString(),minutes:30,is_trial:true,peer_name:'Persona anterior'};
@@ -91,8 +95,18 @@ async function run() {
         if (route.request().url().includes('hospitalito-telemed')) {
           const office={enabled:true,rates:[{minutes:15,amount_cents:100000},{minutes:30,amount_cents:180000}],weekly:{days:Array.from({length:7},()=>({active:true}))}};
           if(b.action==='directory' && failDirectory) {failDirectory=false;return route.fulfill({status:503,json:{ok:false,error:'Conexión de prueba interrumpida'}});}
-          if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[{...provider,username:'qa',revision:1,trialAvailable:true,modes:{office,telemedicine:office,home:office}}]}});
-          if(b.action==='availability')return route.fulfill({json:{ok:true,providers:[{id:'qa',available:true}]}});
+          if(b.action==='directory')return route.fulfill({json:{ok:true,providers:[
+            {...provider,username:'qa',revision:1,trialAvailable:true,modes:{office,telemedicine:office,home:office}},
+            ...[nearProvider,unmappedProvider].map(profile=>({...profile,modes:{office}}))
+          ]}});
+          if(b.action==='availability'){
+            availabilityRequests.push(b);
+            return route.fulfill({json:{ok:true,providers:[
+              {id:'qa',available:true,locations:[farOffice]},
+              {id:'near',available:true,locations:[{latitude:-31.6,longitude:-64.6},nearOffice]},
+              {id:'unknown',available:true,locations:[]}
+            ]}});
+          }
           if(b.action==='slots'){
             const profileRevision=changedQuote?2:1;
             changedQuote=false;
@@ -330,6 +344,13 @@ async function run() {
         await contrast(portal.locator('.hc310MonthHeader h2'));
       }
       await capture(page,'calendario-'+width);
+      const mainPane=portal.locator('#hc289PortalMain');
+      const closeToCalendar=mainPane.getByRole('button',{name:'Volver al calendario',exact:true});
+      await start.click();
+      await centeredIcon(closeToCalendar);
+      assert.equal(await mainPane.getByRole('button',{name:/Nuevo turno|^‹ Calendario$/i}).count(),0);
+      await closeToCalendar.click();
+      await start.waitFor();
       if(width>800){
         const vp=await portal.locator('.hc310CalendarViewport').boundingBox();
         const transform=await portal.locator('.hc310CalendarTrack').evaluate(e=>e.style.transform);
@@ -487,6 +508,12 @@ async function run() {
       await portal.getByRole('button',{name:'Informe de prueba'}).waitFor();
       await openSidebar();
       await portal.getByRole('button',{name:/Nuevo Turno/}).click();
+      await centeredIcon(closeToCalendar);
+      assert.equal(await mainPane.locator('[data-hc310-close]').count(),0);
+      await closeToCalendar.click();
+      await noSelection();
+      await openSidebar();
+      await portal.getByRole('button',{name:/Nuevo Turno/}).click();
       for(const care of ['institution','office','home','telemedicine','home']){
         await portal.locator('[data-care-mode="'+care+'"]').click();
         assert.equal(await portal.locator('[data-care-mode]:visible').count(),4);
@@ -532,7 +559,31 @@ async function run() {
       await home.click();
       await openSidebar();
       await portal.getByRole('button',{name:/Nuevo Turno/}).click();
+      const useLocation=portal.getByRole('button',{name:'Usar mi ubicación actual'});
+      assert.equal(await useLocation.isVisible(),false);
+      await portal.locator('[data-care-mode=office]').click();
+      await useLocation.waitFor();
+      await portal.locator('.hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]').click();
+      await search.click();
+      const resultNames=portal.locator('[data-result] b');
+      await resultNames.nth(2).waitFor();
+      assert.deepEqual(await resultNames.allTextContents(),[nearProvider.name,provider.name,unmappedProvider.name]);
+      const nearest=portal.locator('[data-result]').first();
+      assert.match(await nearest.innerText(),/Sede disponible a \d+ m · Sede cercana/);
+      await contrast(nearest.locator('small').last());
+      await portal.getByText('Distancia no disponible',{exact:true}).waitFor();
+      await page.evaluate(()=>{window.HC299Geo.locate=async()=>{throw Error('Permiso de prueba denegado');};});
+      await useLocation.click();
+      await portal.getByText(/No pudimos obtener tu ubicación actual/).waitFor();
+      assert.deepEqual(await resultNames.allTextContents(),[nearProvider.name,provider.name,unmappedProvider.name]);
+      const searchCount=availabilityRequests.length;
+      await page.evaluate(point=>{window.HC299Geo.locate=async()=>point;},farOffice);
+      await useLocation.click();
+      await portal.getByText('Distancias en línea recta desde tu ubicación actual.').waitFor();
+      assert.deepEqual(await resultNames.allTextContents(),[provider.name,nearProvider.name,unmappedProvider.name]);
+      assert.equal(availabilityRequests.length,searchCount);
       await portal.locator('[data-care-mode=institution]').click();
+      assert.equal(await useLocation.isVisible(),false);
       await portal.locator('.hc310MonthGrid:not([inert]) [data-day-key="'+today+'"]').click();
       await search.click();
       await portal.locator('[data-result]').first().click();
