@@ -39,3 +39,9 @@ La bandeja ambulatoria y los resultados del cliente se comprueban cada ocho segu
 Las comprobaciones previas de sincronización clínica, historia, borradores, avisos, permisos y escalas también pasaron. `release-v289.json` registra la huella del HTML entregado. Las pruebas no constituyen una certificación clínica ni una garantía de disponibilidad o latencia de servicios externos.
 
 Pruebas de navegador reproducibles con Node y Playwright: instalar Playwright y su Chromium; ejecutar `node tests/portal-ui.cjs` y `node tests/portal-ocr.cjs` desde la raíz. Puede indicarse un ejecutable existente con `BROWSER_EXECUTABLE`. Las capturas se escriben en `test-artifacts/`. Las pruebas con credenciales temporales del servidor no se publican.
+
+## DNI de internación y rutas · v320
+
+Administración puede adjuntar el frente y el dorso del DNI durante el ingreso. Se reutiliza el depósito privado `hospitalito-portal-private`. La ficha guarda un identificador, y `hospitalito-services` verifica la institución y el rol antes de emitir enlaces de 60 segundos. La lectura del DNI ocurre en el navegador.
+
+«Cómo llegar» aparece en los turnos de consultorio para el paciente y en las visitas a domicilio para el profesional. El cálculo consulta Google Maps Routes API cuando el usuario lo solicita y habilita la ubicación. `hospitalito-telemed` comprueba la participación en el turno antes de usar su dirección. El despliegue requiere el secreto del servidor `HC_GOOGLE_ROUTES_KEY` con acceso a Routes API. Mientras se configura, el calendario muestra la dirección y el enlace a Google Maps.

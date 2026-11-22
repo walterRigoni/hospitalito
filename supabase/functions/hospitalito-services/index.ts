@@ -58,11 +58,53 @@ async function hc286ImagePortals(c:any,a:any,institutionId:string,b:any){
  return R({ok:true,config:payload,revision,canManage});
 }
 
+const intakeDniBucket='hospitalito-portal-private';
+function intakePhoto(data:unknown){
+  const match=typeof data==='string'&&data.length<=2800000?
+    /^data:image\/jpeg;base64,([A-Za-z0-9+/]+={0,2})$/.exec(data):null;
+  if(!match)throw Error('La foto del DNI debe ser JPEG y pesar como máximo 2 MB.');
+  const bytes=Uint8Array.from(atob(match[1]),value=>value.charCodeAt(0));
+  if(bytes.length<8||bytes.length>2000000||bytes[0]!==255||bytes[1]!==216||bytes[2]!==255||
+     bytes.at(-2)!==255||bytes.at(-1)!==217)throw Error('La foto del DNI es inválida o pesa más de 2 MB.');
+  return bytes;
+}
+async function intakeDni(c:any,a:any,institutionId:string,b:any){
+  const prefix='intake-dni/'+encodeURIComponent(institutionId)+'/';
+  if(b.action==='readIntakeDni'){
+    if(!['admin','administrativo','medico','enfermero'].includes(a.role))throw Error('Sin acceso a las fotos del DNI.');
+    if(typeof b.id!=='string'||!/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(b.id)||
+       !['front','back'].includes(b.side))throw Error('Foto del DNI inválida.');
+    const result=await c.storage.from(intakeDniBucket).createSignedUrl(prefix+b.id+'/'+b.side+'.jpg',60);
+    if(result.error||!result.data?.signedUrl)throw Error('La foto del DNI no está disponible.');
+    return R({ok:true,url:result.data.signedUrl});
+  }
+  if(!['admin','administrativo'].includes(a.role))throw Error('Sólo Administración puede adjuntar fotos de DNI al ingreso.');
+  const license=await c.rpc('hc284_access_mode',{p_data_id:a.dataId,p_username:a.username});
+  if(license.error)throw license.error;
+  if(license.data==='ro')throw Error('La licencia permite consulta. Revisá Facturación para habilitar nuevas cargas.');
+  const photos:[string,Uint8Array][]=[['front',intakePhoto(b.front)]];
+  if(b.back!==undefined)photos.push(['back',intakePhoto(b.back)]);
+  const id=crypto.randomUUID(),storage=c.storage.from(intakeDniBucket),uploaded:string[]=[];
+  try{
+    for(const [side,bytes] of photos){
+      const path=prefix+id+'/'+side+'.jpg';
+      const result=await storage.upload(path,bytes,{contentType:'image/jpeg',upsert:false,cacheControl:'0'});
+      if(result.error)throw Error('No se pudieron guardar las fotos del DNI. Volvé a intentar.');
+      uploaded.push(path);
+    }
+  }catch(error){
+    if(uploaded.length)await storage.remove(uploaded).catch(()=>{});
+    throw error;
+  }
+  return R({ok:true,document:{id,hasBack:photos.length===2}});
+}
+
 Deno.serve(async(req:Request)=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:CORS});
  try{
   const keys=JSON.parse(Deno.env.get('SUPABASE_PUBLISHABLE_KEYS')||'{}');if(!Object.values(keys).includes(req.headers.get('apikey')))throw Error('Aplicación no autorizada.');
   const b=await req.json(),c=db(),i=text(b.institutionId),a=await actor(c,text(b.token,500),i),act=text(b.action),kind=text(b.kind);
+  if(['saveIntakeDni','readIntakeDni'].includes(act))return await intakeDni(c,a,i,b);
   if(['imagePortals','saveImagePortals'].includes(act))return await hc286ImagePortals(c,a,i,b);
   if(act==='saveInstitutionBrand'){
    if(!['admin','superadmin'].includes(a.role))throw Error('Sólo Administración y Hospitalito pueden cambiar el membrete.');const logo=text(b.logoData,500000);

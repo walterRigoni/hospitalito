@@ -31,6 +31,36 @@ async function rtcConfig(a:any){const iceServers:any[]=[{urls:['stun:stun.l.goog
  if(urls.length&&secret){const username=String(Math.floor(Date.now()/1000)+3600)+':tele:'+a.username,key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-1'},false,['sign']),sig=new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(username)));iceServers.push({urls,username,credential:btoa(String.fromCharCode(...sig))});}
  return {iceServers,iceCandidatePoolSize:2,bundlePolicy:'max-bundle',relayConfigured:iceServers.some(s=>(Array.isArray(s.urls)?s.urls:[s.urls]).some((u:any)=>/^turns?:/.test(u)))};}
 
+async function visitDirections(visit:any,side:string,input:any){
+  const mode=visit.mode;
+  if(!['confirmed','active','finished'].includes(visit.status)||
+     !(mode==='office'||(mode==='home'&&side==='provider')))throw Error('Las indicaciones no están disponibles para este turno.');
+  const {latitude,longitude}=input||{};
+  if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||Math.abs(latitude)>90||Math.abs(longitude)>180)
+    throw Error('La ubicación de partida no es válida.');
+  const snapshot=str(visit.location_snapshot,500);
+  const address=mode==='office'?snapshot.split(' · ').at(-1)?.trim():snapshot;
+  if(!address)throw Error('El turno no tiene una dirección registrada.');
+  const key=Deno.env.get('HC_GOOGLE_ROUTES_KEY');
+  if(!key)throw Error('El cálculo en Hospitalito todavía no está habilitado. Podés abrir el destino en Google Maps.');
+  const response=await fetch('https://routes.googleapis.com/directions/v2:computeRoutes',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-Goog-Api-Key':key,
+      'X-Goog-FieldMask':'routes.distanceMeters,routes.duration,routes.legs.steps.navigationInstruction.instructions'},
+    body:JSON.stringify({origin:{location:{latLng:{latitude,longitude}}},destination:{address},
+      travelMode:'DRIVE',languageCode:'es-AR',regionCode:'ar',units:'METRIC'}),
+    signal:AbortSignal.timeout(12000)
+  }).catch(()=>null);
+  if(!response?.ok)throw Error('No se pudo calcular el recorrido. Revisá la dirección en Google Maps.');
+  const result=await response.json(),route=result.routes?.[0];
+  const duration=Number.parseFloat(route?.duration);
+  const steps=(route?.legs||[]).flatMap((leg:any)=>(leg.steps||[]).map((step:any)=>step.navigationInstruction?.instructions))
+    .filter((step:any)=>typeof step==='string'&&step.trim());
+  if(!Number.isFinite(route?.distanceMeters)||!Number.isFinite(duration)||!steps.length)
+    throw Error('No se encontró un recorrido para esa dirección.');
+  return {ok:true,distance:route.distanceMeters,duration,steps};
+}
+
 Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('ok',{headers:cors});const c=db(),url=new URL(req.url);try{
  if(url.searchParams.get('webhook')==='1')return await webhook(req,c,url);
  if(url.searchParams.get('oauth')==='1'&&req.method==='GET')return await oauthCallback(c,url);
@@ -110,6 +140,10 @@ Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response('o
  await audit(c,a,'clinical_read',v.id);return reply({ok:true,note,history});
  }
  if(act==='myVisits'){const client=a.default_role==='cliente';if(!client)await pro(c,a);check(await c.from('hc_tele_visits').update({status:'expired'}).eq(client?'client':'provider',a.username).eq('status','awaiting_payment').lt('hold_until',new Date().toISOString()));const visits=check(await c.from('hc_tele_visits').select('*').eq(client?'client':'provider',a.username).order('starts_at',{ascending:false}).limit(100));const peers=[...new Set(visits.map((v:any)=>client?v.provider:v.client))],names=peers.length?check(await c.from('hc_auth_users').select('username,name').in('username',peers)):[];return reply({ok:true,visits:visits.map((v:any)=>({...v,peer_name:names.find((u:any)=>u.username===(client?v.provider:v.client))?.name||''}))});}
+ if(act==='visitDirections'){
+   const {v,side}=await access(c,a,str(b.visitId,40));
+   return reply(await visitDirections(v,side,b.origin));
+ }
  if(['visit','checkout','reconcile','join','heartbeat','signals','signal','offerExtension','requestExtension','startOffice','finish','cancel','documents','uploadDocument','documentFile'].includes(act)){
  const {v,side}=await access(c,a,str(b.visitId,40));if(v.is_trial&&['checkout','offerExtension','requestExtension'].includes(act))throw Error('Esta consulta de prueba es gratuita e incluye el tiempo reservado. No admite cobros ni extensiones pagas. Podés reservar otra consulta para continuar.');if(['join','heartbeat','signals','signal'].includes(act)){const professional=check(await c.from('hc_auth_users').select('username,default_role,active,is_global_admin').eq('username',v.provider).single());if(!professional.active)throw Error('Profesional deshabilitado');await pro(c,professional);}
  if(act==='visit'){const payments=check(await c.from('hc_tele_payments').select('id,kind,minutes,amount_cents,platform_cents,provider_cents,status,consented_at,expires_at,provider_approved').eq('visit_id',v.id).order('created_at')),peer=check(await c.from('hc_auth_users').select('name').eq('username',side==='client'?v.provider:v.client).single()),patient=side==='provider'?check(await c.from('hc_portal_clients').select('legal_name,dni,dob,profile').eq('username',v.client).single()):null;return reply({ok:true,visit:v,payments,side,role:side==='provider'?await pro(c,a):'cliente',peerName:peer.name,patient});}
