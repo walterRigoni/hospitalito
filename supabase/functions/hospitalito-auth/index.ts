@@ -48,7 +48,7 @@ async function legacy(action:string,payload:any){
 function cleanProfile(p:any={}){return{
   phone:String(p.phone||''),specialty:String(p.specialty||''),licenseNumber:String(p.licenseNumber||''),professionalTitle:String(p.professionalTitle||''),photo:String(p.photo||''),signature:String(p.signature||''),signatureUpdatedAt:String(p.signatureUpdatedAt||''),uiTheme:String(p.uiTheme||''),preferences:p.preferences&&typeof p.preferences==='object'?p.preferences:{}
 }}
-function publicUser(u:any,role?:string){return{username:String(u?.username||''),name:String(u?.name||u?.username||''),role:String(role||u?.default_role||'medico'),email:String(u?.email||''),...cleanProfile(u?.profile||{}),active:u?.active!==false,isGlobalAdmin:!!u?.is_global_admin,mustChangePassword:!!u?.must_change_password,createdAt:u?.created_at||'',updatedAt:u?.updated_at||''}}
+function publicUser(u:any,role?:string){return{username:String(u?.username||''),name:String(u?.name||u?.username||''),role:String(role||u?.default_role||'medico'),email:String(u?.email||''),...cleanProfile(u?.profile||{}),loginAlias:u?.login_alias||'',professionalAccount:!!u?.professional_registration,active:u?.active!==false,isGlobalAdmin:!!u?.is_global_admin,mustChangePassword:!!u?.must_change_password,createdAt:u?.created_at||'',updatedAt:u?.updated_at||''}}
 async function userRow(c:any,username:string){const {data,error}=await c.from('hc_auth_users').select('*').eq('username',username).maybeSingle();if(error)throw error;if(!data||data.active===false)throw new Error('Usuario no encontrado o inactivo.');return data}
 async function isGlobal(c:any,username:string){try{return !!(await userRow(c,username)).is_global_admin}catch{return false}}
 async function createAuthSession(c:any,username:string){const token=randomHex(),token_hash=await sha256(token),now=new Date(),expires=new Date(now.getTime()+24*3600000);await c.from('hc_auth_sessions').delete().lt('expires_at',now.toISOString());const {error}=await c.from('hc_auth_sessions').insert({token_hash,username,expires_at:expires.toISOString(),last_seen_at:now.toISOString()});if(error)throw error;return{token,expiresAt:expires.toISOString()}}
@@ -71,10 +71,48 @@ async function upsertInstitution(c:any,inst:any,dataId:string){const id=String(i
 async function upsertUser(c:any,user:any,institutionId:string,role:string,password?:string){const username=String(user.username||'').trim();if(!username)throw new Error('Falta usuario.');if(username.toLowerCase()==='admin')throw new Error('El nombre admin está reservado para la herramienta admin semilla.');const old=(await c.from('hc_auth_users').select('*').eq('username',username).maybeSingle()).data;const profile={...(old?.profile||{}),...cleanProfile({...old?.profile,...user})};let row:any={username,name:String(user.name||old?.name||username),default_role:String(user.role||old?.default_role||role||'medico'),email:String(user.email??old?.email??''),profile,active:user.active!==false,legacy_migrated:true,updated_at:new Date().toISOString()};if(password){const p=await newPassword(password);Object.assign(row,{password_salt:p.salt,password_hash:p.hash,password_iterations:p.iterations,must_change_password:!!user.mustChangePassword})}const {error}=await c.from('hc_auth_users').upsert(row,{onConflict:'username'});if(error)throw error;if(institutionId){const rr=ROLES.has(role)?role:'medico';const {error:e2}=await c.from('hc_auth_memberships').upsert({username,institution_id:institutionId,role:rr,active:true,updated_at:new Date().toISOString()},{onConflict:'username,institution_id'});if(e2)throw e2}return username}
 async function migrateLegacyUser(c:any,username:string,password:string){const a=await legacy('authenticateUser',{username,password});const U=a.user||{username};const insts=Array.isArray(a.institutions)?a.institutions:[];if(!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');for(const i of insts){let selected:any={};try{selected=await legacy('selectInstitution',{token:a.token,institutionId:String(i.id||'')})}catch{}const dataId=String(selected?.backend?.id||selected?.backend?.identificador||selected?.institution?.backendId||i.dataInstitutionId||i.id||'');await upsertInstitution(c,selected.institution||i,dataId);await upsertUser(c,{...U,...(selected.user||{})},String(i.id),String(selected?.user?.role||i.role||U.role||'medico'),password)}const uname=String(U.username||username);const s=await createAuthSession(c,uname);return{ok:true,...s,user:publicUser(await userRow(c,uname)),institutions:await memberships(c,uname),migrated:true}}
 async function addNotification(c:any,username:string,kind:string,title:string,body:string,payload:any={}){try{await c.from('hc_notifications').insert({username,kind,title,body,payload})}catch{}}
-async function contactDirectory(c:any,username:string,institutionId:string){const names=new Set<string>(),scope=new Map<string,string>();if(institutionId){for(const u of await institutionUsers(c,institutionId)){if(u.username!==username){names.add(u.username);scope.set(u.username,'institución')}}}const {data:cs}=await c.from('hc_contacts').select('contact_username').eq('owner_username',username);for(const x of cs||[]){names.add(String(x.contact_username));if(!scope.has(String(x.contact_username)))scope.set(String(x.contact_username),'contacto')}const {data:out}=await c.from('hc_direct_messages').select('recipient_username').eq('sender_username',username).limit(200);const {data:inc}=await c.from('hc_direct_messages').select('sender_username').eq('recipient_username',username).limit(200);for(const x of out||[])names.add(String(x.recipient_username));for(const x of inc||[])names.add(String(x.sender_username));names.delete(username);names.delete('admin');if(!names.size)return[];const {data,error}=await c.from('hc_auth_users').select('*').in('username',Array.from(names)).eq('active',true);if(error)throw error;return(data||[]).map((x:any)=>({...publicUser(x),contactScope:scope.get(x.username)||'mensaje'})).sort((a:any,b:any)=>String(a.name).localeCompare(String(b.name),'es'))}
+async function contactDirectory(c:any,username:string,institutionId:string){const names=new Set<string>(),scope=new Map<string,string>();if(institutionId){for(const u of await institutionUsers(c,institutionId)){if(u.username!==username){names.add(u.username);scope.set(u.username,'institución')}}}const {data:cs}=await c.from('hc_contacts').select('contact_username').eq('owner_username',username);for(const x of cs||[]){names.add(String(x.contact_username));if(!scope.has(String(x.contact_username)))scope.set(String(x.contact_username),'contacto')}const {data:out}=await c.from('hc_direct_messages').select('recipient_username').eq('sender_username',username).limit(200);const {data:inc}=await c.from('hc_direct_messages').select('sender_username').eq('recipient_username',username).limit(200);for(const x of out||[])names.add(String(x.recipient_username));for(const x of inc||[])names.add(String(x.sender_username));names.delete(username);names.delete('admin');if(!names.size)return[];const {data,error}=await c.from('hc_auth_users').select('*').in('username',Array.from(names)).eq('active',true);if(error)throw error;return(data||[]).map((x:any)=>({...publicUser(x),signature:'',contactScope:scope.get(x.username)||'mensaje'})).sort((a:any,b:any)=>String(a.name).localeCompare(String(b.name),'es'))}
 async function canMessage(c:any,username:string,other:string,institutionId:string){if(!other||other===username||other==='admin')return false;if(await isGlobal(c,username)||await sameInstitution(c,username,other,institutionId))return true;if((await c.from('hc_contacts').select('owner_username').eq('owner_username',username).eq('contact_username',other).maybeSingle()).data)return true;const {count}=await c.from('hc_direct_messages').select('*',{count:'exact',head:true}).or(`and(sender_username.eq.${username},recipient_username.eq.${other}),and(sender_username.eq.${other},recipient_username.eq.${username})`);return Number(count||0)>0}
 async function syncInstitutionLogo(c:any,institutionId:string,logoData:string){try{const inst=(await c.from('hc_auth_institutions').select('data_institution_id,name,display_name').eq('id',institutionId).single()).data;if(!inst)return;const dataId=String(inst.data_institution_id||institutionId);const existing=(await c.from('hc_state').select('payload,sort_index').eq('institution_id',dataId).eq('bucket','inst').eq('record_id','main').maybeSingle()).data;const payload=existing?.payload&&typeof existing.payload==='object'?existing.payload:{};const value=payload.value&&typeof payload.value==='object'?payload.value:{};await c.from('hc_state').upsert({institution_id:dataId,bucket:'inst',record_id:'main',payload:{...payload,value:{...value,logoData}},sort_index:Number(existing?.sort_index||0),deleted:false,writer:'hospitalito-auth-v3'},{onConflict:'institution_id,bucket,record_id'});}catch(e){console.warn('sync logo',e)}}
 async function setInstitutionPassword(c:any,institutionId:string,password:string){if(password.length<4)throw new Error('La contraseña institucional debe tener al menos 4 caracteres.');const p=await newPassword(password);const {error}=await c.from('hc_auth_institutions').update({setup_password_salt:p.salt,setup_password_hash:p.hash,setup_password_iterations:p.iterations,updated_at:new Date().toISOString()}).eq('id',institutionId);if(error)throw error}
+
+
+const PROFESSIONAL_ROLES=new Set(['medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia','farmaceutico']);
+const field=(value:unknown,max=200)=>String(value??'').trim().slice(0,max);
+const check322=(r:any)=>{if(r.error)throw r.error;return r.data;};
+function cuil322(value:unknown,dni:unknown){
+ const c=String(value||'').replace(/[-\s]/g,''),d=String(dni||'').replace(/\D/g,'');
+ if(!/^\d{11}$/.test(c)||!/^\d{6,8}$/.test(d)||c.slice(2,10)!==d.padStart(8,'0'))throw Error('Revisá el DNI y el CUIL (11 números).');
+ const sum=[5,4,3,2,7,6,5,4,3,2].reduce((acc,w,i)=>acc+w*Number(c[i]),0),digit=(11-sum%11)%11;
+ if(digit!==Number(c[10]))throw Error('El CUIL no es válido.');return c;
+}
+function website322(raw:unknown){let u:URL;try{u=new URL(field(raw,500));}catch{throw Error('Ingresá una página web válida de la entidad.');}if(u.protocol!=='https:'||u.username||u.password)throw Error('La página de habilitación debe usar HTTPS.');return u.href;}
+function registration322(x:any){const role=field(x.role,50),dni=field(x.dni,20).replace(/\D/g,''),cuil=cuil322(x.cuil,dni);
+ if(!PROFESSIONAL_ROLES.has(role))throw Error('Seleccioná un rol profesional.');
+ const reg={dni,cuil,professionalTitle:field(x.professionalTitle),licenseNumber:field(x.licenseNumber,160),licenseIssuer:field(x.licenseIssuer),specialty:field(x.specialty),verificationEntity:field(x.verificationEntity),verificationWebsite:website322(x.verificationWebsite),role};
+ if(![reg.professionalTitle,reg.licenseNumber,reg.licenseIssuer,reg.specialty,reg.verificationEntity].every(Boolean))throw Error('Completá los datos profesionales y de matrícula.');
+ return reg;
+}
+function signature322(value:unknown){const s=String(value||'');if(!/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(s)||s.length>400000)throw Error('Agregá una foto de sello y firma de hasta 300 KB.');const bytes=atob(s.split(',')[1]);if(bytes.length<4||bytes.charCodeAt(0)!==255||bytes.charCodeAt(1)!==216||bytes.charCodeAt(bytes.length-2)!==255||bytes.charCodeAt(bytes.length-1)!==217)throw Error('La imagen no es válida.');return s;}
+function transport322(x:any){const result:any={enabled:x.enabled===true,service:field(x.service,500),area:field(x.area,300),contact:field(x.contact,180),publicVisible:x.publicVisible===true,days:{}};
+ const time=/^([01]\d|2[0-3]):[0-5]\d$/;
+ for(let i=0;i<7;i++){const rows=x.days?.[i];if(!Array.isArray(rows)||rows.length>8)throw Error('Revisá los bloques de horarios.');const sorted=rows.map((w:any)=>({start:field(w.start,5),end:field(w.end,5)})).sort((a:any,b:any)=>a.start.localeCompare(b.start));for(let j=0;j<sorted.length;j++){const w=sorted[j];if(!time.test(w.start)||!time.test(w.end)||w.start>=w.end||(j>0&&w.start<sorted[j-1].end))throw Error('Revisá los horarios superpuestos o inválidos.');}result.days[i]=sorted;}
+ if(result.enabled&&(!result.service||!Object.values(result.days).some((rows:any)=>rows.length)))throw Error('Indicá el tipo de traslado y al menos un horario.');
+ if(result.publicVisible&&(!result.enabled||!result.contact||!result.area))throw Error('Para publicar completá el área y contacto, y activá los traslados.');
+ return result;
+}
+async function lookup322(c:any,q:string){
+ const normalized=q.trim().toLowerCase();
+ if(/^[a-z][a-z0-9_.-]{2,79}$/.test(normalized)){const alias=check322(await c.from('hc_auth_users').select('*').eq('login_alias',normalized).maybeSingle());if(alias)return alias;}
+ const {data,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();if(error)throw error;
+ if(data?.login_alias)throw Error('Usuario o contraseña incorrectos.');return data;
+}
+async function target322(c:any,q:string){
+ const clean=q.trim().replace(/^(\d{2})-(\d{8})-(\d)$/,'$1$2$3');
+ const direct=check322(await c.from('hc_auth_users').select('username,active,default_role,is_global_admin,professional_registration').eq('username',clean).maybeSingle());
+ if(direct)return direct;
+ return check322(await c.from('hc_auth_users').select('username,active,default_role,is_global_admin,professional_registration').eq('login_alias',clean.toLowerCase()).maybeSingle());
+}
 
 Deno.serve(async(req:Request)=>{
   if(req.method==='OPTIONS')return new Response('ok',{headers:CORS});
@@ -84,11 +122,22 @@ Deno.serve(async(req:Request)=>{
 
     if(action==='publicBranding'){const {data}=await c.from('hc_platform_settings').select('value').eq('key','branding').maybeSingle();return reply({ok:true,settings:data?.value||{}})}
 
+    if(action==='registerProfessional'){
+      const x=b.professional||{},reg=registration322(x),name=field(x.name,150),password=String(x.password||'');
+      if(name.length<3||password.length<10||password.length>200||password.includes(reg.cuil)||password===reg.dni||x.confirmed!==true)throw Error('Completá tus datos, elegí una contraseña de 10 caracteres o más distinta de tu identificación y confirmá la declaración.');
+      const signature=signature322(x.signature);
+      const source=String(req.headers.get('cf-connecting-ip')||req.headers.get('x-forwarded-for')||'unknown').split(',')[0].trim();
+      const allowed=check322(await c.rpc('hc322_register_limit',{p_key:await sha256('professional:'+source)}));if(!allowed)throw Error('Demasiados intentos de registro. Volvé a intentar más tarde.');
+      const p=await newPassword(password);
+      const result=await c.from('hc_auth_users').insert({username:reg.cuil,name,default_role:reg.role,profile:{professionalTitle:reg.professionalTitle,licenseNumber:reg.licenseNumber,specialty:reg.specialty,signature,signatureUpdatedAt:new Date().toISOString()},professional_registration:{...reg,declaredAt:new Date().toISOString()},password_salt:p.salt,password_hash:p.hash,password_iterations:p.iterations,active:true,legacy_migrated:true,is_global_admin:false,must_change_password:false});
+      if(result.error){if(result.error.code==='23505')throw Error('No se pudo registrar este CUIL. Si ya tenés cuenta, iniciá sesión.');throw result.error;}
+      return reply({ok:true});
+    }
     if(action==='authenticateUser'){
       const q=String(b.username||'').trim(),password=String(b.password||'');if(!q||!password)throw new Error('Completá usuario y contraseña.');
       if(q.toLowerCase()==='admin')throw new Error('El admin semilla es una herramienta local. Ingresá con admin/admin y vinculá este equipo a una institución.');
-      const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();if(error)throw error;
-      if(user?.active&&user.password_hash){if(!await verifyPassword(password,user))throw new Error('Usuario o contraseña incorrectos.');const s=await createAuthSession(c,user.username),insts=await memberships(c,user.username);if(!user.is_global_admin&&!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia'].includes(user.default_role)&&!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');return reply({ok:true,...s,user:publicUser(user),institutions:insts,migrated:false})}
+      const user=await lookup322(c,q);
+      if(user?.active&&user.password_hash){if(!await verifyPassword(password,user))throw new Error('Usuario o contraseña incorrectos.');const s=await createAuthSession(c,user.username),insts=await memberships(c,user.username);if(!user.is_global_admin&&!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia','farmaceutico'].includes(user.default_role)&&!insts.length)throw new Error('La cuenta no tiene instituciones habilitadas.');return reply({ok:true,...s,user:publicUser(user),institutions:insts,migrated:false})}
       return reply(await migrateLegacyUser(c,q,password));
     }
 
@@ -106,7 +155,7 @@ Deno.serve(async(req:Request)=>{
 
     const actor=await requireAnySession(c,String(b.token||''));const institutionId=String(b.institutionId||'');const global=actor.kind==='user'&&await isGlobal(c,actor.username);
 
-    if(actor.kind==='user'&&(await userRow(c,actor.username))?.default_role==='cliente'&&!['updateProfile','changePassword','getNotifications','markNotificationsRead'].includes(action))throw new Error('Esta cuenta utiliza el portal de clientes.');
+    if(actor.kind==='user'&&(await userRow(c,actor.username))?.default_role==='cliente'&&!['updateProfile','changePassword','getNotifications','markNotificationsRead','transportDirectory'].includes(action))throw new Error('Esta cuenta utiliza el portal de clientes.');
     if(action==='selectInstitution'){
       if(actor.kind==='seed'){
         if(actor.institutionId!==institutionId)throw new Error('El admin semilla sólo puede usar la institución vinculada a este equipo.');const {data:i,error}=await c.from('hc_auth_institutions').select('*').eq('id',institutionId).maybeSingle();if(error)throw error;if(!i||i.active===false)throw new Error('La institución no está habilitada.');return reply({ok:true,user:{username:'admin',name:'Admin semilla local',role:'admin',localSeed:true},institutions:[{id:i.id,name:i.name,displayName:i.display_name,description:i.description,role:'admin',dataInstitutionId:i.data_institution_id||i.id,logoData:i.logo_data||''}],institution:{id:i.id,name:i.name,displayName:i.display_name,description:i.description,role:'admin',dataInstitutionId:i.data_institution_id||i.id,logoData:i.logo_data||''},backend:{id:i.data_institution_id||i.id,authInstitutionId:i.id,name:i.name,dataInstitutionId:i.data_institution_id||i.id}})
@@ -117,7 +166,18 @@ Deno.serve(async(req:Request)=>{
     if(action==='listInstitutionUsers'){if(!await hasInstitution(c,actor,institutionId))throw new Error('No tenés acceso a esa institución.');return reply({ok:true,users:await institutionUsers(c,institutionId)})}
 
     if(action==='upsertUserAccess'){
-      if(!await isInstitutionAdmin(c,actor,institutionId))throw new Error('Solo un administrador puede gestionar usuarios.');const x=b.user||b,target=String(x.username||'').trim(),role=String(x.role||'medico');if(!target)throw new Error('Falta usuario.');if(target.toLowerCase()==='admin')throw new Error('admin está reservado para la herramienta local.');if(!ROLES.has(role))throw new Error('Rol no permitido.');if((await c.from('hc_auth_users').select('default_role').eq('username',target).maybeSingle()).data?.default_role==='cliente')throw new Error('Los clientes se verifican en Portal; no reciben permisos clínicos.');await upsertUser(c,x,institutionId,role,String(x.password||'')||undefined);return reply({ok:true,users:await institutionUsers(c,institutionId)})
+      if(!await isInstitutionAdmin(c,actor,institutionId))throw Error('Solo un administrador puede gestionar usuarios.');
+      const x=b.user||b,q=field(x.username,100),role=field(x.role,40);if(!q||!ROLES.has(role)||q.toLowerCase()==='admin')throw Error('Usuario o rol inválidos.');
+      const existing=await target322(c,q);
+      if(existing){
+        if(!existing.active||existing.is_global_admin||existing.default_role==='cliente')throw Error('Esta cuenta no puede recibir acceso institucional.');
+        if(existing.professional_registration&&PROFESSIONAL_ROLES.has(role)&&role!==existing.professional_registration.role)throw Error('El rol debe coincidir con el declarado por el profesional. Revisá su matrícula antes de otorgar acceso.');
+        check322(await c.from('hc_auth_memberships').upsert({username:existing.username,institution_id:institutionId,role,active:true,updated_at:new Date().toISOString()},{onConflict:'username,institution_id'}));
+        return reply({ok:true,created:false,users:await institutionUsers(c,institutionId)});
+      }
+      if(PROFESSIONAL_ROLES.has(role))throw Error('El profesional debe registrarse en Hospitalito primero. Ingresá su CUIL o usuario.');
+      if(String(x.password||'').length<10)throw Error('Para crear una cuenta administrativa, definí una contraseña de al menos 10 caracteres.');
+      await upsertUser(c,x,institutionId,role,String(x.password));return reply({ok:true,created:true,users:await institutionUsers(c,institutionId)});
     }
     if(action==='removeUserAccess'){if(!await isInstitutionAdmin(c,actor,institutionId))throw new Error('Solo un administrador puede gestionar usuarios.');const target=String(b.username||'');if(!target||target==='Hospitalito'||target==='admin')throw new Error('Este acceso no puede quitarse aquí.');if(actor.kind==='user'&&target===actor.username)throw new Error('No podés quitar tu propio acceso desde esta sesión.');await c.from('hc_auth_memberships').update({active:false,updated_at:new Date().toISOString()}).eq('institution_id',institutionId).eq('username',target);return reply({ok:true,users:await institutionUsers(c,institutionId)})}
     if(action==='updateInstitutionSettings'){
@@ -126,15 +186,45 @@ Deno.serve(async(req:Request)=>{
 
     if(actor.kind==='seed')throw new Error('El admin semilla sólo puede gestionar su institución desde el panel técnico.');
 
+    if(action==='myInstitutions')return reply({ok:true,institutions:await memberships(c,actor.username)});
+    if(action==='myProfessionalRegistration'){
+      const u=await userRow(c,actor.username);if(!PROFESSIONAL_ROLES.has(u.default_role))throw Error('Cuenta profesional requerida.');
+      return reply({ok:true,registration:u.professional_registration,loginAlias:u.login_alias||u.username,signature:u.profile?.signature||''});
+    }
+    if(action==='changeLoginAlias'){
+      const u=await userRow(c,actor.username);if(!u.professional_registration)throw Error('Disponible para cuentas profesionales registradas.');
+      if(!await verifyPassword(String(b.currentPassword||''),u))throw Error('Contraseña actual incorrecta.');
+      const alias=field(b.alias,80).toLowerCase();
+      if(alias!==u.username&&!/^[a-z][a-z0-9_.-]{2,79}$/.test(alias))throw Error('Usá 3 a 80 caracteres, empezá con una letra y usá letras, números, punto, guion o guion bajo.');
+      const r=await c.from('hc_auth_users').update({login_alias:alias===u.username?null:alias,updated_at:new Date().toISOString()}).eq('username',u.username);
+      if(r.error)throw Error('No se pudo cambiar el usuario; verificá que esté disponible.');
+      return reply({ok:true,loginAlias:alias});
+    }
+    if(action==='myTransport'||action==='saveTransport'){
+      const u=await userRow(c,actor.username);if(!PROFESSIONAL_ROLES.has(u.default_role)||u.is_global_admin)throw Error('Cuenta profesional requerida.');
+      if(action==='myTransport')return reply({ok:true,schedule:u.transport_schedule||null});
+      const schedule=transport322(b.schedule||{});if(schedule.publicVisible&&b.consent!==true)throw Error('Confirmá la publicación del servicio.');
+      const revision=Number(b.revision)||0;if(revision!==Number(u.transport_schedule?.revision||0))throw Error('La agenda cambió en otro dispositivo. Volvé a abrirla.');
+      schedule.revision=revision+1;
+      let update=c.from('hc_auth_users').update({transport_schedule:schedule}).eq('username',u.username);
+      update=u.transport_schedule?update.eq('transport_schedule->>revision',String(revision)):update.is('transport_schedule',null);
+      if(!check322(await update.select('username')).length)throw Error('La agenda cambió en otro dispositivo. Volvé a abrirla.');
+      return reply({ok:true,schedule});
+    }
+    if(action==='transportDirectory'){
+      const u=await userRow(c,actor.username);if(u.default_role!=='cliente')throw Error('Disponible para pacientes.');
+      const rows=check322(await c.from('hc_auth_users').select('name,default_role,professional_registration,transport_schedule').eq('active',true).eq('transport_schedule->>publicVisible','true').eq('transport_schedule->>enabled','true').limit(200));
+      return reply({ok:true,services:rows.filter((u:any)=>PROFESSIONAL_ROLES.has(u.default_role)).map((u:any)=>({name:u.name,service:u.transport_schedule.service,area:u.transport_schedule.area,contact:u.transport_schedule.contact,days:u.transport_schedule.days,credential:u.professional_registration?{licenseNumber:u.professional_registration.licenseNumber,entity:u.professional_registration.verificationEntity,website:u.professional_registration.verificationWebsite}:null}))});
+    }
     if(action==='changePassword'){
-      const current=String(b.currentPassword||''),next=String(b.newPassword||'');if(next.length<6)throw new Error('La nueva contraseña debe tener al menos 6 caracteres.');const u=await userRow(c,actor.username);if(!await verifyPassword(current,u))throw new Error('Contraseña actual incorrecta.');const p=await newPassword(next);await c.from('hc_auth_users').update({password_salt:p.salt,password_hash:p.hash,password_iterations:p.iterations,must_change_password:false,updated_at:new Date().toISOString()}).eq('username',actor.username);return reply({ok:true})
+      const current=String(b.currentPassword||''),next=String(b.newPassword||'');if(next.length<10||next.length>200)throw new Error('La nueva contraseña debe tener de 10 a 200 caracteres.');const u=await userRow(c,actor.username);if(u.professional_registration&&(next.includes(u.professional_registration.cuil)||next===u.professional_registration.dni))throw Error('Elegí una contraseña distinta de tu identificación.');if(!await verifyPassword(current,u))throw new Error('Contraseña actual incorrecta.');const p=await newPassword(next);await c.from('hc_auth_users').update({password_salt:p.salt,password_hash:p.hash,password_iterations:p.iterations,must_change_password:false,updated_at:new Date().toISOString()}).eq('username',actor.username);return reply({ok:true})
     }
     if(action==='updateProfile'){
       const old=await userRow(c,actor.username),x=b.user||{},profile={...(old.profile||{}),...cleanProfile({...old.profile,...x})};profile.preferences={...(old.profile?.preferences||{}),...(x.preferences||{})};await c.from('hc_auth_users').update({name:String(x.name??old.name),email:String(x.email??old.email),profile,updated_at:new Date().toISOString()}).eq('username',actor.username);return reply({ok:true,user:publicUser(await userRow(c,actor.username))})
     }
 
-    if(action==='listContacts')return reply({ok:true,contacts:await contactDirectory(c,actor.username,institutionId)})
-    if(action==='addContact'){const q=String(b.username||'').trim();const {data:t}=await c.from('hc_auth_users').select('*').ilike('username',q).limit(1).maybeSingle();if(!t?.active)throw new Error('No existe un usuario activo con ese nombre.');if(t.username===actor.username)throw new Error('No podés agregarte a vos mismo.');if(t.username==='admin')throw new Error('El admin semilla no es una cuenta de mensajería.');await c.from('hc_contacts').upsert({owner_username:actor.username,contact_username:t.username},{onConflict:'owner_username,contact_username'});await addNotification(c,t.username,'contact','Nuevo contacto',`${(await userRow(c,actor.username)).name||actor.username} te agregó a sus contactos.`,{from:actor.username});return reply({ok:true,contact:publicUser(t)})}
+    if(action==='listContacts')return reply({ok:true,contacts:await contactDirectory(c,actor.username,institutionId&&await hasInstitution(c,actor,institutionId)?institutionId:'')})
+    if(action==='addContact'){const q=String(b.username||'').trim();const {data:t}=await c.from('hc_auth_users').select('*').ilike('username',q).limit(1).maybeSingle();if(!t?.active)throw new Error('No existe un usuario activo con ese nombre.');if(t.username===actor.username)throw new Error('No podés agregarte a vos mismo.');if(t.username==='admin')throw new Error('El admin semilla no es una cuenta de mensajería.');await c.from('hc_contacts').upsert({owner_username:actor.username,contact_username:t.username},{onConflict:'owner_username,contact_username'});await addNotification(c,t.username,'contact','Nuevo contacto',`${(await userRow(c,actor.username)).name||actor.username} te agregó a sus contactos.`,{from:actor.username});return reply({ok:true,contact:{...publicUser(t),signature:''}})}
     if(action==='getMessages'){const other=String(b.withUsername||'');if(!await canMessage(c,actor.username,other,institutionId))throw new Error('Agendá a este usuario antes de conversar.');const {data,error}=await c.from('hc_direct_messages').select('*').or(`and(sender_username.eq.${actor.username},recipient_username.eq.${other}),and(sender_username.eq.${other},recipient_username.eq.${actor.username})`).order('created_at');if(error)throw error;await c.from('hc_direct_messages').update({read_at:new Date().toISOString()}).eq('recipient_username',actor.username).eq('sender_username',other).is('read_at',null);return reply({ok:true,messages:data||[]})}
     if(action==='sendMessage'){const other=String(b.to||''),body=String(b.body||'').trim();if(!body&&!b.attachment)throw new Error('El mensaje está vacío.');if(!await canMessage(c,actor.username,other,institutionId))throw new Error('Agendá a este usuario antes de enviarle mensajes.');const target=await userRow(c,other);const {data,error}=await c.from('hc_direct_messages').insert({sender_username:actor.username,recipient_username:target.username,body,attachment:b.attachment||{}}).select('*').single();if(error)throw error;await addNotification(c,target.username,'message',`Mensaje de ${(await userRow(c,actor.username)).name||actor.username}`,body||'Adjunto',{from:actor.username,messageId:data.id});return reply({ok:true,message:data})}
     if(action==='getNotifications'){const limit=Math.min(100,Math.max(1,Number(b.limit||60)));const {data,error}=await c.from('hc_notifications').select('*').eq('username',actor.username).order('created_at',{ascending:false}).limit(limit);if(error)throw error;return reply({ok:true,notifications:data||[],unread:(data||[]).filter((x:any)=>!x.read_at).length})}

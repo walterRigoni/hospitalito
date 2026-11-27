@@ -31,7 +31,15 @@ function same(a:string,b:string){if(a.length!==b.length)return false;let x=0;for
 function cleanProfile(p:any={}){return{
   phone:String(p.phone||''),specialty:String(p.specialty||''),licenseNumber:String(p.licenseNumber||''),professionalTitle:String(p.professionalTitle||''),photo:String(p.photo||''),signature:String(p.signature||''),signatureUpdatedAt:String(p.signatureUpdatedAt||''),uiTheme:String(p.uiTheme||''),preferences:p.preferences&&typeof p.preferences==='object'?p.preferences:{}
 }}
-function publicUser(u:any,role?:string){return{username:String(u?.username||''),name:String(u?.name||u?.username||''),role:String(role||u?.default_role||'medico'),email:String(u?.email||''),...cleanProfile(u?.profile||{}),active:u?.active!==false,isGlobalAdmin:!!u?.is_global_admin,mustChangePassword:!!u?.must_change_password,createdAt:u?.created_at||'',updatedAt:u?.updated_at||''}}
+function publicUser(u:any,role?:string){return{username:String(u?.username||''),name:String(u?.name||u?.username||''),role:String(role||u?.default_role||'medico'),email:String(u?.email||''),...cleanProfile(u?.profile||{}),loginAlias:u?.login_alias||'',professionalAccount:!!u?.professional_registration,active:u?.active!==false,isGlobalAdmin:!!u?.is_global_admin,mustChangePassword:!!u?.must_change_password,createdAt:u?.created_at||'',updatedAt:u?.updated_at||''}}
+
+const check322=(r:any)=>{if(r.error)throw r.error;return r.data;};
+async function lookup322(c:any,q:string){
+ const normalized=q.trim().toLowerCase();
+ if(/^[a-z][a-z0-9_.-]{2,79}$/.test(normalized)){const alias=check322(await c.from('hc_auth_users').select('*').eq('login_alias',normalized).maybeSingle());if(alias)return alias;}
+ const {data,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();if(error)throw error;
+ if(data?.login_alias)throw Error('Usuario o contraseña incorrectos.');return data;
+}
 
 Deno.serve(async(req:Request)=>{
   if(req.method==='OPTIONS')return new Response('ok',{headers:CORS});
@@ -47,8 +55,8 @@ Deno.serve(async(req:Request)=>{
     if(q.toLowerCase()==='admin')throw new Error('El admin semilla es una herramienta local. Ingresá con admin/admin y vinculá este equipo a una institución.');
     const c=db();
     const t0=performance.now();
-    const {data:user,error}=await c.from('hc_auth_users').select('*').ilike('username',q.replace(/[\\%_]/g,c=>'\\'+c)).limit(1).maybeSingle();
-    if(error)throw error;if(!user||user.active===false)throw new Error('Usuario o contraseña incorrectos.');
+    const user=await lookup322(c,q);
+    if(!user||user.active===false)throw new Error('Usuario o contraseña incorrectos.');
     if(!user.password_hash||!user.password_salt)throw new Error('La cuenta todavía no tiene credenciales Supabase migradas.');
     const t1=performance.now();
     const got=await derive(password,String(user.password_salt),Number(user.password_iterations||210000));
@@ -67,7 +75,7 @@ Deno.serve(async(req:Request)=>{
       institutions=(membershipsResult.data||[]).filter((i:any)=>i.active!==false).map((i:any)=>({id:String(i.id),name:String(i.name||i.display_name||i.id),displayName:String(i.display_name||''),description:String(i.description||''),role:'superadmin',dataInstitutionId:String(i.data_institution_id||i.id),active:true,logoData:String(i.logo_data||'')}));
     }else{
       institutions=(membershipsResult.data||[]).filter((x:any)=>x.hc_auth_institutions?.active!==false).map((x:any)=>({id:String(x.institution_id),name:String(x.hc_auth_institutions?.name||x.institution_id),displayName:String(x.hc_auth_institutions?.display_name||''),description:String(x.hc_auth_institutions?.description||''),role:String(x.role||user.default_role||'medico'),dataInstitutionId:String(x.hc_auth_institutions?.data_institution_id||x.institution_id),active:true,logoData:String(x.hc_auth_institutions?.logo_data||'')}));
-      if(!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia'].includes(user.default_role)&&!institutions.length)throw new Error('La cuenta no tiene instituciones habilitadas.');
+      if(!['cliente','medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia','farmaceutico'].includes(user.default_role)&&!institutions.length)throw new Error('La cuenta no tiene instituciones habilitadas.');
     }
     const t3=performance.now();
     return reply({ok:true,token,expiresAt:expires.toISOString(),user:publicUser(user),institutions,migrated:false,loginPath:'fast-v1',timingMs:{lookup:Math.round(t1-t0),password:Math.round(t2-t1),sessionAndMemberships:Math.round(t3-t2),total:Math.round(performance.now()-started)}});

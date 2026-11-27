@@ -1,0 +1,38 @@
+name: Publish Hospitalito v322
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v322.yml'
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct validated release
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected=9adba215edf440860cd69a50b65dafb64e0c12cd
+          if [ "$(git hash-object index.html)" = "$expected" ] && [ -f Hospitalito_v322.html ]; then exit 0; fi
+          test "$(git hash-object index.html)" = 156ba3aa921741ccca6359dcd29fb4244f0dede7
+          base64 -d .hospitalito/v322.patch.b64 | gzip -d > /tmp/v322.patch
+          git apply --check /tmp/v322.patch
+          git apply /tmp/v322.patch
+          test "$(git hash-object index.html)" = "$expected"
+          cp index.html Hospitalito_v322.html
+          node <<'NODE'
+          const fs=require('fs'), vm=require('vm');
+          const html=fs.readFileSync('index.html','utf8');
+          const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)].filter(m=>!m[1].includes('src='));
+          scripts.forEach(m=>new vm.Script(m[2]));
+          if(scripts.length!==71)throw Error('Unexpected script count');
+          console.log('Validated',scripts.length,'inline scripts');
+          NODE
+          git config user.name 'Hospitalito releases'
+          git config user.email 'actions@users.noreply.github.com'
+          git add index.html Hospitalito_v322.html
+          git commit -m 'Hospitalito v322: registro profesional, accesos, traslados y cámara'
+          git push origin HEAD:main

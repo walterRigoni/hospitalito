@@ -1,4 +1,4 @@
-export const roles=['medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia'];
+export const roles=['medico','enfermero','kinesiologo','nutricionista','bioquimico','microbiologo','imagenologo','hemoterapia','farmaceutico'];
 export const str=(v:unknown,n=500)=>String(v??'').trim().slice(0,n);
 export function integer(v:unknown,min:number,max:number){const n=Number(v);if(!Number.isSafeInteger(n)||n<min||n>max)throw Error('Número fuera del rango permitido');return n;}
 export function split(amount:number,bps:number){integer(amount,100,100000000);integer(bps,1,9999);const platform=Math.round(amount*bps/10000);if(platform<1||platform>=amount)throw Error('Comisión incompatible con el precio');return {amount_cents:amount,platform_cents:platform,provider_cents:amount-platform};}
